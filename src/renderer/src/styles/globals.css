@@ -1,0 +1,65 @@
+:root {
+  --cream:   #F4EFE4;
+  --cream-d: #EDE8DC;
+  --cream-dd:#E6E0D3;
+  --ink:     #1A1612;
+  --ox:      #6B2424;
+  --slate:   #5A5751;
+  --line:    rgba(26,22,18,0.10);
+  --line-m:  rgba(26,22,18,0.18);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #272320;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Window shell ---- */
+
+.app-window {
+  width: 100%;
+  height: 100%;
+  background: var(--cream);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Paper grain overlay */
+.app-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.055;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 400px 400px;
+}
+
+/* Edge aging shadow */
+.app-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 101;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px rgba(60,35,10,0.10);
+}
