@@ -5,7 +5,7 @@ import type { ParsedText } from './ingest/text'
 
 const CHUNK_CHARS = 2048  // ≈512 tokens
 const OVERLAP_CHARS = 256 // ≈64 tokens
-const PARSER_VERSION = '1' as const
+export const PARSER_VERSION = '2' as const  // bump when parse/chunk logic changes to force re-index
 
 export type Chunk = {
   id: string

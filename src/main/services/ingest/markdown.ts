@@ -17,7 +17,9 @@ export function parseMarkdown(content: string): MarkdownSection[] {
       if (currentBody.join('').trim()) {
         sections.push({
           headingAnchor: currentHeading,
-          text: currentBody.join('\n').trim(),
+          // Prepend the heading so embeddings capture section context ("What Claude is here for"
+          // must be in the text or queries referencing the heading won't match the chunk).
+          text: (currentHeading ? currentHeading + '\n\n' : '') + currentBody.join('\n').trim(),
           lineNumber: headingLine
         })
       }
@@ -32,7 +34,7 @@ export function parseMarkdown(content: string): MarkdownSection[] {
   if (currentBody.join('').trim()) {
     sections.push({
       headingAnchor: currentHeading,
-      text: currentBody.join('\n').trim(),
+      text: (currentHeading ? currentHeading + '\n\n' : '') + currentBody.join('\n').trim(),
       lineNumber: headingLine
     })
   }

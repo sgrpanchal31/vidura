@@ -4,7 +4,7 @@ import { scanFolder, hashFile } from './scanner'
 import { parsePdf } from './ingest/pdf'
 import { parseMarkdown } from './ingest/markdown'
 import { parseText } from './ingest/text'
-import { chunkPdf, chunkMarkdown, chunkText, type Chunk } from './chunker'
+import { chunkPdf, chunkMarkdown, chunkText, PARSER_VERSION, type Chunk } from './chunker'
 import { readState, writeState, type NotebookState } from './state'
 import { embedService } from './embed'
 import { vectorStore } from './store'
@@ -64,7 +64,8 @@ export async function indexFolder(
     const relPath = relative(folderPath, file.path)
     const existing = state.files[relPath]
     const alreadyEmbedded = existing?.embeddingModel === EMBEDDING_MODEL
-    if (existing && existing.hash === hash && !existing.failed && alreadyEmbedded) {
+    const currentParser = existing?.parserVersion === PARSER_VERSION
+    if (existing && existing.hash === hash && !existing.failed && alreadyEmbedded && currentParser) {
       unchanged.push(relPath)
     } else {
       toIndex.push({ path: file.path, ext: file.ext, hash, relPath })
@@ -108,7 +109,8 @@ export async function indexFolder(
         relativePath: relPath,
         hash,
         lastIndexed: Date.now(),
-        chunkCount: chunks.length
+        chunkCount: chunks.length,
+        parserVersion: PARSER_VERSION,
       }
     } catch (err) {
       failCount++

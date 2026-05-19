@@ -25,9 +25,10 @@ function buildSystemPrompt(chunks: SearchResult[]): string {
     .map((c, i) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
       const loc = c.pageNumber ? ` p.${c.pageNumber}` : c.lineNumber ? ` L${c.lineNumber}` : ''
+      const heading = c.headingAnchor ? ` § ${c.headingAnchor.replace(/^#+\s*/, '')}` : ''
       const text = c.text.trim().slice(0, CHUNK_PROMPT_CHARS)
       const ellipsis = c.text.trim().length > CHUNK_PROMPT_CHARS ? '…' : ''
-      return `[${i + 1}] From ${filename}${loc}:\n${text}${ellipsis}`
+      return `[${i + 1}] From ${filename}${loc}${heading}:\n${text}${ellipsis}`
     })
     .join('\n\n')
 
