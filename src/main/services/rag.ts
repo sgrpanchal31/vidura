@@ -5,11 +5,10 @@ import { llamaService } from './inference'
 
 const RETRIEVE_TOP_K = 5
 
-// Each retrieved chunk may be up to 2048 chars (~512 tokens). In a 4096-token
-// context window, pasting 8 full chunks leaves no room for the model to generate.
-// We truncate to ~500 chars per chunk in the prompt (~125 tokens), keeping
-// ~3000 tokens of the context window free for the model's response.
-const CHUNK_PROMPT_CHARS = 500
+// Each retrieved chunk may be up to 2048 chars (~512 tokens). We truncate to
+// ~800 chars (~200 tokens) in the prompt so 5 sources ≈ 1000 tokens input,
+// leaving ~3000 tokens of the 4096-token context free for the model's response.
+const CHUNK_PROMPT_CHARS = 800
 
 export type CitationEntry = {
   sourceNum: number    // the [N] number the model used in the answer
@@ -24,18 +23,20 @@ export type RagResult = {
 function buildSystemPrompt(chunks: SearchResult[]): string {
   const sources = chunks
     .map((c, i) => {
+      const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
+      const loc = c.pageNumber ? ` p.${c.pageNumber}` : c.lineNumber ? ` L${c.lineNumber}` : ''
       const text = c.text.trim().slice(0, CHUNK_PROMPT_CHARS)
       const ellipsis = c.text.trim().length > CHUNK_PROMPT_CHARS ? '…' : ''
-      return `[${i + 1}] ${text}${ellipsis}`
+      return `[${i + 1}] From ${filename}${loc}:\n${text}${ellipsis}`
     })
     .join('\n\n')
 
-  return `You are a research assistant. Answer the question using ONLY the numbered sources below.
-Cite every fact with its source number like [1] or [2]. Multiple citations like [1][3] are fine.
-If the answer is not in the sources, say: "I couldn't find that in the provided sources."
-Write complete sentences. No preamble.
+  return `You are a research assistant. Use the document excerpts below to answer the question.
+Cite every fact with its source number like [1] or [2].
+For broad questions, synthesize what you can from the available excerpts — do not refuse just because the excerpts are partial.
+Only say "I couldn't find that in the provided sources." if truly nothing in the excerpts is relevant.
+Write complete sentences. No preamble, no "Sure!".
 
-Sources:
 ${sources}`
 }
 
