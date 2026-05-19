@@ -43,9 +43,14 @@ export type ModelProgress = {
   total: number
 }
 
+export type CitationEntry = {
+  sourceNum: number
+  chunk: SearchResult
+}
+
 export type ChatResult = {
   answer: string
-  citations: SearchResult[]
+  citations: CitationEntry[]
 }
 
 const api = {

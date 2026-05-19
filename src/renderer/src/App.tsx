@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Onboarding from './screens/Onboarding'
 import './styles/globals.css'
-import type { IndexProgress, IndexSummary, ModelProgress, ChatResult, SearchResult } from '../../preload'
+import type { IndexProgress, IndexSummary, ModelProgress, ChatResult, CitationEntry } from '../../preload'
 
 type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready'
 
@@ -242,7 +242,7 @@ export default function App() {
 
   if (screen === 'ready' && notebookFolder && modelId) {
     const displayText = streamedTokens || chatResult?.answer || ''
-    const citations: SearchResult[] = chatResult?.citations ?? []
+    const citations: CitationEntry[] = chatResult?.citations ?? []
 
     return (
       <div className="app-window">
@@ -316,10 +316,10 @@ export default function App() {
               <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--slate)', marginBottom: '8px' }}>
                 Sources cited
               </div>
-              {citations.map((c, i) => (
-                <div key={c.id} style={{ fontSize: '11px', color: 'var(--slate)', marginBottom: '4px' }}>
-                  <span style={{ fontFamily: "'Source Serif 4', serif", color: 'var(--ox)', marginRight: '6px' }}>[{i + 1}]</span>
-                  {c.sourceFile.split('/').pop()} {c.pageNumber ? `p.${c.pageNumber}` : c.lineNumber ? `L${c.lineNumber}` : ''}
+              {citations.map(({ sourceNum, chunk }) => (
+                <div key={chunk.id} style={{ fontSize: '11px', color: 'var(--slate)', marginBottom: '4px' }}>
+                  <span style={{ fontFamily: "'Source Serif 4', serif", color: 'var(--ox)', marginRight: '6px' }}>[{sourceNum}]</span>
+                  {chunk.sourceFile.split('/').pop()} {chunk.pageNumber ? `p.${chunk.pageNumber}` : chunk.lineNumber ? `L${chunk.lineNumber}` : ''}
                 </div>
               ))}
             </div>
