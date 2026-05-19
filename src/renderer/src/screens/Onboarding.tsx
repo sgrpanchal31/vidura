@@ -12,9 +12,9 @@ type Model = {
 const MODELS: Model[] = [
   {
     id: 'gemma2-2b',
-    name: 'Gemma 2 2B',
+    name: 'Qwen 2.5 1.5B',
     desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
-    size: '1.6 GB',
+    size: '1.0 GB',
     minRamGB: 0
   },
   {

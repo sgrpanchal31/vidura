@@ -207,8 +207,16 @@ export default function App() {
             {modelLoadStage === 'load' ? 'Loading model' : 'Downloading model'}
           </span>
           {modelPrepError ? (
-            <div style={{ color: '#a03030', fontSize: '12px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              {modelPrepError}
+            <div>
+              <div style={{ color: '#a03030', fontSize: '12px', fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: '16px' }}>
+                {modelPrepError}
+              </div>
+              <button
+                onClick={() => modelId && startModelPrep(modelId)}
+                style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}
+              >
+                Retry
+              </button>
             </div>
           ) : (
             <>

@@ -115,7 +115,7 @@ ipcMain.handle('search:query', async (_event, query: string, topK?: number) => {
 
 // ── Model management ──────────────────────────────────────────────────────────
 
-ipcMain.handle('model:isDownloaded', (_event, modelId: string) => {
+ipcMain.handle('model:isDownloaded', async (_event, modelId: string) => {
   return isModelDownloaded(modelId)
 })
 

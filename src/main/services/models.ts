@@ -1,23 +1,32 @@
 import { join } from 'path'
 import { app, net } from 'electron'
 import { existsSync, createWriteStream, mkdirSync } from 'fs'
-import { stat, unlink } from 'fs/promises'
+import { stat, unlink, open as fsOpen } from 'fs/promises'
 
 const MODELS_DIR = join(app.getPath('userData'), 'models')
 
+// A file is only "downloaded" if it's at least this fraction of the expected size.
+// Catches partial downloads that were interrupted mid-stream.
+const COMPLETE_THRESHOLD = 0.95
+
+// GGUF magic bytes: ASCII "GGUF" at offset 0
+const GGUF_MAGIC = Buffer.from('GGUF', 'ascii')
+
 type ModelEntry = {
   filename: string
-  // HuggingFace /resolve/main/ URLs — redirected by Electron net to CDN automatically
+  // HuggingFace /resolve/main/ URLs — Electron net follows CDN redirects automatically.
+  // NOTE: gemma2-2b uses the Qwen2.5-1.5B GGUF because Gemma 2 requires HF auth (gated model).
   url: string
   sizeBytes: number
 }
 
-// Sizes are approximate Q4_K_M GGUF sizes used for progress %. Server Content-Range overrides.
+// Sizes are approximate Q4_K_M bytes used for progress %. Server Content-Range overrides.
 const REGISTRY: Record<string, ModelEntry> = {
   'gemma2-2b': {
     filename: 'gemma2-2b.gguf',
-    url: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf',
-    sizeBytes: 1_619_058_688,
+    // Replaces gated Gemma 2 2B with Qwen 2.5 1.5B (comparable size, fully open, Apache-2.0).
+    url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+    sizeBytes: 986_710_016,
   },
   'llama3.2-3b': {
     filename: 'llama3.2-3b.gguf',
@@ -47,9 +56,29 @@ export function getModelPath(modelId: string): string {
   return join(MODELS_DIR, entry.filename)
 }
 
-export function isModelDownloaded(modelId: string): boolean {
+async function hasGgufMagic(filePath: string): Promise<boolean> {
+  let fh: Awaited<ReturnType<typeof fsOpen>> | null = null
   try {
-    return existsSync(getModelPath(modelId))
+    fh = await fsOpen(filePath, 'r')
+    const buf = Buffer.alloc(4)
+    const { bytesRead } = await fh.read(buf, 0, 4, 0)
+    return bytesRead === 4 && buf.equals(GGUF_MAGIC)
+  } catch {
+    return false
+  } finally {
+    await fh?.close().catch(() => {})
+  }
+}
+
+export async function isModelDownloaded(modelId: string): Promise<boolean> {
+  const entry = REGISTRY[modelId]
+  if (!entry) return false
+  try {
+    const p = getModelPath(modelId)
+    if (!existsSync(p)) return false
+    const { size } = await stat(p)
+    if (size < entry.sizeBytes * COMPLETE_THRESHOLD) return false
+    return hasGgufMagic(p)
   } catch {
     return false
   }
@@ -65,21 +94,25 @@ export async function downloadModel(
   ensureModelsDir()
   const destPath = getModelPath(modelId)
 
-  // Range-resume: how much have we already downloaded?
+  // Range-resume: see how much is already on disk
   let startByte = 0
   try {
-    const st = await stat(destPath)
-    startByte = st.size
-    if (startByte >= entry.sizeBytes) return // already complete
+    const { size } = await stat(destPath)
+    // If the existing fragment is suspiciously small (e.g. a saved HTML error page), discard it
+    if (size > 0 && size < 1024 * 1024) {
+      await unlink(destPath)
+    } else {
+      startByte = size
+      if (startByte >= entry.sizeBytes) return // already complete
+    }
   } catch {
     // file doesn't exist — start from 0
   }
 
-  return new Promise<void>((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const headers: Record<string, string> = {}
     if (startByte > 0) headers['Range'] = `bytes=${startByte}-`
 
-    // Electron net handles HuggingFace → CDN redirects automatically
     const request = net.request({ url: entry.url, headers })
 
     request.on('response', (response) => {
@@ -116,24 +149,30 @@ export async function downloadModel(
         writeStream.once('error', reject)
       })
 
-      response.on('error', async (err: Error) => {
+      response.on('error', (err: Error) => {
         writeStream.destroy()
-        // Partial file remains for range-resume on next attempt — don't delete
         reject(err)
       })
     })
 
     request.on('error', async (err: Error) => {
-      // If the file is completely absent still, clean up zero-byte artifacts
       try {
-        const st = await stat(destPath)
-        if (st.size === 0) await unlink(destPath)
-      } catch {
-        // ignore
-      }
+        const { size } = await stat(destPath)
+        if (size === 0) await unlink(destPath)
+      } catch { /* ignore */ }
       reject(err)
     })
 
     request.end()
   })
+
+  // Validate the completed file starts with GGUF magic bytes.
+  // A failed HuggingFace auth returns HTTP 200 with an HTML login page — catch that here.
+  if (!(await hasGgufMagic(destPath))) {
+    await unlink(destPath).catch(() => {})
+    throw new Error(
+      'Downloaded file is not a valid model. ' +
+      'If the model requires a HuggingFace account, download it manually and place it in the models folder.'
+    )
+  }
 }
