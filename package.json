@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "preview": "electron-vite preview"
+    "preview": "electron-vite preview",
+    "postinstall": "electron-rebuild -f -w @lancedb/lancedb"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -20,5 +21,12 @@
     "react-dom": "^18.3.1",
     "typescript": "^5.5.4",
     "vite": "^5.4.6"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@lancedb/lancedb": "^0.27.2",
+    "apache-arrow": "^18.1.0",
+    "node-llama-cpp": "^3.18.1",
+    "pdfjs-dist": "^5.7.284"
   }
 }

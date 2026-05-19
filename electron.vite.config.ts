@@ -4,7 +4,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          'workers/embed.worker': resolve('src/main/workers/embed.worker.ts')
+        }
+      }
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin()]
