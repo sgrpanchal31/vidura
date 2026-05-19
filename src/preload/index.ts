@@ -5,6 +5,22 @@ export type Prefs = {
   modelId: string | null
 }
 
+export type FileRecord = {
+  relativePath: string
+  hash: string
+  lastIndexed: number
+  chunkCount: number
+  embeddingModel?: string
+  parserVersion?: string
+  failed?: boolean
+  failReason?: string
+}
+
+export type NotebookState = {
+  version: 1
+  files: Record<string, FileRecord>
+}
+
 export type SystemInfo = {
   totalRamGB: number
   platform: NodeJS.Platform
@@ -67,7 +83,7 @@ const api = {
   // ── Ingest ──────────────────────────────────────────────────────────────────
   startIngest: (folderPath: string): Promise<IndexSummary> =>
     ipcRenderer.invoke('ingest:start', folderPath),
-  getIngestState: (folderPath: string): Promise<unknown> =>
+  getIngestState: (folderPath: string): Promise<NotebookState> =>
     ipcRenderer.invoke('ingest:getState', folderPath),
   onIngestProgress: (cb: (p: IndexProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: IndexProgress) => cb(p)
@@ -115,6 +131,9 @@ const api = {
     ipcRenderer.on('chat:error', handler)
     return () => ipcRenderer.off('chat:error', handler)
   },
+
+  setWindowSize: (width: number, height: number): Promise<void> =>
+    ipcRenderer.invoke('window:setSize', width, height),
 }
 
 if (process.contextIsolated) {

@@ -87,8 +87,26 @@ export async function ragQuery(
   }
 
   const systemPrompt = buildSystemPrompt(chunks)
-  const answer = await llamaService.generateStream(systemPrompt, question, onToken)
-  const citations = extractCitations(answer, chunks)
+  const rawAnswer = await llamaService.generateStream(systemPrompt, question, onToken)
+  const rawCitations = extractCitations(rawAnswer, chunks)
+
+  // Remap [4] → [1] etc. so the UI always shows sequential citation numbers
+  // starting from 1 regardless of which retrieval slot the model happened to cite.
+  const remap = new Map<number, number>()
+  let next = 1
+  rawAnswer.replace(/\[(\d+)\]/g, (_, n) => {
+    const num = parseInt(n, 10)
+    if (rawCitations.some(c => c.sourceNum === num) && !remap.has(num)) remap.set(num, next++)
+    return ''
+  })
+  const answer = rawAnswer.replace(/\[(\d+)\]/g, (orig, n) => {
+    const d = remap.get(parseInt(n, 10))
+    return d !== undefined ? `[${d}]` : orig
+  })
+  const citations = rawCitations
+    .filter(c => remap.has(c.sourceNum))
+    .map(c => ({ ...c, sourceNum: remap.get(c.sourceNum)! }))
+    .sort((a, b) => a.sourceNum - b.sourceNum)
 
   return { answer, citations }
 }

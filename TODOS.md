@@ -16,6 +16,12 @@
 
 ## v1.1 (after v1.0 launches)
 
+### TODO-4: Selectable files in sources panel
+**What:** Allow the user to check/uncheck individual files (or folders) in the sources panel to scope a query to a subset of sources. RAG retrieval would filter the vector store to only the selected files' chunks before returning results.
+**Why:** Power users often want to ask questions across specific papers only, not the entire notebook. Implementing this requires LanceDB filter expressions (`WHERE sourceFile IN (...)`) which the current `search()` method doesn't yet accept.
+**Where to start:** `src/renderer/src/screens/Chat.tsx` (checkbox UI per source-file row). `src/main/services/store.ts` `search()` — add optional `allowedPaths: string[]` param that injects a LanceDB filter. Wire through `rag.ts` and IPC.
+**Depends on:** v1.0 shipped and stable.
+
 ### TODO-3: PDF source panel with real page rendering
 **What:** Upgrade the source panel from "display extracted text" (v1) to rendering the actual PDF page with a highlight box over the matched passage.
 **Why:** This is what NotebookLM does. V1 shows extracted text (readable but unformatted). V1.1 shows the actual PDF page.

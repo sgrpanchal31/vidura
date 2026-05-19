@@ -151,6 +151,12 @@ ipcMain.handle('chat:cancel', () => {
   llamaService.cancel()
 })
 
+ipcMain.handle('window:setSize', (_event, width: number, height: number) => {
+  if (!mainWindow) return
+  mainWindow.setSize(width, height, true)
+  mainWindow.center()
+})
+
 app.whenReady().then(() => {
   createWindow()
 
