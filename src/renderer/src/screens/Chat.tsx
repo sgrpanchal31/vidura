@@ -22,6 +22,7 @@ type TreeNode =
 type ChatProps = {
   folder: string
   modelId: string
+  onChangeFolder: () => void
 }
 
 const MODEL_LABELS: Record<string, string> = {
@@ -210,7 +211,7 @@ function renderMarkdown(
   return <>{elements}</>
 }
 
-export default function Chat({ folder, modelId }: ChatProps) {
+export default function Chat({ folder, modelId, onChangeFolder }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -221,6 +222,7 @@ export default function Chat({ folder, modelId }: ChatProps) {
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesListRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const unsubsRef = useRef<Array<() => void>>([])
 
@@ -244,7 +246,8 @@ export default function Chat({ folder, modelId }: ChatProps) {
   }, [folder])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = messagesListRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messages, streamBuffer])
 
   function toggleDir(path: string) {
@@ -345,6 +348,13 @@ export default function Chat({ folder, modelId }: ChatProps) {
       <div className="chat-titlebar">
         <div className="chat-titlebar-center">
           <span className="chat-folder-name">{folderName}</span>
+          <button
+            className="chat-change-folder-btn"
+            onClick={onChangeFolder}
+            disabled={isGenerating}
+          >
+            Change
+          </button>
           {sources.length > 0 && (
             <span className="chat-source-count">{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
           )}
@@ -373,7 +383,7 @@ export default function Chat({ folder, modelId }: ChatProps) {
         <div className="chat-main">
 
           {hasMessages ? (
-            <div className="messages-list">
+            <div className="messages-list" ref={messagesListRef}>
               {messages.map(msg => (
                 <div key={msg.id} className={`message message-${msg.role}`}>
                   <div className="message-bubble">
