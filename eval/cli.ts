@@ -19,11 +19,13 @@ import { loadLongMemEval } from './datasets/longmemeval/loader'
 // variant flag for longmemeval: 'oracle' (15MB, quick dev), 's' (278MB, real benchmark)
 import { runEval } from './harness/runner'
 import { baseline } from './techniques/baseline'
+import { structured } from './techniques/structured'
 import type { RetrievalTechnique } from './harness/types'
 import { join } from 'path'
 
 const TECHNIQUES: Record<string, RetrievalTechnique> = {
   baseline,
+  structured,
   // Add more here as Phase 3 progresses:
   // rerank: rerank,
   // 'hybrid-rrf': hybridRRF,

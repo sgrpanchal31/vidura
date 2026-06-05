@@ -63,14 +63,20 @@ export type IndexSummary = {
 
 export type SearchResult = {
   id: string
-  text: string
+  text: string           // child chunk — what was matched
+  parentText: string     // parent unit — shown to the LLM for context
+  parentId: string
   sourceFile: string
   chunkIndex: number
   pageNumber?: number
   headingAnchor?: string
+  headingPath?: string
   lineNumber?: number
   score: number
 }
+
+export type GenerateTask = 'overview' | 'podcast' | 'facts'
+export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
 
 export type ModelProgress = {
   modelId: string
@@ -100,6 +106,8 @@ const api = {
     ipcRenderer.invoke('system:info'),
 
   // ── Ingest ──────────────────────────────────────────────────────────────────
+  getParserVersion: (): Promise<string> =>
+    ipcRenderer.invoke('ingest:parserVersion'),
   startIngest: (folderPath: string, embeddingModel?: string): Promise<IndexSummary> =>
     ipcRenderer.invoke('ingest:start', folderPath, embeddingModel),
   getIngestState: (folderPath: string): Promise<NotebookState> =>
@@ -174,6 +182,28 @@ const api = {
 
   setWindowSize: (width: number, height: number): Promise<void> =>
     ipcRenderer.invoke('window:setSize', width, height),
+
+  // ── Generation (map-reduce over full corpus) ─────────────────────────────
+  // generateRun resolves immediately; tokens arrive via onGenerateToken, completion via onGenerateDone
+  generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat): Promise<void> =>
+    ipcRenderer.invoke('generate:run', folderPath, modelId, task, format),
+  generateCancel: (): Promise<void> =>
+    ipcRenderer.invoke('chat:cancel'),  // reuses the same LlamaService cancel
+  onGenerateToken: (cb: (token: string) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
+    ipcRenderer.on('generate:token', handler)
+    return () => ipcRenderer.off('generate:token', handler)
+  },
+  onGenerateDone: (cb: (result: string) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, result: string) => cb(result)
+    ipcRenderer.on('generate:done', handler)
+    return () => ipcRenderer.off('generate:done', handler)
+  },
+  onGenerateError: (cb: (message: string) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, message: string) => cb(message)
+    ipcRenderer.on('generate:error', handler)
+    return () => ipcRenderer.off('generate:error', handler)
+  },
 }
 
 if (process.contextIsolated) {

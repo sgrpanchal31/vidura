@@ -15,11 +15,14 @@ export type VectorStoreOptions = {
 
 export type SearchResult = {
   id: string
-  text: string
+  text: string           // child chunk — what was matched
+  parentText: string     // parent unit — shown to the LLM for context
+  parentId: string       // shared across siblings from the same parent
   sourceFile: string
   chunkIndex: number
   pageNumber: number | undefined
   headingAnchor: string | undefined
+  headingPath: string | undefined
   lineNumber: number | undefined
   score: number
 }
@@ -29,11 +32,14 @@ function makeSchema(dim: number): Schema {
     new Field('id', new Utf8(), false),
     new Field('vector', new FixedSizeList(dim, new Field('item', new Float32(), false)), false),
     new Field('text', new Utf8(), false),
+    new Field('parentText', new Utf8(), false),
+    new Field('parentId', new Utf8(), false),
     new Field('sourceFile', new Utf8(), false),
     new Field('chunkIndex', new Int32(), false),
     new Field('parserVersion', new Utf8(), false),
     new Field('pageNumber', new Int32(), true),
     new Field('headingAnchor', new Utf8(), true),
+    new Field('headingPath', new Utf8(), true),
     new Field('lineNumber', new Int32(), true),
   ])
 }
@@ -61,8 +67,9 @@ export class VectorStore {
       const tblSchema = await tbl.schema()
       const vecField = tblSchema.fields.find(f => f.name === 'vector')
       const storedDim: number | undefined = (vecField?.type as any)?.listSize
-      if (storedDim !== undefined && storedDim !== dim) {
-        // Embedding model changed — dimension mismatch; drop and recreate
+      // Drop and recreate if embedding dimension changed or schema is missing new fields
+      const hasParentText = tblSchema.fields.some(f => f.name === 'parentText')
+      if ((storedDim !== undefined && storedDim !== dim) || !hasParentText) {
         await this.db.dropTable(TABLE_NAME)
         this.table = await this.db.createEmptyTable(TABLE_NAME, schema)
       } else {
@@ -89,11 +96,14 @@ export class VectorStore {
       id: c.id,
       vector: vectors[i],
       text: c.text,
+      parentText: c.parentText,
+      parentId: c.parentId,
       sourceFile: c.sourceFile,
       chunkIndex: c.chunkIndex,
       parserVersion: c.parserVersion,
       pageNumber: c.pageNumber ?? null,
       headingAnchor: c.headingAnchor ?? null,
+      headingPath: c.headingPath ?? null,
       lineNumber: c.lineNumber ?? null,
     }))
 
@@ -118,17 +128,19 @@ export class VectorStore {
         .limit(topK)
         .toArray()
     } catch {
-      // Table is empty or index not yet built — return nothing
       return []
     }
 
     return rows.map((row) => ({
       id: row.id as string,
       text: row.text as string,
+      parentText: row.parentText as string,
+      parentId: row.parentId as string,
       sourceFile: row.sourceFile as string,
       chunkIndex: row.chunkIndex as number,
       pageNumber: row.pageNumber ?? undefined,
       headingAnchor: row.headingAnchor ?? undefined,
+      headingPath: row.headingPath ?? undefined,
       lineNumber: row.lineNumber ?? undefined,
       // LanceDB cosine distance: 0 = identical, 2 = opposite; convert to [0,1] similarity
       score: Math.max(0, 1 - (row._distance ?? 1)),

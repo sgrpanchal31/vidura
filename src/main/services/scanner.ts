@@ -3,7 +3,11 @@ import { join, extname } from 'path'
 import { createReadStream } from 'fs'
 import { createHash } from 'crypto'
 
-const SUPPORTED_EXTS = new Set(['.pdf', '.md', '.txt'])
+const SUPPORTED_EXTS = new Set([
+  '.pdf', '.md', '.txt',
+  // Code files — indexed via tree-sitter, falling back to text chunking if grammar unavailable
+  '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb',
+])
 const IGNORED_DIRS = new Set(['.openbook', '.git', '.obsidian', 'node_modules'])
 const MAX_FILE_BYTES = 50 * 1024 * 1024
 

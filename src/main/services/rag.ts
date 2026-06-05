@@ -4,7 +4,9 @@ import type { SearchResult } from './store'
 import { llamaService } from './inference'
 import { DEFAULT_EMBED, embedDim } from './embed-models'
 
-const RETRIEVE_TOP_K = 5
+// Retrieve more child chunks than we'll show, then collapse to unique parents.
+const RETRIEVE_TOP_K = 8
+const MAX_UNIQUE_PARENTS = 5
 
 // Qwen3-Embedding is an asymmetric retrieval model: queries must be prefixed with
 // a task instruction, while document chunks are embedded as-is.
@@ -12,10 +14,10 @@ function formatQueryForEmbed(question: string): string {
   return `Instruct: Given a question, retrieve passages from the user's documents that answer it\nQuery: ${question}`
 }
 
-// Each retrieved chunk may be up to 2048 chars (~512 tokens). We truncate to
-// ~800 chars (~200 tokens) in the prompt so 5 sources ≈ 1000 tokens input,
-// leaving ~3000 tokens of the 4096-token context free for the model's response.
-const CHUNK_PROMPT_CHARS = 800
+// Parent text can be up to PARENT_MAX_CHARS (~6000 chars). Show up to 1500 chars
+// in the prompt; 5 sources × 1500 ≈ 7500 chars ≈ 1875 tokens of source material,
+// leaving ~2000 tokens of the 4096-token context for the model's response.
+const PARENT_PROMPT_CHARS = 1500
 
 export type CitationEntry = {
   sourceNum: number    // the [N] number the model used in the answer
@@ -27,14 +29,29 @@ export type RagResult = {
   citations: CitationEntry[]
 }
 
-function buildSystemPrompt(chunks: SearchResult[]): string {
-  const sources = chunks
+// Collapse child chunks to unique parents, keeping the highest-scoring child per parent.
+// Chunks arrive ordered best-score-first, so the first occurrence of each parentId is best.
+function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
+  const seen = new Map<string, SearchResult>()
+  for (const c of chunks) {
+    if (!seen.has(c.parentId)) seen.set(c.parentId, c)
+  }
+  return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
+}
+
+function buildSystemPrompt(parents: SearchResult[]): string {
+  const sources = parents
     .map((c, i) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
       const loc = c.pageNumber ? ` p.${c.pageNumber}` : c.lineNumber ? ` L${c.lineNumber}` : ''
-      const heading = c.headingAnchor ? ` § ${c.headingAnchor.replace(/^#+\s*/, '')}` : ''
-      const text = c.text.trim().slice(0, CHUNK_PROMPT_CHARS)
-      const ellipsis = c.text.trim().length > CHUNK_PROMPT_CHARS ? '…' : ''
+      // Prefer rich headingPath breadcrumb; fall back to raw headingAnchor
+      const heading = c.headingPath
+        ? ` § ${c.headingPath}`
+        : c.headingAnchor
+          ? ` § ${c.headingAnchor.replace(/^#+\s*/, '')}`
+          : ''
+      const text = c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)
+      const ellipsis = c.parentText.trim().length > PARENT_PROMPT_CHARS ? '…' : ''
       return `[${i + 1}] From ${filename}${loc}${heading}:\n${text}${ellipsis}`
     })
     .join('\n\n')
@@ -48,15 +65,15 @@ Write complete sentences. No preamble, no "Sure!".
 ${sources}`
 }
 
-function extractCitations(answer: string, chunks: SearchResult[]): CitationEntry[] {
+function extractCitations(answer: string, parents: SearchResult[]): CitationEntry[] {
   const seen = new Map<number, CitationEntry>()  // sourceNum → entry (preserves order)
   const pattern = /\[(\d+)\]/g
   let match: RegExpExecArray | null
 
   while ((match = pattern.exec(answer)) !== null) {
     const sourceNum = parseInt(match[1], 10)
-    if (sourceNum >= 1 && sourceNum <= chunks.length && !seen.has(sourceNum)) {
-      seen.set(sourceNum, { sourceNum, chunk: chunks[sourceNum - 1] })
+    if (sourceNum >= 1 && sourceNum <= parents.length && !seen.has(sourceNum)) {
+      seen.set(sourceNum, { sourceNum, chunk: parents[sourceNum - 1] })
     }
   }
 
@@ -86,24 +103,24 @@ export async function ragQuery(
   modelId: string,
   onToken: (token: string) => void
 ): Promise<RagResult> {
-  // Ensure model is loaded
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
-  // Embed query and retrieve relevant chunks
-  const chunks = await retrieve(question, folderPath, { topK: RETRIEVE_TOP_K })
+  // Retrieve child chunks, then collapse to unique parent units
+  const childChunks = await retrieve(question, folderPath, { topK: RETRIEVE_TOP_K })
 
-  if (chunks.length === 0) {
+  if (childChunks.length === 0) {
     return {
       answer: "I couldn't find any relevant sources in this notebook.",
       citations: [],
     }
   }
 
-  const systemPrompt = buildSystemPrompt(chunks)
+  const parents = dedupeByParent(childChunks)
+  const systemPrompt = buildSystemPrompt(parents)
   const rawAnswer = await llamaService.generateStream(systemPrompt, question, onToken)
-  const rawCitations = extractCitations(rawAnswer, chunks)
+  const rawCitations = extractCitations(rawAnswer, parents)
 
   // Remap [4] → [1] etc. so the UI always shows sequential citation numbers
   // starting from 1 regardless of which retrieval slot the model happened to cite.

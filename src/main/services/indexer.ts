@@ -4,7 +4,8 @@ import { scanFolder, hashFile } from './scanner'
 import { parsePdf } from './ingest/pdf'
 import { parseMarkdown } from './ingest/markdown'
 import { parseText } from './ingest/text'
-import { chunkPdf, chunkMarkdown, chunkText, PARSER_VERSION, type Chunk } from './chunker'
+import { parseCode } from './ingest/code'
+import { chunkPdf, chunkMarkdown, chunkText, chunkCode, PARSER_VERSION, type Chunk } from './chunker'
 import { readState, writeState, type NotebookState } from './state'
 import { embedService } from './embed'
 import { vectorStore } from './store'
@@ -102,6 +103,15 @@ export async function indexFolder(
         const content = await readFile(path, 'utf-8')
         const sections = parseMarkdown(content)
         chunks = chunkMarkdown(relPath, sections)
+      } else if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
+        const content = await readFile(path, 'utf-8')
+        const symbols = await parseCode(path, content)
+        if (symbols.length > 0) {
+          chunks = chunkCode(relPath, symbols)
+        } else {
+          // Fall back to text chunking if tree-sitter parse produced no symbols
+          chunks = chunkText(relPath, parseText(content))
+        }
       } else {
         const content = await readFile(path, 'utf-8')
         const parsed = parseText(content)

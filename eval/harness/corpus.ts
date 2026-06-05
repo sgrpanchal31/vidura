@@ -15,10 +15,13 @@ const SCHEMA = new Schema([
   new Field('id', new Utf8(), false),
   new Field('vector', new FixedSizeList(EVAL_EMBEDDING_DIM, new Field('item', new Float32(), false)), false),
   new Field('text', new Utf8(), false),
+  new Field('parentText', new Utf8(), false),
+  new Field('parentId', new Utf8(), false),
   new Field('sourceFile', new Utf8(), false),
   new Field('chunkIndex', new Int32(), false),
   new Field('pageNumber', new Int32(), true),
   new Field('headingAnchor', new Utf8(), true),
+  new Field('headingPath', new Utf8(), true),
   new Field('lineNumber', new Int32(), true),
 ])
 
@@ -75,10 +78,13 @@ export async function buildCorpusIndex(
         id: c.id,
         vector: vectors[i],
         text: c.text,
+        parentText: c.parentText,
+        parentId: c.parentId,
         sourceFile: c.sourceFile,
         chunkIndex: c.chunkIndex,
         pageNumber: c.pageNumber ?? null,
         headingAnchor: c.headingAnchor ?? null,
+        headingPath: c.headingPath ?? null,
         lineNumber: c.lineNumber ?? null,
       })))
     } catch (e) {

@@ -68,15 +68,21 @@ export default function App() {
   // embed model and indexes files). On success, show chat.
 
   async function ensureEmbedAndIndex(folder: string) {
-    const folderState = await window.api.getIngestState(folder)
-    const hasIndexedFiles = Object.values(folderState.files ?? {}).some(
+    const [folderState, currentParser] = await Promise.all([
+      window.api.getIngestState(folder),
+      window.api.getParserVersion(),
+    ])
+    const indexedFiles = Object.values(folderState.files ?? {}).filter(
       f => !f.failed && f.chunkCount > 0
     )
-    // Only skip ingest if the notebook was already indexed with the current model.
-    // Old notebooks (BGE ids) must re-embed into the new 1024-dim vector store.
+    const hasIndexedFiles = indexedFiles.length > 0
+    // Only skip ingest if the notebook was already indexed with the current model
+    // AND the current parser version — a version bump means the schema changed and
+    // all files need to be re-parsed and re-embedded into the new structure.
     const onCurrentModel = folderState.embeddingModel === DEFAULT_EMBED_ID
+    const onCurrentParser = indexedFiles.every(f => f.parserVersion === currentParser)
 
-    if (hasIndexedFiles && onCurrentModel) {
+    if (hasIndexedFiles && onCurrentModel && onCurrentParser) {
       window.api.setWindowSize(1100, 760)
       setScreen('ready')
       return

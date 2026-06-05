@@ -1,0 +1,147 @@
+import { readFile } from 'fs/promises'
+import { relative, extname } from 'path'
+import { scanFolder } from './scanner'
+import { parsePdf } from './ingest/pdf'
+import { parseMarkdown } from './ingest/markdown'
+import { parseText } from './ingest/text'
+import { parseCode } from './ingest/code'
+import { llamaService } from './inference'
+
+export type GenerateTask = 'overview' | 'podcast' | 'facts'
+export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
+
+const SYSTEM_PROMPT =
+  "You are a research assistant. You read documents and produce clear, well-structured summaries and syntheses. Follow the user's formatting instructions exactly. No preamble."
+
+// How much text to feed per document during the map phase (~1000 tokens of source)
+const MAP_CHARS_PER_DOC = 4000
+// How many document summaries to combine in one reduce call
+const REDUCE_BATCH_SIZE = 4
+
+function mapPrompt(task: GenerateTask, format: GenerateFormat, docSummaries: string): string {
+  const formatHint = format === 'mermaid'
+    ? 'Output valid Mermaid diagram syntax.'
+    : format === 'facts-json'
+      ? 'Output a JSON array of fact strings, e.g. ["Fact 1", "Fact 2"].'
+      : 'Write flowing prose.'
+
+  const taskHint: Record<GenerateTask, string> = {
+    overview: 'Summarize the key ideas and structure of this document in 3–5 sentences.',
+    podcast: 'Extract the main talking points and interesting details from this document.',
+    facts: 'List the most important facts and claims from this document.',
+  }
+
+  return `${taskHint[task]}
+${formatHint}
+Be concise. Do not repeat the document title.
+
+Document:
+${docSummaries}`
+}
+
+function reducePrompt(task: GenerateTask, format: GenerateFormat, intermediates: string): string {
+  const formatHint = format === 'mermaid'
+    ? 'Output valid Mermaid diagram syntax only — no prose.'
+    : format === 'facts-json'
+      ? 'Output a JSON array of fact strings only — no prose.'
+      : 'Write flowing prose.'
+
+  const taskHint: Record<GenerateTask, string> = {
+    overview: 'Synthesize the following document summaries into a single cohesive overview.',
+    podcast: 'Combine the following talking points into a natural podcast script with a host narrating key ideas.',
+    facts: 'Combine and deduplicate the following facts into a final list.',
+  }
+
+  return `${taskHint[task]}
+${formatHint}
+
+Summaries:
+${intermediates}`
+}
+
+// Extract up to MAP_CHARS_PER_DOC of representative text from a file
+async function extractDocText(absPath: string, ext: string): Promise<string> {
+  if (ext === '.pdf') {
+    const parsed = await parsePdf(absPath)
+    return parsed.pages.map(p => p.text).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+  }
+  const content = await readFile(absPath, 'utf-8')
+  if (ext === '.md') {
+    const sections = parseMarkdown(content)
+    return sections.map(s => s.text).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+  }
+  if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
+    const symbols = await parseCode(absPath, content)
+    if (symbols.length > 0) {
+      return symbols.map(s => s.parentText).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+    }
+  }
+  return parseText(content).text.slice(0, MAP_CHARS_PER_DOC)
+}
+
+export async function generateFromCorpus(
+  folderPath: string,
+  modelId: string,
+  task: GenerateTask,
+  format: GenerateFormat,
+  onToken: (token: string) => void
+): Promise<string> {
+  if (!llamaService.isLoaded(modelId)) {
+    await llamaService.loadModel(modelId)
+  }
+
+  const { files } = await scanFolder(folderPath)
+  if (files.length === 0) {
+    const msg = 'No documents found in this notebook.'
+    onToken(msg)
+    return msg
+  }
+
+  // Map phase: summarize each document sequentially
+  const intermediates: string[] = []
+  for (const file of files) {
+    const ext = extname(file.path).toLowerCase()
+    const relPath = relative(folderPath, file.path)
+    let docText: string
+    try {
+      docText = await extractDocText(file.path, ext)
+    } catch {
+      continue
+    }
+    if (!docText.trim()) continue
+
+    const prompt = mapPrompt(task, format, `[${relPath}]\n${docText}`)
+    // Silent map calls — tokens only stream during the final reduce
+    const summary = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+    if (summary.trim()) {
+      intermediates.push(`[${relPath}]\n${summary.trim()}`)
+    }
+  }
+
+  if (intermediates.length === 0) {
+    const msg = 'Could not extract content from any documents in this notebook.'
+    onToken(msg)
+    return msg
+  }
+
+  // Reduce phase: combine intermediates, batching if needed
+  let current = intermediates
+  while (current.length > 1) {
+    const next: string[] = []
+    for (let i = 0; i < current.length; i += REDUCE_BATCH_SIZE) {
+      const batch = current.slice(i, i + REDUCE_BATCH_SIZE)
+      if (batch.length === 1) {
+        next.push(batch[0])
+        continue
+      }
+      const prompt = reducePrompt(task, format, batch.join('\n\n---\n\n'))
+      const merged = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+      next.push(merged.trim())
+    }
+    current = next
+  }
+
+  // Final reduce — stream tokens to the caller
+  const finalPrompt = reducePrompt(task, format, current[0])
+  return llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
+}

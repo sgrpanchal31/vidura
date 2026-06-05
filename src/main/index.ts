@@ -10,6 +10,8 @@ import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteMod
 import { listEmbedModels, deleteEmbed, DEFAULT_EMBED, embedDim } from './services/embed-models'
 import { llamaService } from './services/inference'
 import { ragQuery } from './services/rag'
+import { PARSER_VERSION } from './services/chunker'
+import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 
 const PREFS_PATH = join(app.getPath('userData'), 'prefs.json')
 
@@ -88,6 +90,8 @@ ipcMain.handle('system:info', () => ({
   totalRamGB: Math.round(os.totalmem() / 1024 ** 3),
   platform: process.platform
 }))
+
+ipcMain.handle('ingest:parserVersion', () => PARSER_VERSION)
 
 ipcMain.handle('ingest:start', async (_event, folderPath: string, embeddingModel?: string) => {
   const result = await indexFolder(
@@ -175,20 +179,54 @@ ipcMain.handle('embed:delete', async (_event, hfId: string) => {
 
 // ── Chat / RAG ────────────────────────────────────────────────────────────────
 
+// Detect whether a question is a full-corpus generation task (summary, podcast,
+// infographic) rather than a targeted lookup. Returns task+format if yes, null if no.
+function detectGenerateIntent(question: string): { task: GenerateTask; format: GenerateFormat } | null {
+  const q = question.toLowerCase()
+  if (/\bpodcast\b/.test(q)) return { task: 'podcast', format: 'prose' }
+  if (/\b(infographic|diagram|mermaid|visuali[sz]e|chart)\b/.test(q)) return { task: 'facts', format: 'mermaid' }
+  if (/\b(summari[sz]e|summary|summaries|overview|tldr|tl;dr)\b/.test(q)) return { task: 'overview', format: 'prose' }
+  if (/what('s| is) in (this|the) (folder|notebook|sources?|documents?|files?)/.test(q)) return { task: 'overview', format: 'prose' }
+  if (/\b(key|main|core|all|every) (themes?|ideas?|topics?|concepts?|points?)\b/.test(q)) return { task: 'overview', format: 'prose' }
+  if (/give me an overview|tell me (about )?everything/.test(q)) return { task: 'overview', format: 'prose' }
+  return null
+}
+
 ipcMain.handle('chat:ask', async (_event, question: string, folderPath: string, modelId: string) => {
   // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
-  ragQuery(
-    question,
-    folderPath,
-    modelId,
-    (token) => mainWindow?.webContents.send('chat:token', token)
-  )
-    .then((result) => mainWindow?.webContents.send('chat:done', result))
-    .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+  const genIntent = detectGenerateIntent(question)
+  if (genIntent) {
+    generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format,
+      (token) => mainWindow?.webContents.send('chat:token', token)
+    )
+      .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
+      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+  } else {
+    ragQuery(question, folderPath, modelId,
+      (token) => mainWindow?.webContents.send('chat:token', token)
+    )
+      .then((result) => mainWindow?.webContents.send('chat:done', result))
+      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+  }
 })
 
 ipcMain.handle('chat:cancel', () => {
   llamaService.cancel()
+})
+
+// ── Generation (map-reduce over full corpus) ─────────────────────────────────
+
+ipcMain.handle('generate:run', async (_event, folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => {
+  // Returns immediately; streams tokens via 'generate:token', terminates with 'generate:done' or 'generate:error'
+  generateFromCorpus(
+    folderPath,
+    modelId,
+    task,
+    format,
+    (token) => mainWindow?.webContents.send('generate:token', token)
+  )
+    .then((result) => mainWindow?.webContents.send('generate:done', result))
+    .catch((err) => mainWindow?.webContents.send('generate:error', String(err)))
 })
 
 ipcMain.handle('window:setSize', (_event, width: number, height: number) => {

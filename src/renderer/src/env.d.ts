@@ -12,6 +12,8 @@ import type {
   NotebookState,
   LlmModelInfo,
   EmbedModelInfo,
+  GenerateTask,
+  GenerateFormat,
 } from '../../preload/index'
 
 declare global {
@@ -22,6 +24,7 @@ declare global {
       setPrefs: (patch: Partial<Prefs>) => Promise<void>
       getSystemInfo: () => Promise<SystemInfo>
 
+      getParserVersion: () => Promise<string>
       startIngest: (folderPath: string, embeddingModel?: string) => Promise<IndexSummary>
       getIngestState: (folderPath: string) => Promise<NotebookState>
       onIngestProgress: (cb: (p: IndexProgress) => void) => () => void
@@ -50,6 +53,12 @@ declare global {
       onChatError: (cb: (message: string) => void) => () => void
 
       setWindowSize: (width: number, height: number) => Promise<void>
+
+      generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => Promise<void>
+      generateCancel: () => Promise<void>
+      onGenerateToken: (cb: (token: string) => void) => () => void
+      onGenerateDone: (cb: (result: string) => void) => () => void
+      onGenerateError: (cb: (message: string) => void) => () => void
     }
   }
 }
