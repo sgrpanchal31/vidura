@@ -40,8 +40,8 @@ const REGISTRY: Record<string, ModelEntry> = {
   },
   'phi3-mini': {
     filename: 'phi3-mini.gguf',
-    url: 'https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf',
-    sizeBytes: 2_175_945_728,
+    url: 'https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-Q4_K_M.gguf',
+    sizeBytes: 2_392_352_768,
   },
 }
 
@@ -84,6 +84,25 @@ export async function isModelDownloaded(modelId: string): Promise<boolean> {
   }
 }
 
+// Two-pronged cancel:
+//  1. cancelRequested flag — checked in data handler to stop progress events immediately
+//  2. activeDownloadReject — called directly to settle the promise without waiting for a net event
+// abort() alone is unreliable once Electron's net response stream is active.
+let cancelRequested = false
+let activeDownloadRequest: ReturnType<typeof net.request> | null = null
+let activeDownloadReject: ((e: Error) => void) | null = null
+let activeWriteStream: ReturnType<typeof createWriteStream> | null = null
+
+export function cancelDownload(): void {
+  cancelRequested = true
+  activeDownloadRequest?.abort()
+  activeDownloadRequest = null
+  activeWriteStream?.destroy()
+  activeWriteStream = null
+  activeDownloadReject?.(new Error('DOWNLOAD_CANCELLED'))
+  activeDownloadReject = null
+}
+
 export async function downloadModel(
   modelId: string,
   onProgress: (downloaded: number, total: number) => void
@@ -91,6 +110,7 @@ export async function downloadModel(
   const entry = REGISTRY[modelId]
   if (!entry) throw new Error(`Unknown model ID: ${modelId}`)
 
+  cancelRequested = false
   ensureModelsDir()
   const destPath = getModelPath(modelId)
 
@@ -109,62 +129,88 @@ export async function downloadModel(
     // file doesn't exist — start from 0
   }
 
-  await new Promise<void>((resolve, reject) => {
-    const headers: Record<string, string> = {}
-    if (startByte > 0) headers['Range'] = `bytes=${startByte}-`
+  try {
+    await new Promise<void>((resolve, reject) => {
+      activeDownloadReject = reject
 
-    const request = net.request({ url: entry.url, headers })
+      const headers: Record<string, string> = {}
+      if (startByte > 0) headers['Range'] = `bytes=${startByte}-`
 
-    request.on('response', (response) => {
-      if (response.statusCode !== 200 && response.statusCode !== 206) {
-        reject(new Error(`HTTP ${response.statusCode} downloading model`))
-        return
-      }
+      const request = net.request({ url: entry.url, headers })
+      activeDownloadRequest = request
 
-      // Prefer Content-Range total over our hardcoded estimate
-      let totalBytes = entry.sizeBytes
-      const contentRange = response.headers['content-range'] as string | undefined
-      if (contentRange) {
-        const match = contentRange.match(/\/(\d+)$/)
-        if (match) totalBytes = parseInt(match[1], 10)
-      } else if (response.statusCode === 200) {
-        const cl = response.headers['content-length'] as string | undefined
-        if (cl) totalBytes = parseInt(cl, 10)
-      }
+      request.on('response', (response) => {
+        if (response.statusCode !== 200 && response.statusCode !== 206) {
+          activeDownloadRequest = null
+          activeDownloadReject = null
+          reject(new Error(`HTTP ${response.statusCode} downloading model`))
+          return
+        }
 
-      const writeStream = createWriteStream(destPath, {
-        flags: startByte > 0 ? 'a' : 'w',
+        // Prefer Content-Range total over our hardcoded estimate
+        let totalBytes = entry.sizeBytes
+        const contentRange = response.headers['content-range'] as string | undefined
+        if (contentRange) {
+          const match = contentRange.match(/\/(\d+)$/)
+          if (match) totalBytes = parseInt(match[1], 10)
+        } else if (response.statusCode === 200) {
+          const cl = response.headers['content-length'] as string | undefined
+          if (cl) totalBytes = parseInt(cl, 10)
+        }
+
+        const writeStream = createWriteStream(destPath, {
+          flags: startByte > 0 ? 'a' : 'w',
+        })
+        activeWriteStream = writeStream
+        let downloaded = startByte
+
+        response.on('data', (chunk: Buffer) => {
+          // Flag checked first — stops progress events from firing after cancel
+          if (cancelRequested) return
+          downloaded += chunk.length
+          writeStream.write(chunk)
+          onProgress(downloaded, totalBytes)
+        })
+
+        response.on('end', () => {
+          activeDownloadRequest = null
+          activeDownloadReject = null
+          activeWriteStream = null
+          writeStream.end()
+          writeStream.once('finish', resolve)
+          writeStream.once('error', reject)
+        })
+
+        response.on('error', (err: Error) => {
+          activeDownloadRequest = null
+          activeDownloadReject = null
+          activeWriteStream = null
+          writeStream.destroy()
+          reject(err)
+        })
       })
-      let downloaded = startByte
 
-      response.on('data', (chunk: Buffer) => {
-        downloaded += chunk.length
-        writeStream.write(chunk)
-        onProgress(downloaded, totalBytes)
-      })
-
-      response.on('end', () => {
-        writeStream.end()
-        writeStream.once('finish', resolve)
-        writeStream.once('error', reject)
-      })
-
-      response.on('error', (err: Error) => {
-        writeStream.destroy()
+      request.on('error', (err: Error) => {
+        activeDownloadRequest = null
+        activeDownloadReject = null
         reject(err)
       })
-    })
 
-    request.on('error', async (err: Error) => {
-      try {
-        const { size } = await stat(destPath)
-        if (size === 0) await unlink(destPath)
-      } catch { /* ignore */ }
-      reject(err)
+      request.end()
     })
-
-    request.end()
-  })
+  } catch (err) {
+    if (err instanceof Error && err.message === 'DOWNLOAD_CANCELLED') {
+      // Delete the partial file — user chose to cancel, not resume
+      await unlink(destPath).catch(() => {})
+      throw err
+    }
+    // For network errors: clean up zero-byte files only
+    try {
+      const { size } = await stat(destPath)
+      if (size === 0) await unlink(destPath)
+    } catch { /* ignore */ }
+    throw err
+  }
 
   // Validate the completed file starts with GGUF magic bytes.
   // A failed HuggingFace auth returns HTTP 200 with an HTML login page — catch that here.
@@ -174,5 +220,32 @@ export async function downloadModel(
       'Downloaded file is not a valid model. ' +
       'If the model requires a HuggingFace account, download it manually and place it in the models folder.'
     )
+  }
+}
+
+export type LlmModelInfo = {
+  id: string
+  filename: string
+  sizeBytes: number
+  downloaded: boolean
+}
+
+export async function listModels(): Promise<LlmModelInfo[]> {
+  return Promise.all(
+    Object.entries(REGISTRY).map(async ([id, entry]) => ({
+      id,
+      filename: entry.filename,
+      sizeBytes: entry.sizeBytes,
+      downloaded: await isModelDownloaded(id),
+    }))
+  )
+}
+
+export async function deleteModel(modelId: string): Promise<void> {
+  const entry = REGISTRY[modelId]
+  if (!entry) throw new Error(`Unknown model ID: ${modelId}`)
+  const p = getModelPath(modelId)
+  if (existsSync(p)) {
+    await unlink(p)
   }
 }

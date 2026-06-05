@@ -4,9 +4,14 @@ import { join } from 'path'
 import { ensureOpenbookDir } from './state'
 import type { Chunk } from './chunker'
 
-const LANCE_SUBDIR = join('.openbook', 'lance')
+const DEFAULT_LANCE_SUBDIR = join('.openbook', 'lance')
 const TABLE_NAME = 'chunks'
-const EMBEDDING_DIM = 384
+export const EMBEDDING_DIM = 1024  // default; override via VectorStoreOptions.dim
+
+export type VectorStoreOptions = {
+  subdir?: string
+  dim?: number
+}
 
 export type SearchResult = {
   id: string
@@ -19,39 +24,55 @@ export type SearchResult = {
   score: number
 }
 
-const SCHEMA = new Schema([
-  new Field('id', new Utf8(), false),
-  new Field('vector', new FixedSizeList(EMBEDDING_DIM, new Field('item', new Float32(), false)), false),
-  new Field('text', new Utf8(), false),
-  new Field('sourceFile', new Utf8(), false),
-  new Field('chunkIndex', new Int32(), false),
-  new Field('parserVersion', new Utf8(), false),
-  new Field('pageNumber', new Int32(), true),
-  new Field('headingAnchor', new Utf8(), true),
-  new Field('lineNumber', new Int32(), true),
-])
+function makeSchema(dim: number): Schema {
+  return new Schema([
+    new Field('id', new Utf8(), false),
+    new Field('vector', new FixedSizeList(dim, new Field('item', new Float32(), false)), false),
+    new Field('text', new Utf8(), false),
+    new Field('sourceFile', new Utf8(), false),
+    new Field('chunkIndex', new Int32(), false),
+    new Field('parserVersion', new Utf8(), false),
+    new Field('pageNumber', new Int32(), true),
+    new Field('headingAnchor', new Utf8(), true),
+    new Field('lineNumber', new Int32(), true),
+  ])
+}
 
 export class VectorStore {
   private db: Connection | null = null
   private table: Table | null = null
-  private openFolderPath = ''
+  private openKey = ''
 
-  async open(folderPath: string): Promise<void> {
-    if (this.openFolderPath === folderPath && this.table) return
+  async open(folderPath: string, opts?: VectorStoreOptions): Promise<void> {
+    const subdir = opts?.subdir ?? DEFAULT_LANCE_SUBDIR
+    const dim = opts?.dim ?? EMBEDDING_DIM
+    const key = `${folderPath}::${subdir}::${dim}`
+    if (this.openKey === key && this.table) return
 
     await ensureOpenbookDir(folderPath)
-    const dbPath = join(folderPath, LANCE_SUBDIR)
+    const dbPath = join(folderPath, subdir)
+    const schema = makeSchema(dim)
 
     this.db = await connect(dbPath)
     const names = await this.db.tableNames()
 
     if (names.includes(TABLE_NAME)) {
-      this.table = await this.db.openTable(TABLE_NAME)
+      const tbl = await this.db.openTable(TABLE_NAME)
+      const tblSchema = await tbl.schema()
+      const vecField = tblSchema.fields.find(f => f.name === 'vector')
+      const storedDim: number | undefined = (vecField?.type as any)?.listSize
+      if (storedDim !== undefined && storedDim !== dim) {
+        // Embedding model changed — dimension mismatch; drop and recreate
+        await this.db.dropTable(TABLE_NAME)
+        this.table = await this.db.createEmptyTable(TABLE_NAME, schema)
+      } else {
+        this.table = tbl
+      }
     } else {
-      this.table = await this.db.createEmptyTable(TABLE_NAME, SCHEMA)
+      this.table = await this.db.createEmptyTable(TABLE_NAME, schema)
     }
 
-    this.openFolderPath = folderPath
+    this.openKey = key
   }
 
   async upsertChunks(chunks: Chunk[], vectors: number[][]): Promise<void> {
@@ -116,6 +137,12 @@ export class VectorStore {
 
   isOpen(): boolean {
     return this.table !== null
+  }
+
+  async close(): Promise<void> {
+    this.table = null
+    this.db = null
+    this.openKey = ''
   }
 }
 

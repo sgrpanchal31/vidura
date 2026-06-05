@@ -6,7 +6,8 @@ import { indexFolder } from './services/indexer'
 import { readState } from './services/state'
 import { embedService } from './services/embed'
 import { vectorStore } from './services/store'
-import { isModelDownloaded, downloadModel } from './services/models'
+import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteModel } from './services/models'
+import { listEmbedModels, deleteEmbed, DEFAULT_EMBED, embedDim } from './services/embed-models'
 import { llamaService } from './services/inference'
 import { ragQuery } from './services/rag'
 
@@ -88,10 +89,12 @@ ipcMain.handle('system:info', () => ({
   platform: process.platform
 }))
 
-ipcMain.handle('ingest:start', async (_event, folderPath: string) => {
-  const result = await indexFolder(folderPath, (progress) => {
-    mainWindow?.webContents.send('ingest:progress', progress)
-  })
+ipcMain.handle('ingest:start', async (_event, folderPath: string, embeddingModel?: string) => {
+  const result = await indexFolder(
+    folderPath,
+    (progress) => { mainWindow?.webContents.send('ingest:progress', progress) },
+    embeddingModel
+  )
   return result.summary
 })
 
@@ -99,16 +102,14 @@ ipcMain.handle('ingest:getState', (_event, folderPath: string) => {
   return readState(folderPath)
 })
 
-ipcMain.handle('search:query', async (_event, query: string, topK?: number) => {
+ipcMain.handle('search:query', async (_event, query: string, topK?: number, folderPath?: string) => {
   // Lazily start embed service and open store if the user returns to the app
   // after a previous session where indexing already ran
-  if (!embedService.isStarted()) {
-    await embedService.start()
-  }
-  if (!vectorStore.isOpen()) {
-    const prefs = readPrefs()
-    if (prefs.lastFolder) await vectorStore.open(prefs.lastFolder)
-  }
+  const folder = folderPath ?? readPrefs().lastFolder
+  const embedModel = DEFAULT_EMBED
+  const dim = embedDim(embedModel)
+  await embedService.start(undefined, { modelId: embedModel })
+  if (folder) await vectorStore.open(folder, { dim })
   const [queryVector] = await embedService.embedBatched([query])
   return vectorStore.search(queryVector, topK ?? 8)
 })
@@ -125,12 +126,51 @@ ipcMain.handle('model:download', async (_event, modelId: string) => {
   })
 })
 
+ipcMain.handle('model:cancelDownload', () => {
+  cancelDownload()
+})
+
 ipcMain.handle('model:load', async (_event, modelId: string) => {
   await llamaService.loadModel(modelId)
 })
 
 ipcMain.handle('model:unload', async () => {
   await llamaService.unloadModel()
+})
+
+ipcMain.handle('model:list', async () => {
+  return listModels()
+})
+
+ipcMain.handle('model:delete', async (_event, modelId: string) => {
+  // Unload first if this is the currently-loaded model
+  if (llamaService.isLoaded(modelId)) {
+    await llamaService.unloadModel()
+  }
+  await deleteModel(modelId)
+})
+
+ipcMain.handle('embed:list', async () => {
+  return listEmbedModels()
+})
+
+// Ensure the default embedding model is downloaded and ready (used at startup).
+ipcMain.handle('embed:ensure', async () => {
+  await embedService.start(
+    (loaded, total) => mainWindow?.webContents.send('embed:downloadProgress', { hfId: DEFAULT_EMBED, loaded, total }),
+    { modelId: DEFAULT_EMBED }
+  )
+})
+
+ipcMain.handle('embed:download', async (_event, hfId: string) => {
+  await embedService.start(
+    (loaded, total) => mainWindow?.webContents.send('embed:downloadProgress', { hfId, loaded, total }),
+    { modelId: hfId }
+  )
+})
+
+ipcMain.handle('embed:delete', async (_event, hfId: string) => {
+  await deleteEmbed(hfId)
 })
 
 // ── Chat / RAG ────────────────────────────────────────────────────────────────

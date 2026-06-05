@@ -4,3 +4,8 @@ out
 .DS_Store
 *.log
 *.local
+
+# Eval harness — large datasets and per-run result JSONs
+eval/datasets/*/data/
+eval/results/*.json
+.openbook/eval/

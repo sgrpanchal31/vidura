@@ -223,6 +223,18 @@
   margin-left: 14px;
 }
 
+/* ---- Advanced embedding toggle ---- */
+
+.advanced-toggle-row {
+  padding: 0 52px 16px;
+  flex-shrink: 0;
+}
+
+.advanced-embed-zone {
+  padding: 0 52px 20px;
+  flex-shrink: 0;
+}
+
 /* ---- Footer ---- */
 
 .win-footer {

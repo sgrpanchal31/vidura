@@ -1,0 +1,427 @@
+import { useState, useEffect, useRef } from 'react'
+import './Settings.css'
+import type { LlmModelInfo, EmbedModelInfo, ModelProgress } from '../../../preload/index'
+
+const LLM_META: Record<string, { name: string; desc: string }> = {
+  'gemma2-2b': {
+    name: 'Qwen 2.5 1.5B',
+    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
+  },
+  'llama3.2-3b': {
+    name: 'Llama 3.2 3B',
+    desc: 'Slightly larger. Better on dense academic text and long-form sources.',
+  },
+  'qwen2.5-7b': {
+    name: 'Qwen 2.5 7B',
+    desc: 'Highest quality. Requires 32 GB RAM or more.',
+  },
+  'phi3-mini': {
+    name: 'Phi-3 Mini',
+    desc: "Microsoft's compact model. Good on structured notes and lists.",
+  },
+}
+
+function recommendedLlmId(ramGB: number): string {
+  if (ramGB >= 32) return 'qwen2.5-7b'
+  if (ramGB >= 16) return 'llama3.2-3b'
+  return 'gemma2-2b'
+}
+
+type Section = 'llm' | 'embed'
+
+type Props = {
+  folder: string
+  modelId: string
+  onClose: () => void
+  onModelChanged: (id: string) => void
+}
+
+export default function Settings({ folder, modelId, onClose, onModelChanged }: Props) {
+  const [activeSection, setActiveSection] = useState<Section>('llm')
+  const [llmModels, setLlmModels] = useState<LlmModelInfo[]>([])
+  const [embedModel, setEmbedModel] = useState<EmbedModelInfo | null>(null)
+  const [ramGB, setRamGB] = useState<number>(8)
+  const [isMac, setIsMac] = useState(false)
+
+  // LLM download / load state
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState<ModelProgress | null>(null)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [llmError, setLlmError] = useState<string | null>(null)
+
+  // Cancel confirmation — shown inline in progress row and on Back press
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
+  // Brief hint when user clicks an undownloaded row
+  const [hintId, setHintId] = useState<string | null>(null)
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Embed download state
+  const [downloadingEmbed, setDownloadingEmbed] = useState(false)
+  const [embedDownloadProgress, setEmbedDownloadProgress] = useState<{ loaded: number; total: number } | null>(null)
+  const [embedError, setEmbedError] = useState<string | null>(null)
+
+  const unsubRef = useRef<(() => void) | null>(null)
+  const embedUnsubRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    Promise.all([
+      window.api.listModels(),
+      window.api.listEmbedModels(),
+      window.api.getSystemInfo(),
+    ]).then(([llms, embeds, sysInfo]) => {
+      setLlmModels(llms)
+      setEmbedModel(embeds[0] ?? null)
+      setRamGB(sysInfo.totalRamGB)
+      setIsMac(sysInfo.platform === 'darwin')
+    })
+
+    return () => {
+      unsubRef.current?.()
+      embedUnsubRef.current?.()
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    }
+  }, [folder])
+
+  function showHint(id: string) {
+    setHintId(id)
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    hintTimerRef.current = setTimeout(() => setHintId(null), 2200)
+  }
+
+  // Back: if downloading, show cancel confirm instead of navigating away
+  function handleBack() {
+    if (downloadingId) {
+      setShowCancelConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
+  async function handleDownload(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (downloadingId) return
+
+    setLlmError(null)
+    setShowCancelConfirm(false)
+    setDownloadingId(id)
+    setDownloadProgress(null)
+
+    const unsub = window.api.onModelProgress(p => {
+      if (p.modelId === id) setDownloadProgress(p)
+    })
+    unsubRef.current = unsub
+
+    try {
+      await window.api.modelDownload(id)
+      setLlmModels(await window.api.listModels())
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg !== 'DOWNLOAD_CANCELLED') {
+        setLlmError(msg)
+      }
+    } finally {
+      unsub()
+      unsubRef.current = null
+      setDownloadingId(null)
+      setDownloadProgress(null)
+      setShowCancelConfirm(false)
+    }
+  }
+
+  async function confirmCancel() {
+    // Actually cancel — main process deletes partial file
+    await window.api.modelCancelDownload()
+    // UI resets via the finally block in handleDownload
+  }
+
+  async function handleUse(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (loadingId || downloadingId) return
+
+    setLlmError(null)
+    setLoadingId(id)
+    try {
+      await window.api.modelLoad(id)
+      await window.api.setPrefs({ modelId: id })
+      onModelChanged(id)
+      setLlmModels(await window.api.listModels())
+    } catch (err) {
+      setLlmError(err instanceof Error ? err.message : String(err))
+    }
+    setLoadingId(null)
+  }
+
+  async function handleDeleteLlm(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await window.api.modelDelete(id)
+      setLlmModels(await window.api.listModels())
+    } catch (err) {
+      setLlmError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function handleDownloadEmbed(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (downloadingEmbed || !embedModel) return
+
+    setEmbedError(null)
+    setDownloadingEmbed(true)
+    setEmbedDownloadProgress(null)
+
+    const unsub = window.api.onEmbedDownloadProgress(p => {
+      setEmbedDownloadProgress({ loaded: p.loaded, total: p.total })
+    })
+    embedUnsubRef.current = unsub
+
+    try {
+      await window.api.embedEnsure()
+      const embeds = await window.api.listEmbedModels()
+      setEmbedModel(embeds[0] ?? null)
+    } catch (err) {
+      setEmbedError(err instanceof Error ? err.message : String(err))
+    } finally {
+      unsub()
+      embedUnsubRef.current = null
+      setDownloadingEmbed(false)
+      setEmbedDownloadProgress(null)
+    }
+  }
+
+  const recommendedLlm = recommendedLlmId(ramGB)
+  const busy = !!downloadingId || !!loadingId
+
+  const NAV_ITEMS: { id: Section; label: string }[] = [
+    { id: 'llm', label: 'Language model' },
+    { id: 'embed', label: 'Embedding model' },
+  ]
+
+  return (
+    <div className="settings-root">
+      {/* Titlebar */}
+      <div className="settings-titlebar">
+        {isMac && <div className="settings-traffic-spacer" />}
+        <button className="settings-back-btn" onClick={handleBack}>
+          ← Back
+        </button>
+        <span className="settings-title">Settings</span>
+      </div>
+
+      {/* Main: nav sidebar + content */}
+      <div className="settings-main">
+
+        {/* Nav */}
+        <nav className="settings-nav">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              className={`settings-nav-item${activeSection === item.id ? ' active' : ''}`}
+              onClick={() => setActiveSection(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Content */}
+        <div className="settings-content">
+
+          {/* ── Language model ── */}
+          {activeSection === 'llm' && (
+            <div className="settings-section">
+              <div className="settings-section-title">Language model</div>
+              <div className="settings-section-note">
+                Controls how responses are generated. Larger models are more capable but require more RAM.
+              </div>
+              {llmError && <div className="settings-error">{llmError}</div>}
+
+              <div className="settings-model-list">
+                {llmModels.map((m) => {
+                  const meta = LLM_META[m.id]
+                  const isActive = m.id === modelId
+                  const isDownloading = downloadingId === m.id
+                  const isLoading = loadingId === m.id
+                  const pct = isDownloading && downloadProgress?.total > 0
+                    ? Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)
+                    : null
+
+                  // Downloading: show progress row or cancel confirm
+                  if (isDownloading) {
+                    if (showCancelConfirm) {
+                      return (
+                        <div key={m.id} className="settings-confirm-row">
+                          <span className="settings-confirm-text">
+                            Stop downloading? The partial file will be deleted.
+                          </span>
+                          <div className="settings-confirm-actions">
+                            <button
+                              className="settings-confirm-cancel"
+                              onClick={() => setShowCancelConfirm(false)}
+                            >
+                              Keep downloading
+                            </button>
+                            <button
+                              className="settings-confirm-ok"
+                              onClick={confirmCancel}
+                            >
+                              Stop
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div key={m.id} className="settings-row-progress">
+                        <div className="settings-progress-header">
+                          <span className="settings-progress-label">
+                            Downloading {meta?.name ?? m.id}
+                            {pct !== null ? ` — ${pct}%` : '…'}
+                          </span>
+                          <button
+                            className="settings-cancel-download-btn"
+                            onClick={() => setShowCancelConfirm(true)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <div className="settings-progress-track">
+                          <div className="settings-progress-fill" style={{ width: pct !== null ? `${pct}%` : '0%' }} />
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`settings-model-row${isActive ? ' sel' : ''}${busy && !isActive ? ' disabled' : ''}${!m.downloaded ? ' clickable' : ''}`}
+                      onClick={!m.downloaded ? () => showHint(m.id) : undefined}
+                    >
+                      <div className="settings-radio" />
+                      <div className="settings-model-info">
+                        <div className="settings-model-name">
+                          {meta?.name ?? m.id}
+                          {m.id === recommendedLlm && <span className="tag-rec">Recommended</span>}
+                        </div>
+                        <div className="settings-model-desc">{meta?.desc ?? ''}</div>
+                      </div>
+                      <div className="settings-model-meta">
+                        <div className="settings-model-size">{(m.sizeBytes / 1e9).toFixed(1)} GB</div>
+                        <div className="settings-model-actions">
+                          {isActive && <span className="settings-badge active">Selected</span>}
+                          {!isActive && m.downloaded && (
+                            <>
+                              <button
+                                className="settings-use-btn"
+                                onClick={(e) => handleUse(m.id, e)}
+                                disabled={busy}
+                              >
+                                {isLoading ? 'Loading…' : 'Use'}
+                              </button>
+                              <button
+                                className="settings-delete-btn"
+                                onClick={(e) => handleDeleteLlm(m.id, e)}
+                                disabled={busy}
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                          {!m.downloaded && (
+                            <div className="settings-download-group">
+                              {hintId === m.id && (
+                                <span className="settings-download-hint">Download first</span>
+                              )}
+                              <button
+                                className={`settings-download-btn${hintId === m.id ? ' hint-pulse' : ''}`}
+                                onClick={(e) => handleDownload(m.id, e)}
+                                disabled={busy}
+                              >
+                                Download
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="settings-coming-soon">
+                Coming soon: switch models per chat
+              </div>
+            </div>
+          )}
+
+          {/* ── Embedding model ── */}
+          {activeSection === 'embed' && embedModel && (
+            <div className="settings-section">
+              <div className="settings-section-title">Embedding model</div>
+              <div className="settings-section-note">
+                Used to index your sources and find relevant passages when you ask a question.
+                Runs entirely on your Mac — no internet connection required after download.
+              </div>
+              {embedError && <div className="settings-error">{embedError}</div>}
+              <div className="settings-model-list">
+                {downloadingEmbed ? (
+                  <div className="settings-row-progress">
+                    <div className="settings-progress-header">
+                      <span className="settings-progress-label">
+                        Downloading {embedModel.name}
+                        {embedDownloadProgress && embedDownloadProgress.total > 0
+                          ? ` — ${Math.round((embedDownloadProgress.loaded / embedDownloadProgress.total) * 100)}%`
+                          : '…'}
+                      </span>
+                    </div>
+                    <div className="settings-progress-track">
+                      <div
+                        className="settings-progress-fill"
+                        style={{
+                          width: embedDownloadProgress && embedDownloadProgress.total > 0
+                            ? `${Math.round((embedDownloadProgress.loaded / embedDownloadProgress.total) * 100)}%`
+                            : '0%'
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-model-row sel">
+                    <div className="settings-radio" />
+                    <div className="settings-model-info">
+                      <div className="settings-model-name">
+                        {embedModel.name}
+                        {embedModel.recommended && <span className="tag-rec">Recommended</span>}
+                        {embedModel.tags.filter(t => t !== 'Recommended').map(t => (
+                          <span key={t} className="tag-info">{t}</span>
+                        ))}
+                      </div>
+                      <div className="settings-model-desc">{embedModel.desc}</div>
+                    </div>
+                    <div className="settings-model-meta">
+                      <div className="settings-model-size">{embedModel.sizeLabel}</div>
+                      <div className="settings-model-actions">
+                        {embedModel.downloaded ? (
+                          <span className="settings-badge active">Downloaded</span>
+                        ) : (
+                          <button
+                            className="settings-download-btn"
+                            onClick={handleDownloadEmbed}
+                          >
+                            Download
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  )
+}

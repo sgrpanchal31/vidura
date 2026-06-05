@@ -8,8 +8,7 @@ import { chunkPdf, chunkMarkdown, chunkText, PARSER_VERSION, type Chunk } from '
 import { readState, writeState, type NotebookState } from './state'
 import { embedService } from './embed'
 import { vectorStore } from './store'
-
-const EMBEDDING_MODEL = 'Xenova/bge-small-en-v1.5'
+import { DEFAULT_EMBED, embedDim } from './embed-models'
 
 export type IndexProgress = {
   stage: 'scanning' | 'hashing' | 'parsing' | 'model_load' | 'embedding' | 'done'
@@ -29,13 +28,18 @@ export type IndexSummary = {
 
 export async function indexFolder(
   folderPath: string,
-  onProgress: (p: IndexProgress) => void
+  onProgress: (p: IndexProgress) => void,
+  embeddingModel?: string
 ): Promise<{ summary: IndexSummary; chunks: Chunk[] }> {
   onProgress({ stage: 'scanning', processed: 0, total: 0 })
 
   const { files, skipped } = await scanFolder(folderPath)
   const state = await readState(folderPath)
-  const newState: NotebookState = { version: 1, files: { ...state.files } }
+
+  // Always use the single current model; ignore stale state.embeddingModel from old notebooks
+  const effectiveModel = embeddingModel ?? DEFAULT_EMBED
+
+  const newState: NotebookState = { version: 1, embeddingModel: effectiveModel, files: { ...state.files } }
 
   onProgress({ stage: 'hashing', processed: 0, total: files.length })
 
@@ -63,7 +67,7 @@ export async function indexFolder(
 
     const relPath = relative(folderPath, file.path)
     const existing = state.files[relPath]
-    const alreadyEmbedded = existing?.embeddingModel === EMBEDDING_MODEL
+    const alreadyEmbedded = existing?.embeddingModel === effectiveModel
     const currentParser = existing?.parserVersion === PARSER_VERSION
     if (existing && existing.hash === hash && !existing.failed && alreadyEmbedded && currentParser) {
       unchanged.push(relPath)
@@ -126,32 +130,47 @@ export async function indexFolder(
   }
 
   // Embedding + vector store write
+  const dim = embedDim(effectiveModel)
   if (allChunks.length > 0) {
-    await vectorStore.open(folderPath)
+    await vectorStore.open(folderPath, { dim })
 
     // Start embed worker — may download model on first run; emit model_load progress
     onProgress({ stage: 'model_load', processed: 0, total: 0 })
-    await embedService.start((loaded, total) => {
-      onProgress({ stage: 'model_load', processed: loaded, total })
-    })
+    await embedService.start(
+      (loaded, total) => { onProgress({ stage: 'model_load', processed: loaded, total }) },
+      { modelId: effectiveModel }
+    )
 
     onProgress({ stage: 'embedding', processed: 0, total: allChunks.length })
 
-    const vectors = await embedService.embedBatched(
-      allChunks.map((c) => c.text),
-      (done, total) => onProgress({ stage: 'embedding', processed: done, total })
-    )
-
-    await vectorStore.upsertChunks(allChunks, vectors)
-
-    // Stamp embeddingModel on every successfully embedded file record
+    // Embed and persist one source file at a time so a crash mid-index leaves
+    // completed files stamped in state.json and won't be re-embedded on restart.
+    const chunksByFile = new Map<string, Chunk[]>()
     for (const chunk of allChunks) {
-      const rec = newState.files[chunk.sourceFile]
-      if (rec) rec.embeddingModel = EMBEDDING_MODEL
+      const arr = chunksByFile.get(chunk.sourceFile) ?? []
+      arr.push(chunk)
+      chunksByFile.set(chunk.sourceFile, arr)
+    }
+
+    let embeddedSoFar = 0
+    for (const [sourceFile, chunks] of chunksByFile) {
+      const vectors = await embedService.embedBatched(
+        chunks.map((c) => c.text),
+        (done) => onProgress({ stage: 'embedding', processed: embeddedSoFar + done, total: allChunks.length })
+      )
+      await vectorStore.upsertChunks(chunks, vectors)
+
+      // Stamp this file as embedded and persist immediately so a crash here
+      // won't re-embed it on the next launch.
+      const rec = newState.files[sourceFile]
+      if (rec) rec.embeddingModel = effectiveModel
+      await writeState(folderPath, newState)
+
+      embeddedSoFar += chunks.length
     }
   } else if (toIndex.length === 0) {
     // Nothing new to index — still need the store open for search
-    await vectorStore.open(folderPath)
+    await vectorStore.open(folderPath, { dim })
   }
 
   // Remove vector rows for files deleted since last index

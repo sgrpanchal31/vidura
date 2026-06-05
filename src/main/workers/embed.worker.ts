@@ -1,34 +1,58 @@
 import { parentPort, workerData } from 'worker_threads'
 import { pipeline } from '@huggingface/transformers'
 
-const MODEL_ID = 'Xenova/bge-small-en-v1.5'
-const EMBEDDING_DIM = 384
+const DEFAULT_MODEL_ID = 'onnx-community/Qwen3-Embedding-0.6B-ONNX'
 
-type InitMsg  = { type: 'init' }
+// Catch any crash (e.g. native module failure, unhandled rejection from Transformers.js)
+// and turn it into a clean init_error so the main thread resets gracefully.
+process.on('uncaughtException', (err) => {
+  try { parentPort?.postMessage({ type: 'init_error', error: String(err) }) } catch {}
+})
+process.on('unhandledRejection', (reason) => {
+  try { parentPort?.postMessage({ type: 'init_error', error: String(reason) }) } catch {}
+})
+
+type InitMsg  = { type: 'init'; modelId?: string; dtype?: string; pooling?: 'mean' | 'last_token' }
 type EmbedMsg = { type: 'embed'; reqId: number; texts: string[] }
 type WorkerMsg = InitMsg | EmbedMsg
 
 let extractor: Awaited<ReturnType<typeof pipeline>> | null = null
+let activePooling: 'mean' | 'last_token' = 'last_token'
 
-async function init(): Promise<void> {
-  extractor = await pipeline('feature-extraction', MODEL_ID, {
-    dtype: 'q8',
-    // cache_dir: userData/models — keeps downloaded models in a predictable location
+async function init(modelId: string, dtype: string, pooling: 'mean' | 'last_token'): Promise<void> {
+  activePooling = pooling
+
+  const pipelineOpts = (device: string) => ({
+    dtype,
+    device,
     cache_dir: workerData?.cacheDir ?? undefined,
     progress_callback: (p: any) => {
-      // Forward file-level download progress to the main thread
-      if (p.status === 'progress' && typeof p.loaded === 'number' && typeof p.total === 'number') {
+      // Only report progress for large files (>1MB) — small config/tokenizer files
+      // download instantly and reset the bar, causing it to visually glitch.
+      if ((p.status === 'progress' || p.status === 'download') &&
+          typeof p.loaded === 'number' && typeof p.total === 'number' &&
+          p.total > 1_000_000) {
         parentPort!.postMessage({ type: 'download_progress', loaded: p.loaded, total: p.total })
       }
     }
   })
+
+  // CPU is the only viable execution provider: CoreML cannot handle the zero-length
+  // KV-cache tensors this decoder model produces on its first forward pass.
+  extractor = await pipeline('feature-extraction', modelId, pipelineOpts('cpu'))
+  parentPort!.postMessage({ type: 'device_info', device: 'cpu' })
+
   parentPort!.postMessage({ type: 'ready' })
 }
 
 parentPort!.on('message', async (msg: WorkerMsg) => {
   if (msg.type === 'init') {
     try {
-      await init()
+      await init(
+        msg.modelId ?? DEFAULT_MODEL_ID,
+        msg.dtype ?? 'q8',
+        msg.pooling ?? 'last_token'
+      )
     } catch (err) {
       parentPort!.postMessage({ type: 'init_error', error: String(err) })
     }
@@ -41,9 +65,9 @@ parentPort!.on('message', async (msg: WorkerMsg) => {
       return
     }
     try {
-      const output = await extractor(msg.texts, { pooling: 'mean', normalize: true }) as any
+      const output = await extractor(msg.texts, { pooling: activePooling, normalize: true }) as any
       const batchSize: number = output.dims[0]
-      const dim: number = output.dims[1] ?? EMBEDDING_DIM
+      const dim: number = output.dims[1]
       const vectors: number[][] = []
       for (let i = 0; i < batchSize; i++) {
         vectors.push(Array.from(output.data.slice(i * dim, (i + 1) * dim)) as number[])

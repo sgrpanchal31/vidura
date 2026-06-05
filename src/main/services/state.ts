@@ -17,6 +17,7 @@ export type FileRecord = {
 
 export type NotebookState = {
   version: 1
+  embeddingModel?: string   // HF id of the model used for this folder; absent = default
   files: Record<string, FileRecord>
 }
 

@@ -10,6 +10,8 @@ import type {
   CitationEntry,
   ChatResult,
   NotebookState,
+  LlmModelInfo,
+  EmbedModelInfo,
 } from '../../preload/index'
 
 declare global {
@@ -20,7 +22,7 @@ declare global {
       setPrefs: (patch: Partial<Prefs>) => Promise<void>
       getSystemInfo: () => Promise<SystemInfo>
 
-      startIngest: (folderPath: string) => Promise<IndexSummary>
+      startIngest: (folderPath: string, embeddingModel?: string) => Promise<IndexSummary>
       getIngestState: (folderPath: string) => Promise<NotebookState>
       onIngestProgress: (cb: (p: IndexProgress) => void) => () => void
 
@@ -31,6 +33,15 @@ declare global {
       modelLoad: (modelId: string) => Promise<void>
       modelUnload: () => Promise<void>
       onModelProgress: (cb: (p: ModelProgress) => void) => () => void
+      modelCancelDownload: () => Promise<void>
+      listModels: () => Promise<LlmModelInfo[]>
+      modelDelete: (modelId: string) => Promise<void>
+
+      listEmbedModels: () => Promise<EmbedModelInfo[]>
+      embedEnsure: () => Promise<void>
+      embedDownload: (hfId: string) => Promise<void>
+      embedDelete: (hfId: string) => Promise<void>
+      onEmbedDownloadProgress: (cb: (p: { hfId: string; loaded: number; total: number }) => void) => () => void
 
       chatAsk: (question: string, folderPath: string, modelId: string) => Promise<void>
       chatCancel: () => Promise<void>

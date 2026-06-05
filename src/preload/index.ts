@@ -5,6 +5,24 @@ export type Prefs = {
   modelId: string | null
 }
 
+export type LlmModelInfo = {
+  id: string
+  filename: string
+  sizeBytes: number
+  downloaded: boolean
+}
+
+export type EmbedModelInfo = {
+  hfId: string
+  name: string
+  desc: string
+  sizeLabel: string
+  dim: number
+  recommended: boolean
+  tags: string[]
+  downloaded: boolean
+}
+
 export type FileRecord = {
   relativePath: string
   hash: string
@@ -18,6 +36,7 @@ export type FileRecord = {
 
 export type NotebookState = {
   version: 1
+  embeddingModel?: string
   files: Record<string, FileRecord>
 }
 
@@ -81,8 +100,8 @@ const api = {
     ipcRenderer.invoke('system:info'),
 
   // ── Ingest ──────────────────────────────────────────────────────────────────
-  startIngest: (folderPath: string): Promise<IndexSummary> =>
-    ipcRenderer.invoke('ingest:start', folderPath),
+  startIngest: (folderPath: string, embeddingModel?: string): Promise<IndexSummary> =>
+    ipcRenderer.invoke('ingest:start', folderPath, embeddingModel),
   getIngestState: (folderPath: string): Promise<NotebookState> =>
     ipcRenderer.invoke('ingest:getState', folderPath),
   onIngestProgress: (cb: (p: IndexProgress) => void): (() => void) => {
@@ -108,6 +127,27 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, p: ModelProgress) => cb(p)
     ipcRenderer.on('model:progress', handler)
     return () => ipcRenderer.off('model:progress', handler)
+  },
+  modelCancelDownload: (): Promise<void> =>
+    ipcRenderer.invoke('model:cancelDownload'),
+  listModels: (): Promise<LlmModelInfo[]> =>
+    ipcRenderer.invoke('model:list'),
+  modelDelete: (modelId: string): Promise<void> =>
+    ipcRenderer.invoke('model:delete', modelId),
+
+  // ── Embed model management ───────────────────────────────────────────────────
+  listEmbedModels: (): Promise<EmbedModelInfo[]> =>
+    ipcRenderer.invoke('embed:list'),
+  embedEnsure: (): Promise<void> =>
+    ipcRenderer.invoke('embed:ensure'),
+  embedDownload: (hfId: string): Promise<void> =>
+    ipcRenderer.invoke('embed:download', hfId),
+  embedDelete: (hfId: string): Promise<void> =>
+    ipcRenderer.invoke('embed:delete', hfId),
+  onEmbedDownloadProgress: (cb: (p: { hfId: string; loaded: number; total: number }) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: { hfId: string; loaded: number; total: number }) => cb(p)
+    ipcRenderer.on('embed:downloadProgress', handler)
+    return () => ipcRenderer.off('embed:downloadProgress', handler)
   },
 
   // ── Chat / RAG ──────────────────────────────────────────────────────────────

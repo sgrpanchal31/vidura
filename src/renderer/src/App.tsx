@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import Onboarding from './screens/Onboarding'
 import Chat from './screens/Chat'
+import Settings from './screens/Settings'
 import './styles/globals.css'
+import bgImg from './assets/background.png'
+import vitruvianManImg from './assets/vitruvian-man.png'
 import type { IndexProgress, IndexSummary, ModelProgress } from '../../preload'
 
-type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready'
+type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready' | 'settings'
+
+// Must match DEFAULT_EMBED in embed-models.ts
+const DEFAULT_EMBED_ID = 'onnx-community/Qwen3-Embedding-0.6B-ONNX'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('loading')
@@ -18,7 +24,7 @@ export default function App() {
 
   // Model prep
   const [modelProgress, setModelProgress] = useState<ModelProgress | null>(null)
-  const [modelLoadStage, setModelLoadStage] = useState<'download' | 'load' | null>(null)
+  const [modelLoadStage, setModelLoadStage] = useState<'download' | 'load' | 'embed' | null>(null)
   const [modelPrepError, setModelPrepError] = useState<string | null>(null)
 
   const unsubsRef = useRef<Array<() => void>>([])
@@ -26,20 +32,18 @@ export default function App() {
   useEffect(() => {
     window.api.getPrefs().then((prefs) => {
       if (prefs.lastFolder && prefs.modelId) {
-        // Returning user — skip onboarding and indexing, just load the model
         setNotebookFolder(prefs.lastFolder)
         setModelId(prefs.modelId)
-        startModelPrep(prefs.modelId)
+        startModelPrep(prefs.modelId, prefs.lastFolder)
       } else {
         setScreen('onboarding')
       }
     })
   }, [])
 
-  async function handleOnboardingComplete(folder: string, mId: string) {
-    window.api.setPrefs({ lastFolder: folder, modelId: mId })
-    setNotebookFolder(folder)
-    setModelId(mId)
+  // ── Ingest helper ──────────────────────────────────────────────────────────
+
+  async function runIngest(folder: string, embedModel?: string): Promise<boolean> {
     setScreen('indexing')
     setProgress(null)
     setSummary(null)
@@ -47,18 +51,49 @@ export default function App() {
 
     const unsub = window.api.onIngestProgress(p => setProgress(p))
     try {
-      const result = await window.api.startIngest(folder)
+      const result = await window.api.startIngest(folder, embedModel)
       setSummary(result)
+      return true
     } catch (err) {
       setIngestError(err instanceof Error ? err.message : String(err))
+      return false
     } finally {
       unsub()
     }
-
-    startModelPrep(mId)
   }
 
-  async function startModelPrep(mId: string) {
+  // ── Embed + index check ────────────────────────────────────────────────────
+  // After LLM is ready, verify the embed model is downloaded and the folder
+  // has indexed files. If either is missing, run ingest (which downloads the
+  // embed model and indexes files). On success, show chat.
+
+  async function ensureEmbedAndIndex(folder: string) {
+    const folderState = await window.api.getIngestState(folder)
+    const hasIndexedFiles = Object.values(folderState.files ?? {}).some(
+      f => !f.failed && f.chunkCount > 0
+    )
+    // Only skip ingest if the notebook was already indexed with the current model.
+    // Old notebooks (BGE ids) must re-embed into the new 1024-dim vector store.
+    const onCurrentModel = folderState.embeddingModel === DEFAULT_EMBED_ID
+
+    if (hasIndexedFiles && onCurrentModel) {
+      window.api.setWindowSize(1100, 760)
+      setScreen('ready')
+      return
+    }
+
+    // Missing files or stale embedding model — run ingest.
+    const ok = await runIngest(folder, DEFAULT_EMBED_ID)
+    if (ok) {
+      window.api.setWindowSize(1100, 760)
+      setScreen('ready')
+    }
+    // On failure: stay on indexing screen showing the error + Back button
+  }
+
+  // ── LLM prep ──────────────────────────────────────────────────────────────
+
+  async function startModelPrep(mId: string, folder?: string) {
     setScreen('model_prep')
     setModelPrepError(null)
     setModelProgress(null)
@@ -82,22 +117,72 @@ export default function App() {
       setModelLoadStage('load')
       await window.api.modelLoad(mId)
 
-      // Resize window for the three-pane chat layout before showing it
-      window.api.setWindowSize(1100, 760)
-      setScreen('ready')
+      // Ensure embedding model is downloaded before opening chat.
+      const [embedInfo] = await window.api.listEmbedModels()
+      if (!embedInfo?.downloaded) {
+        setModelLoadStage('embed')
+        const unsub = window.api.onEmbedDownloadProgress(p => {
+          setModelProgress({ modelId: p.hfId, downloaded: p.loaded, total: p.total })
+        })
+        unsubsRef.current.push(unsub)
+        try {
+          await window.api.embedEnsure()
+        } finally {
+          unsub()
+          unsubsRef.current = unsubsRef.current.filter(u => u !== unsub)
+          setModelProgress(null)
+        }
+      }
     } catch (err) {
       setModelPrepError(err instanceof Error ? err.message : String(err))
+      return
+    }
+
+    // LLM + embed model are ready. Check indexing.
+    if (folder) {
+      await ensureEmbedAndIndex(folder)
+    } else {
+      window.api.setWindowSize(1100, 760)
+      setScreen('ready')
     }
   }
 
-  // ── Screens ───────────────────────────────────────────────────────────────
+  // ── Screen handlers ────────────────────────────────────────────────────────
+
+  async function handleOnboardingComplete(folder: string, mId: string) {
+    window.api.setPrefs({ lastFolder: folder, modelId: mId })
+    setNotebookFolder(folder)
+    setModelId(mId)
+    startModelPrep(mId, folder)
+  }
+
+  async function handleChangeFolder() {
+    const newFolder = await window.api.pickFolder()
+    if (!newFolder || newFolder === notebookFolder) return
+
+    await window.api.chatCancel()
+    window.api.setPrefs({ lastFolder: newFolder })
+    setNotebookFolder(newFolder)
+
+    const ok = await runIngest(newFolder)
+    if (ok) {
+      window.api.setWindowSize(1100, 760)
+      setScreen('ready')
+    }
+  }
+
+  // ── Screens ────────────────────────────────────────────────────────────────
 
   if (screen === 'loading') return null
 
   if (screen === 'onboarding') {
     return (
       <div className="app-window">
-        <Onboarding onComplete={handleOnboardingComplete} />
+        <img src={bgImg} className="vitruvian-texture" alt="" />
+        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
+        <div className="screen-content">
+          <Onboarding onComplete={handleOnboardingComplete} />
+        </div>
       </div>
     )
   }
@@ -131,7 +216,9 @@ export default function App() {
 
     return (
       <div className="app-window">
-        <div style={{ padding: '64px 52px' }}>
+        <img src={bgImg} className="vitruvian-texture" alt="" />
+        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
+        <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span style={{ fontFamily: "'Source Serif 4', serif", fontStyle: 'italic', fontSize: '18px', color: 'var(--ink)', display: 'block', marginBottom: '20px' }}>
             Indexing your sources
           </span>
@@ -147,8 +234,18 @@ export default function App() {
             }} />
           </div>
           {ingestError && (
-            <div style={{ marginTop: '16px', fontSize: '12px', color: '#a03030', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              {ingestError}
+            <div style={{ marginTop: '16px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+              <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
+                {ingestError}
+              </div>
+              {notebookFolder && modelId && (
+                <button
+                  onClick={() => notebookFolder && modelId && startModelPrep(modelId, notebookFolder)}
+                  style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', marginRight: '8px' }}
+                >
+                  Retry
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -163,15 +260,27 @@ export default function App() {
 
     const label = modelLoadStage === 'load'
       ? 'Loading model into memory…'
-      : modelProgress
-        ? `Downloading model — ${pct ?? 0}%`
-        : 'Checking model…'
+      : modelLoadStage === 'embed'
+        ? modelProgress
+          ? `Downloading embedding model — ${pct ?? 0}%`
+          : 'Downloading embedding model…'
+        : modelProgress
+          ? `Downloading model — ${pct ?? 0}%`
+          : 'Checking model…'
+
+    const heading = modelLoadStage === 'load'
+      ? 'Loading model'
+      : modelLoadStage === 'embed'
+        ? 'Downloading embedding model'
+        : 'Downloading model'
 
     return (
       <div className="app-window">
-        <div style={{ padding: '64px 52px' }}>
+        <img src={bgImg} className="vitruvian-texture" alt="" />
+        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
+        <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span style={{ fontFamily: "'Source Serif 4', serif", fontStyle: 'italic', fontSize: '18px', color: 'var(--ink)', display: 'block', marginBottom: '20px' }}>
-            {modelLoadStage === 'load' ? 'Loading model' : 'Downloading model'}
+            {heading}
           </span>
           {modelPrepError ? (
             <div>
@@ -179,7 +288,7 @@ export default function App() {
                 {modelPrepError}
               </div>
               <button
-                onClick={() => modelId && startModelPrep(modelId)}
+                onClick={() => modelId && startModelPrep(modelId, notebookFolder ?? undefined)}
                 style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}
               >
                 Retry
@@ -190,7 +299,7 @@ export default function App() {
               <div style={{ fontSize: '12px', color: 'var(--slate)', marginBottom: '12px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
                 {label}
               </div>
-              {modelLoadStage === 'download' && (
+              {(modelLoadStage === 'download' || modelLoadStage === 'embed') && (
                 <div style={{ height: '2px', background: 'var(--line-m)', borderRadius: '1px', overflow: 'hidden', width: '280px' }}>
                   <div style={{
                     height: '100%',
@@ -210,7 +319,34 @@ export default function App() {
   if (screen === 'ready' && notebookFolder && modelId) {
     return (
       <div className="app-window">
-        <Chat folder={notebookFolder} modelId={modelId} />
+        <img src={bgImg} className="vitruvian-texture" alt="" />
+        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
+        <div className="screen-content">
+          <Chat
+            key={notebookFolder}
+            folder={notebookFolder}
+            modelId={modelId}
+            onChangeFolder={handleChangeFolder}
+            onOpenSettings={() => setScreen('settings')}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (screen === 'settings' && notebookFolder && modelId) {
+    return (
+      <div className="app-window">
+        <img src={bgImg} className="vitruvian-texture" alt="" />
+        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
+        <div className="screen-content">
+          <Settings
+            folder={notebookFolder}
+            modelId={modelId}
+            onClose={() => setScreen('ready')}
+            onModelChanged={(id) => setModelId(id)}
+          />
+        </div>
       </div>
     )
   }

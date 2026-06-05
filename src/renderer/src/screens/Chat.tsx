@@ -23,6 +23,7 @@ type ChatProps = {
   folder: string
   modelId: string
   onChangeFolder: () => void
+  onOpenSettings: () => void
 }
 
 const MODEL_LABELS: Record<string, string> = {
@@ -30,6 +31,11 @@ const MODEL_LABELS: Record<string, string> = {
   'llama3.2-3b': 'Llama 3.2 3B',
   'qwen2.5-7b': 'Qwen 2.5 7B',
   'phi3-mini': 'Phi-3 Mini',
+}
+
+function collectDirPaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<string> {
+  for (const n of nodes) if (n.type === 'dir') { out.add(n.path); collectDirPaths(n.children, out) }
+  return out
 }
 
 function buildTree(sources: SourceItem[]): TreeNode[] {
@@ -211,7 +217,7 @@ function renderMarkdown(
   return <>{elements}</>
 }
 
-export default function Chat({ folder, modelId, onChangeFolder }: ChatProps) {
+export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -241,6 +247,7 @@ export default function Chat({ folder, modelId, onChangeFolder }: ChatProps) {
           ext: (f.relativePath.split('.').pop() ?? 'file').toUpperCase().slice(0, 3),
         }))
       setSources(items)
+      setCollapsedDirs(collectDirPaths(buildTree(items)))
       setSuggestions(buildSuggestions(items))
     }).catch(() => {})
   }, [folder])
@@ -377,6 +384,9 @@ export default function Chat({ folder, modelId, onChangeFolder }: ChatProps) {
           <div className="sources-list">
             {renderTree(tree, 0, collapsedDirs, toggleDir)}
           </div>
+          <button className="sources-settings-btn" onClick={onOpenSettings}>
+            ⚙ Settings
+          </button>
         </div>
 
         {/* Chat main */}

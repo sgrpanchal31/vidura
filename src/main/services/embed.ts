@@ -1,8 +1,11 @@
 import { Worker } from 'worker_threads'
 import { join } from 'path'
-import { app } from 'electron'
+import os from 'os'
+import { DEFAULT_EMBED, EMBED_REGISTRY } from './embed-models'
 
-const BATCH_SIZE = 32
+const BATCH_SIZE = 1
+// Number of stderr lines to keep as a rolling tail for crash diagnostics
+const STDERR_TAIL = 20
 
 type PendingRequest = {
   resolve: (vectors: number[][]) => void
@@ -12,15 +15,28 @@ type PendingRequest = {
 export class EmbedService {
   private worker: Worker | null = null
   private started = false
+  private currentModelId: string | null = null
   private readyPromise: Promise<void> | null = null
   private resolveReady!: () => void
   private rejectReady!: (e: Error) => void
   private pending = new Map<number, PendingRequest>()
   private nextId = 0
 
-  async start(onDownloadProgress?: (loaded: number, total: number) => void): Promise<void> {
-    if (this.started) return
+  async start(
+    onDownloadProgress?: (loaded: number, total: number) => void,
+    opts?: { cacheDir?: string; modelId?: string }
+  ): Promise<void> {
+    const requestedModel = opts?.modelId ?? DEFAULT_EMBED
+    const entry = EMBED_REGISTRY[requestedModel] ?? EMBED_REGISTRY[DEFAULT_EMBED]
+
+    // If already started with the same model, nothing to do
+    if (this.started && this.currentModelId === requestedModel) return
+
+    // If started with a different model, tear down the old worker first
+    if (this.started) this.stop()
+
     this.started = true
+    this.currentModelId = requestedModel
 
     this.readyPromise = new Promise<void>((res, rej) => {
       this.resolveReady = res
@@ -28,15 +44,56 @@ export class EmbedService {
     })
 
     const workerPath = join(__dirname, 'workers', 'embed.worker.js')
-    const cacheDir = join(app.getPath('userData'), 'models')
 
-    this.worker = new Worker(workerPath, { workerData: { cacheDir } })
+    let cacheDir: string
+    if (opts?.cacheDir) {
+      cacheDir = opts.cacheDir
+    } else if (process.versions.electron) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      cacheDir = join(require('electron').app.getPath('userData'), 'models')
+    } else {
+      cacheDir = process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), '.openbook', 'models')
+    }
 
-    this.worker.on('message', (msg: any) => {
-      if (msg.type === 'ready') {
+    // Capture stderr so genuine onnxruntime crashes surface in the error message
+    const worker = new Worker(workerPath, { workerData: { cacheDir }, stderr: true })
+    this.worker = worker
+
+    // Rolling stderr tail — piped to process.stderr so it shows in the dev console too
+    const stderrLines: string[] = []
+    let stderrBuf = ''
+    worker.stderr.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      process.stderr.write(text)
+      stderrBuf += text
+      const lines = stderrBuf.split('\n')
+      stderrBuf = lines.pop() ?? ''
+      for (const line of lines) {
+        stderrLines.push(line)
+        if (stderrLines.length > STDERR_TAIL) stderrLines.shift()
+      }
+    })
+
+    const makeError = (base: string) => {
+      const tail = stderrLines.filter(l => l.trim()).slice(-8).join('\n')
+      return new Error(tail ? `${base}\n${tail}` : base)
+    }
+
+    worker.on('message', (msg: any) => {
+      // Ignore events from a stale/replaced worker
+      if (this.worker !== worker) return
+
+      if (msg.type === 'device_info') {
+        console.log(`[embed] running on ${msg.device === 'gpu' ? 'GPU/CoreML' : 'CPU'}`)
+      } else if (msg.type === 'ready') {
         this.resolveReady()
       } else if (msg.type === 'init_error') {
-        this.rejectReady(new Error(msg.error))
+        const error = new Error(msg.error)
+        this.started = false
+        this.currentModelId = null
+        this.worker = null
+        worker.terminate()
+        this.rejectReady(error)
       } else if (msg.type === 'download_progress') {
         onDownloadProgress?.(msg.loaded, msg.total)
       } else if (msg.type === 'embeddings') {
@@ -48,22 +105,37 @@ export class EmbedService {
       }
     })
 
-    this.worker.on('error', (err) => {
-      this.rejectReady(err)
-      for (const req of this.pending.values()) req.reject(err)
+    worker.on('error', (err) => {
+      if (this.worker !== worker) return
+      this.started = false
+      this.currentModelId = null
+      this.worker = null
+      const wrapped = makeError(err.message)
+      this.rejectReady(wrapped)
+      for (const req of this.pending.values()) req.reject(wrapped)
       this.pending.clear()
     })
 
-    this.worker.on('exit', (code) => {
+    worker.on('exit', (code) => {
+      // Ignore exits from workers we already replaced or deliberately stopped
+      if (this.worker !== worker) return
       if (code !== 0) {
-        const err = new Error(`Embed worker exited unexpectedly (code ${code})`)
+        const err = makeError(`Embed worker exited unexpectedly (code ${code})`)
+        this.started = false
+        this.currentModelId = null
+        this.worker = null
         this.rejectReady(err)
         for (const req of this.pending.values()) req.reject(err)
         this.pending.clear()
       }
     })
 
-    this.worker.postMessage({ type: 'init' })
+    worker.postMessage({
+      type: 'init',
+      modelId: requestedModel,
+      dtype: entry?.dtype ?? 'q4',
+      pooling: entry?.pooling ?? 'last_token',
+    })
     await this.readyPromise
   }
 
@@ -96,11 +168,14 @@ export class EmbedService {
   }
 
   stop(): void {
-    this.worker?.terminate()
+    const worker = this.worker
+    // Null this.worker BEFORE terminate() so the exit handler's guard ignores the event
     this.worker = null
     this.started = false
+    this.currentModelId = null
     this.readyPromise = null
     this.pending.clear()
+    worker?.terminate()
   }
 }
 

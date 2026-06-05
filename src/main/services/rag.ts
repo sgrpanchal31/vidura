@@ -2,8 +2,15 @@ import { embedService } from './embed'
 import { vectorStore } from './store'
 import type { SearchResult } from './store'
 import { llamaService } from './inference'
+import { DEFAULT_EMBED, embedDim } from './embed-models'
 
 const RETRIEVE_TOP_K = 5
+
+// Qwen3-Embedding is an asymmetric retrieval model: queries must be prefixed with
+// a task instruction, while document chunks are embedded as-is.
+function formatQueryForEmbed(question: string): string {
+  return `Instruct: Given a question, retrieve passages from the user's documents that answer it\nQuery: ${question}`
+}
 
 // Each retrieved chunk may be up to 2048 chars (~512 tokens). We truncate to
 // ~800 chars (~200 tokens) in the prompt so 5 sources ≈ 1000 tokens input,
@@ -56,28 +63,36 @@ function extractCitations(answer: string, chunks: SearchResult[]): CitationEntry
   return [...seen.values()]
 }
 
+export type RetrievalConfig = {
+  topK: number
+}
+
+export async function retrieve(
+  question: string,
+  folderPath: string,
+  cfg: RetrievalConfig
+): Promise<SearchResult[]> {
+  const embedModel = DEFAULT_EMBED
+  const dim = embedDim(embedModel)
+  await vectorStore.open(folderPath, { dim })
+  await embedService.start(undefined, { modelId: embedModel })
+  const [queryVector] = await embedService.embedBatched([formatQueryForEmbed(question)])
+  return vectorStore.search(queryVector, cfg.topK)
+}
+
 export async function ragQuery(
   question: string,
   folderPath: string,
   modelId: string,
   onToken: (token: string) => void
 ): Promise<RagResult> {
-  // Ensure stores are available (handles re-open after cold start)
-  if (!vectorStore.isOpen()) {
-    await vectorStore.open(folderPath)
-  }
-  if (!embedService.isStarted()) {
-    await embedService.start()
-  }
-
   // Ensure model is loaded
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
   // Embed query and retrieve relevant chunks
-  const [queryVector] = await embedService.embedBatched([question])
-  const chunks = await vectorStore.search(queryVector, RETRIEVE_TOP_K)
+  const chunks = await retrieve(question, folderPath, { topK: RETRIEVE_TOP_K })
 
   if (chunks.length === 0) {
     return {
