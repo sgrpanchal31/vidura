@@ -162,6 +162,20 @@ export default function App() {
     startModelPrep(mId, folder)
   }
 
+  // Called from the blocked-folder recovery screen. Re-picking via the native
+  // dialog grants macOS access (Powerbox) even for the same folder path.
+  async function recoverFolderAccess() {
+    const folder = await window.api.pickFolder()
+    if (!folder) return
+    window.api.setPrefs({ lastFolder: folder })
+    setNotebookFolder(folder)
+    const ok = await runIngest(folder, DEFAULT_EMBED_ID)
+    if (ok) {
+      window.api.setWindowSize(1100, 760)
+      setScreen('ready')
+    }
+  }
+
   async function handleChangeFolder() {
     const newFolder = await window.api.pickFolder()
     if (!newFolder || newFolder === notebookFolder) return
@@ -241,16 +255,34 @@ export default function App() {
           </div>
           {ingestError && (
             <div style={{ marginTop: '16px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-              <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
-                {ingestError}
-              </div>
-              {notebookFolder && modelId && (
-                <button
-                  onClick={() => notebookFolder && modelId && startModelPrep(modelId, notebookFolder)}
-                  style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', marginRight: '8px' }}
-                >
-                  Retry
-                </button>
+              {ingestError.includes('FOLDER_UNREADABLE') ? (
+                <>
+                  <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
+                    <strong>Can't open this folder.</strong> macOS is blocking access to it — this happens
+                    when the app is launched from a terminal without folder permissions. Choose the folder
+                    again to grant access, or relaunch from a terminal with Full Disk Access (e.g. iTerm).
+                  </div>
+                  <button
+                    onClick={recoverFolderAccess}
+                    style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    Choose folder
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
+                    {ingestError}
+                  </div>
+                  {notebookFolder && modelId && (
+                    <button
+                      onClick={() => notebookFolder && modelId && startModelPrep(modelId, notebookFolder)}
+                      style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', marginRight: '8px' }}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

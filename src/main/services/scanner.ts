@@ -26,11 +26,15 @@ export async function scanFolder(folderPath: string): Promise<ScanResult> {
   const files: ScannedFile[] = []
   const skipped: ScanResult['skipped'] = []
 
-  async function walk(dir: string): Promise<void> {
+  async function walk(dir: string, isRoot = false): Promise<void> {
     let entries: Awaited<ReturnType<typeof readdir>>
     try {
       entries = await readdir(dir, { withFileTypes: true })
     } catch {
+      // A read failure on the selected folder itself is almost always macOS
+      // blocking access (TCC). Surface it so the UI can prompt a re-pick;
+      // a single unreadable subdir deeper in the tree is silently skipped.
+      if (isRoot) throw new Error(`FOLDER_UNREADABLE: Couldn't read "${dir}". macOS may be blocking access to this folder.`)
       return
     }
 
@@ -67,7 +71,7 @@ export async function scanFolder(folderPath: string): Promise<ScanResult> {
     }
   }
 
-  await walk(folderPath)
+  await walk(folderPath, true)
   return { files, skipped }
 }
 
