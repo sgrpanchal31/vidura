@@ -45,7 +45,9 @@ src/renderer/src/
 | `qwen2.5-7b` | Qwen 2.5 7B | ~4.7 GB |
 | `phi3-mini` | Phi-3 Mini | ~2.2 GB |
 
-Embedding model: `Xenova/bge-small-en-v1.5` (384-dim, ~23 MB, auto-downloaded).
+Embedding model (downloaded on first launch via HuggingFace Transformers, cached in userData/models/):
+- `onnx-community/Qwen3-Embedding-0.6B-ONNX` — 1024-dim, ~600 MB, last-token pooling, multilingual
+- Queries are prefixed with a retrieval instruction (`formatQueryForEmbed` in `rag.ts`); documents are embedded as-is
 
 ## Commands
 ```bash
