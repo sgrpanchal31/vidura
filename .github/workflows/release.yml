@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   release:
-    # macos-latest = macos-14 (ARM). Matches the arm64 target in electron-builder.yml.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,30 +27,53 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # electron-vite compiles main + preload + renderer into out/
       - name: Build
         run: npm run build
 
-      # Install electron-builder globally before pruning so it survives the next step.
-      - name: Install electron-builder globally
-        run: npm install -g electron-builder
-
-      # Remove devDependencies so electron-builder only scans the 7 production packages
-      # instead of the full tree (which OOMs even at 8 GB).
       - name: Prune dev dependencies
         run: npm prune --omit=dev
 
-      - name: Package DMG
-        run: electron-builder --mac --publish never
+      # Bypass electron-builder's JS-based node_modules scanner (OOMs on this project's
+      # dep tree). Instead: download the Electron binary, assemble the .app with cp,
+      # and wrap it in a DMG with hdiutil — all shell, no JS scanning.
+      - name: Package .app
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          ELECTRON_VERSION: '31.7.7'
+        run: |
+          curl -sL "https://github.com/electron/electron/releases/download/v${ELECTRON_VERSION}/electron-v${ELECTRON_VERSION}-darwin-arm64.zip" \
+            -o /tmp/electron.zip
+          unzip -q /tmp/electron.zip -d /tmp/electron-dist
+
+          mkdir -p dist
+          cp -r "/tmp/electron-dist/Electron.app" "dist/openbook-lm.app"
+
+          APP_RES="dist/openbook-lm.app/Contents/Resources/app"
+          mkdir -p "$APP_RES"
+          cp package.json "$APP_RES/"
+          cp -r out "$APP_RES/"
+          cp -r node_modules "$APP_RES/"
+
+          PLIST="dist/openbook-lm.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName openbook-lm" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.openbooklm.app" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable openbook-lm" "$PLIST"
+          mv "dist/openbook-lm.app/Contents/MacOS/Electron" \
+             "dist/openbook-lm.app/Contents/MacOS/openbook-lm"
+
+      - name: Create DMG
+        run: |
+          hdiutil create \
+            -volname "openbook-lm" \
+            -srcfolder "dist/openbook-lm.app" \
+            -ov -format UDZO \
+            "dist/openbook-lm-arm64.dmg"
 
       # Create a GitHub Release for this tag and attach the .dmg file.
       # GITHUB_TOKEN is provided automatically — no secrets to configure.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.dmg
+          files: dist/openbook-lm-arm64.dmg
           draft: false
           generate_release_notes: false
           body: |
