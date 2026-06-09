@@ -30,43 +30,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Prune dev dependencies
-        run: npm prune --omit=dev
-
-      # Bypass electron-builder's JS-based node_modules scanner (OOMs on this project's
-      # dep tree). Instead: download the Electron binary, assemble the .app with cp,
-      # and wrap it in a DMG with hdiutil — all shell, no JS scanning.
-      - name: Package .app
-        env:
-          ELECTRON_VERSION: '31.7.7'
-        run: |
-          curl -sL "https://github.com/electron/electron/releases/download/v${ELECTRON_VERSION}/electron-v${ELECTRON_VERSION}-darwin-arm64.zip" \
-            -o /tmp/electron.zip
-          unzip -q /tmp/electron.zip -d /tmp/electron-dist
-
-          mkdir -p dist
-          cp -r "/tmp/electron-dist/Electron.app" "dist/openbook-lm.app"
-
-          APP_RES="dist/openbook-lm.app/Contents/Resources/app"
-          mkdir -p "$APP_RES"
-          cp package.json "$APP_RES/"
-          cp -r out "$APP_RES/"
-          cp -r node_modules "$APP_RES/"
-
-          PLIST="dist/openbook-lm.app/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName openbook-lm" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.openbooklm.app" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable openbook-lm" "$PLIST"
-          mv "dist/openbook-lm.app/Contents/MacOS/Electron" \
-             "dist/openbook-lm.app/Contents/MacOS/openbook-lm"
-
-      - name: Create DMG
-        run: |
-          hdiutil create \
-            -volname "openbook-lm" \
-            -srcfolder "dist/openbook-lm.app" \
-            -ov -format UDZO \
-            "dist/openbook-lm-arm64.dmg"
+      - name: Package and sign DMG
+        run: bash scripts/package-mac.sh
 
       # Create a GitHub Release for this tag and attach the .dmg file.
       # GITHUB_TOKEN is provided automatically — no secrets to configure.
