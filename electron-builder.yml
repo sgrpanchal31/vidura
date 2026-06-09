@@ -2,6 +2,9 @@ appId: com.openbooklm.app
 productName: openbook-lm
 copyright: Copyright © 2025
 
+# postinstall already runs electron-rebuild; skip electron-builder's redundant rebuild pass.
+npmRebuild: false
+
 directories:
   buildResources: build # put a 512x512 icon.png here later to replace the default Electron icon
   output: dist

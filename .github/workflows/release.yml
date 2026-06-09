@@ -37,7 +37,7 @@ jobs:
       - name: Package DMG
         run: npx electron-builder --mac --publish never
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          NODE_OPTIONS: --max-old-space-size=8192
 
       # Create a GitHub Release for this tag and attach the .dmg file.
       # GITHUB_TOKEN is provided automatically — no secrets to configure.
