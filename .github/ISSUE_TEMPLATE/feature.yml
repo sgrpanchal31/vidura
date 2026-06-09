@@ -1,0 +1,37 @@
+name: Feature
+description: New capability or improvement
+labels: [feature]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What should happen?
+      description: Describe the desired behavior from the user's perspective.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why? (context or motivation)
+      description: What problem does this solve, or what user need does it address?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: |
+        Bullet list of observable behaviors that mean "done."
+        Be specific enough that someone else could verify each item without asking you.
+      placeholder: |
+        - [ ] User can do X
+        - [ ] Y happens when Z
+        - [ ] Error case: if A, show message B
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / constraints
+      description: Anything that should constrain the implementation (files to touch, things to avoid, etc.)
