@@ -1,0 +1,34 @@
+appId: com.openbooklm.app
+productName: openbook-lm
+copyright: Copyright © 2025
+
+directories:
+  buildResources: build # put a 512x512 icon.png here later to replace the default Electron icon
+  output: dist
+
+# Only include the compiled output and package metadata.
+# electron-builder automatically bundles production node_modules.
+files:
+  - out/**
+  - package.json
+
+# Native .node binaries can't live inside an asar archive — unpack them so
+# the OS can load them directly. Covers lancedb and node-llama-cpp.
+asarUnpack:
+  - '**/*.node'
+  - '**/node-llama-cpp/**'
+  - '**/@lancedb/**'
+
+mac:
+  category: public.app-category.productivity
+  # identity: null  → unsigned build. macOS Gatekeeper will warn on first launch;
+  # users right-click → Open to bypass it. Fine for small distribution.
+  # To add code signing later: set identity to your Developer ID and add
+  # APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID as GitHub secrets.
+  identity: null
+  target:
+    - target: dmg
+      arch: arm64 # Apple Silicon. Add x64 here for an Intel build.
+
+dmg:
+  sign: false
