@@ -8,16 +8,15 @@ on:
 
 jobs:
   ci:
-    runs-on: macos-latest   # macOS required: @lancedb/lancedb and node-llama-cpp
-                             # have native bindings that must compile for the target OS.
+    runs-on:
+      macos-latest # macOS required: @lancedb/lancedb and node-llama-cpp
+      # have native bindings that must compile for the target OS.
     steps:
       - uses: actions/checkout@v4
 
-      # Node 20 LTS matches what Electron 31 embeds internally.
-      # cache: npm persists ~/.npm between runs so re-installs are fast.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # npm ci = clean install (always matches package-lock.json exactly).
