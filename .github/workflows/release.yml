@@ -32,12 +32,19 @@ jobs:
       - name: Build
         run: npm run build
 
-      # electron-builder reads electron-builder.yml and produces an unsigned .dmg in dist/
-      # NODE_OPTIONS increases heap limit — electron-builder OOMs on large node_modules without it.
+      # Install electron-builder globally before pruning so it survives the next step.
+      - name: Install electron-builder globally
+        run: npm install -g electron-builder
+
+      # Remove devDependencies so electron-builder only scans the 7 production packages
+      # instead of the full tree (which OOMs even at 8 GB).
+      - name: Prune dev dependencies
+        run: npm prune --omit=dev
+
       - name: Package DMG
-        run: npx electron-builder --mac --publish never
+        run: electron-builder --mac --publish never
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
+          NODE_OPTIONS: --max-old-space-size=4096
 
       # Create a GitHub Release for this tag and attach the .dmg file.
       # GITHUB_TOKEN is provided automatically — no secrets to configure.
