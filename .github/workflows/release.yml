@@ -12,9 +12,8 @@ permissions:
 
 jobs:
   release:
-    runs-on:
-      macos-latest # ARM runner (macos-14). Matches the arm64 target in
-      # electron-builder.yml — native modules compile for the same arch.
+    # macos-latest = macos-14 (ARM). Matches the arm64 target in electron-builder.yml.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
