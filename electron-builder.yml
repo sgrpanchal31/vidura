@@ -4,6 +4,8 @@ copyright: Copyright © 2025
 
 # postinstall already runs electron-rebuild; skip electron-builder's redundant rebuild pass.
 npmRebuild: false
+# Pin exact version so electron-builder can resolve it after devDeps are pruned.
+electronVersion: '31.7.7'
 
 directories:
   buildResources: build # put a 512x512 icon.png here later to replace the default Electron icon
