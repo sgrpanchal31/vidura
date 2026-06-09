@@ -5,4 +5,4 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    target-branch: dev   # security update PRs target dev, not main
+    target-branch: dev # security update PRs target dev, not main
