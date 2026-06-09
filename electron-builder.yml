@@ -11,11 +11,13 @@ directories:
   buildResources: build # put a 512x512 icon.png here later to replace the default Electron icon
   output: dist
 
-# Only include the compiled output and package metadata.
-# electron-builder automatically bundles production node_modules.
+# Include compiled output, package metadata, and node_modules explicitly.
+# Listing node_modules/** directly bypasses electron-builder's dependency-detection
+# walk, which OOMs on the 20k-file production tree. Prune runs before this step.
 files:
   - out/**
   - package.json
+  - node_modules/**
 
 # Native .node binaries can't live inside an asar archive — unpack them so
 # the OS can load them directly. Covers lancedb and node-llama-cpp.
