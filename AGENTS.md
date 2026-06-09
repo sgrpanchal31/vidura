@@ -61,3 +61,12 @@ npm install   # also runs electron-rebuild for @lancedb/lancedb
 npm run dev
 npm run build
 ```
+
+## Workflow
+
+Development follows an issue-driven flow documented in [docs/workflow.md](docs/workflow.md). When asked to work on an issue, follow it. Rules that always apply:
+
+- **Branch from `dev`** — never commit directly to `main`. Feature branches: `feat/<issue#>-short-name`.
+- **Before opening a PR**, run the `qa-reviewer` agent to check the diff against the issue's acceptance criteria.
+- **Releases** (`dev → main`) go through the `release-gate` agent and require a version bump in `package.json`.
+- Git hooks auto-format staged files on commit and run typecheck + tests on push. Don't bypass with `--no-verify` unless explicitly asked.
