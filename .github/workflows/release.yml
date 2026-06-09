@@ -33,8 +33,11 @@ jobs:
         run: npm run build
 
       # electron-builder reads electron-builder.yml and produces an unsigned .dmg in dist/
+      # NODE_OPTIONS increases heap limit — electron-builder OOMs on large node_modules without it.
       - name: Package DMG
         run: npx electron-builder --mac --publish never
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       # Create a GitHub Release for this tag and attach the .dmg file.
       # GITHUB_TOKEN is provided automatically — no secrets to configure.
