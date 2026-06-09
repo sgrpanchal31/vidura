@@ -19,11 +19,11 @@ export type IndexProgress = {
 }
 
 export type IndexSummary = {
-  total: number       // files found in folder
-  indexed: number     // newly indexed this run
-  upToDate: number    // already indexed, hash unchanged
-  failed: number      // parse errors + oversized
-  chunks: number      // new chunks from this run
+  total: number // files found in folder
+  indexed: number // newly indexed this run
+  upToDate: number // already indexed, hash unchanged
+  failed: number // parse errors + oversized
+  chunks: number // new chunks from this run
   totalChunks: number // total chunks across all indexed files
 }
 
@@ -61,7 +61,7 @@ export async function indexFolder(
         lastIndexed: Date.now(),
         chunkCount: 0,
         failed: true,
-        failReason: 'hash_error'
+        failReason: 'hash_error',
       }
       continue
     }
@@ -103,7 +103,9 @@ export async function indexFolder(
         const content = await readFile(path, 'utf-8')
         const sections = parseMarkdown(content)
         chunks = chunkMarkdown(relPath, sections)
-      } else if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
+      } else if (
+        ['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)
+      ) {
         const content = await readFile(path, 'utf-8')
         const symbols = await parseCode(path, content)
         if (symbols.length > 0) {
@@ -134,7 +136,7 @@ export async function indexFolder(
         lastIndexed: Date.now(),
         chunkCount: 0,
         failed: true,
-        failReason: err instanceof Error ? err.message : String(err)
+        failReason: err instanceof Error ? err.message : String(err),
       }
     }
   }
@@ -147,7 +149,9 @@ export async function indexFolder(
     // Start embed worker — may download model on first run; emit model_load progress
     onProgress({ stage: 'model_load', processed: 0, total: 0 })
     await embedService.start(
-      (loaded, total) => { onProgress({ stage: 'model_load', processed: loaded, total }) },
+      (loaded, total) => {
+        onProgress({ stage: 'model_load', processed: loaded, total })
+      },
       { modelId: effectiveModel }
     )
 
@@ -184,9 +188,7 @@ export async function indexFolder(
   }
 
   // Remove vector rows for files deleted since last index
-  const deletedRelPaths = Object.keys(state.files).filter(
-    (rp) => !newState.files[rp]
-  )
+  const deletedRelPaths = Object.keys(state.files).filter((rp) => !newState.files[rp])
   if (deletedRelPaths.length > 0 && vectorStore.isOpen()) {
     await vectorStore.deleteByFiles(deletedRelPaths)
   }
@@ -206,8 +208,8 @@ export async function indexFolder(
       upToDate: unchanged.length,
       failed: failCount + skipped.length,
       chunks: allChunks.length,
-      totalChunks
+      totalChunks,
     },
-    chunks: allChunks
+    chunks: allChunks,
   }
 }

@@ -49,7 +49,7 @@ export class EmbedService {
     if (opts?.cacheDir) {
       cacheDir = opts.cacheDir
     } else if (process.versions.electron) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       cacheDir = join(require('electron').app.getPath('userData'), 'models')
     } else {
       cacheDir = process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), '.openbook', 'models')
@@ -75,7 +75,10 @@ export class EmbedService {
     })
 
     const makeError = (base: string) => {
-      const tail = stderrLines.filter(l => l.trim()).slice(-8).join('\n')
+      const tail = stderrLines
+        .filter((l) => l.trim())
+        .slice(-8)
+        .join('\n')
       return new Error(tail ? `${base}\n${tail}` : base)
     }
 
@@ -98,10 +101,16 @@ export class EmbedService {
         onDownloadProgress?.(msg.loaded, msg.total)
       } else if (msg.type === 'embeddings') {
         const req = this.pending.get(msg.reqId)
-        if (req) { this.pending.delete(msg.reqId); req.resolve(msg.vectors) }
+        if (req) {
+          this.pending.delete(msg.reqId)
+          req.resolve(msg.vectors)
+        }
       } else if (msg.type === 'error') {
         const req = this.pending.get(msg.reqId)
-        if (req) { this.pending.delete(msg.reqId); req.reject(new Error(msg.error)) }
+        if (req) {
+          this.pending.delete(msg.reqId)
+          req.reject(new Error(msg.error))
+        }
       }
     })
 
@@ -148,10 +157,7 @@ export class EmbedService {
     })
   }
 
-  async embedBatched(
-    texts: string[],
-    onBatch?: (done: number, total: number) => void
-  ): Promise<number[][]> {
+  async embedBatched(texts: string[], onBatch?: (done: number, total: number) => void): Promise<number[][]> {
     if (!this.started) await this.start()
     const results: number[][] = []
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {

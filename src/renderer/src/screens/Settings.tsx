@@ -65,16 +65,14 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    Promise.all([
-      window.api.listModels(),
-      window.api.listEmbedModels(),
-      window.api.getSystemInfo(),
-    ]).then(([llms, embeds, sysInfo]) => {
-      setLlmModels(llms)
-      setEmbedModel(embeds[0] ?? null)
-      setRamGB(sysInfo.totalRamGB)
-      setIsMac(sysInfo.platform === 'darwin')
-    })
+    Promise.all([window.api.listModels(), window.api.listEmbedModels(), window.api.getSystemInfo()]).then(
+      ([llms, embeds, sysInfo]) => {
+        setLlmModels(llms)
+        setEmbedModel(embeds[0] ?? null)
+        setRamGB(sysInfo.totalRamGB)
+        setIsMac(sysInfo.platform === 'darwin')
+      }
+    )
 
     return () => {
       unsubRef.current?.()
@@ -107,7 +105,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     setDownloadingId(id)
     setDownloadProgress(null)
 
-    const unsub = window.api.onModelProgress(p => {
+    const unsub = window.api.onModelProgress((p) => {
       if (p.modelId === id) setDownloadProgress(p)
     })
     unsubRef.current = unsub
@@ -170,7 +168,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     setDownloadingEmbed(true)
     setEmbedDownloadProgress(null)
 
-    const unsub = window.api.onEmbedDownloadProgress(p => {
+    const unsub = window.api.onEmbedDownloadProgress((p) => {
       setEmbedDownloadProgress({ loaded: p.loaded, total: p.total })
     })
     embedUnsubRef.current = unsub
@@ -210,10 +208,9 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
 
       {/* Main: nav sidebar + content */}
       <div className="settings-main">
-
         {/* Nav */}
         <nav className="settings-nav">
-          {NAV_ITEMS.map(item => (
+          {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               className={`settings-nav-item${activeSection === item.id ? ' active' : ''}`}
@@ -226,7 +223,6 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
 
         {/* Content */}
         <div className="settings-content">
-
           {/* ── Language model ── */}
           {activeSection === 'llm' && (
             <div className="settings-section">
@@ -242,9 +238,10 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                   const isActive = m.id === modelId
                   const isDownloading = downloadingId === m.id
                   const isLoading = loadingId === m.id
-                  const pct = isDownloading && downloadProgress?.total > 0
-                    ? Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)
-                    : null
+                  const pct =
+                    isDownloading && downloadProgress != null && downloadProgress.total > 0
+                      ? Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)
+                      : null
 
                   // Downloading: show progress row or cancel confirm
                   if (isDownloading) {
@@ -255,16 +252,10 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                             Stop downloading? The partial file will be deleted.
                           </span>
                           <div className="settings-confirm-actions">
-                            <button
-                              className="settings-confirm-cancel"
-                              onClick={() => setShowCancelConfirm(false)}
-                            >
+                            <button className="settings-confirm-cancel" onClick={() => setShowCancelConfirm(false)}>
                               Keep downloading
                             </button>
-                            <button
-                              className="settings-confirm-ok"
-                              onClick={confirmCancel}
-                            >
+                            <button className="settings-confirm-ok" onClick={confirmCancel}>
                               Stop
                             </button>
                           </div>
@@ -279,10 +270,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                             Downloading {meta?.name ?? m.id}
                             {pct !== null ? ` — ${pct}%` : '…'}
                           </span>
-                          <button
-                            className="settings-cancel-download-btn"
-                            onClick={() => setShowCancelConfirm(true)}
-                          >
+                          <button className="settings-cancel-download-btn" onClick={() => setShowCancelConfirm(true)}>
                             Cancel
                           </button>
                         </div>
@@ -313,11 +301,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                           {isActive && <span className="settings-badge active">Selected</span>}
                           {!isActive && m.downloaded && (
                             <>
-                              <button
-                                className="settings-use-btn"
-                                onClick={(e) => handleUse(m.id, e)}
-                                disabled={busy}
-                              >
+                              <button className="settings-use-btn" onClick={(e) => handleUse(m.id, e)} disabled={busy}>
                                 {isLoading ? 'Loading…' : 'Use'}
                               </button>
                               <button
@@ -331,9 +315,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                           )}
                           {!m.downloaded && (
                             <div className="settings-download-group">
-                              {hintId === m.id && (
-                                <span className="settings-download-hint">Download first</span>
-                              )}
+                              {hintId === m.id && <span className="settings-download-hint">Download first</span>}
                               <button
                                 className={`settings-download-btn${hintId === m.id ? ' hint-pulse' : ''}`}
                                 onClick={(e) => handleDownload(m.id, e)}
@@ -349,9 +331,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                   )
                 })}
               </div>
-              <div className="settings-coming-soon">
-                Coming soon: switch models per chat
-              </div>
+              <div className="settings-coming-soon">Coming soon: switch models per chat</div>
             </div>
           )}
 
@@ -360,8 +340,8 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
             <div className="settings-section">
               <div className="settings-section-title">Embedding model</div>
               <div className="settings-section-note">
-                Used to index your sources and find relevant passages when you ask a question.
-                Runs entirely on your Mac — no internet connection required after download.
+                Used to index your sources and find relevant passages when you ask a question. Runs entirely on your Mac
+                — no internet connection required after download.
               </div>
               {embedError && <div className="settings-error">{embedError}</div>}
               <div className="settings-model-list">
@@ -379,9 +359,10 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                       <div
                         className="settings-progress-fill"
                         style={{
-                          width: embedDownloadProgress && embedDownloadProgress.total > 0
-                            ? `${Math.round((embedDownloadProgress.loaded / embedDownloadProgress.total) * 100)}%`
-                            : '0%'
+                          width:
+                            embedDownloadProgress && embedDownloadProgress.total > 0
+                              ? `${Math.round((embedDownloadProgress.loaded / embedDownloadProgress.total) * 100)}%`
+                              : '0%',
                         }}
                       />
                     </div>
@@ -393,9 +374,13 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                       <div className="settings-model-name">
                         {embedModel.name}
                         {embedModel.recommended && <span className="tag-rec">Recommended</span>}
-                        {embedModel.tags.filter(t => t !== 'Recommended').map(t => (
-                          <span key={t} className="tag-info">{t}</span>
-                        ))}
+                        {embedModel.tags
+                          .filter((t) => t !== 'Recommended')
+                          .map((t) => (
+                            <span key={t} className="tag-info">
+                              {t}
+                            </span>
+                          ))}
                       </div>
                       <div className="settings-model-desc">{embedModel.desc}</div>
                     </div>
@@ -405,10 +390,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                         {embedModel.downloaded ? (
                           <span className="settings-badge active">Downloaded</span>
                         ) : (
-                          <button
-                            className="settings-download-btn"
-                            onClick={handleDownloadEmbed}
-                          >
+                          <button className="settings-download-btn" onClick={handleDownloadEmbed}>
                             Download
                           </button>
                         )}
@@ -419,7 +401,6 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>

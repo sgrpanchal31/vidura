@@ -15,12 +15,12 @@ An open-source, local-first alternative to NotebookLM. Point it at a folder of d
 
 ## Supported platforms
 
-| Platform | Status |
-|---|---|
-| macOS (Apple Silicon) | Supported |
-| macOS (Intel) | Supported |
-| Windows | Supported (builds and runs; UI uses native title bar) |
-| Linux | Not tested |
+| Platform              | Status                                                |
+| --------------------- | ----------------------------------------------------- |
+| macOS (Apple Silicon) | Supported                                             |
+| macOS (Intel)         | Supported                                             |
+| Windows               | Supported (builds and runs; UI uses native title bar) |
+| Linux                 | Not tested                                            |
 
 > **Note:** Apple Silicon Macs get the best performance — node-llama-cpp uses Metal GPU acceleration automatically. Intel Macs and Windows fall back to CPU inference, which is slower.
 
@@ -28,12 +28,12 @@ An open-source, local-first alternative to NotebookLM. Point it at a folder of d
 
 ## System requirements
 
-| | Minimum | Recommended |
-|---|---|---|
-| RAM | 8 GB | 16 GB+ |
-| Disk | 5 GB free | 10 GB+ free |
-| OS | macOS 12+ / Windows 10+ | macOS 13+ |
-| Node.js | 18+ | 20+ |
+|         | Minimum                 | Recommended |
+| ------- | ----------------------- | ----------- |
+| RAM     | 8 GB                    | 16 GB+      |
+| Disk    | 5 GB free               | 10 GB+ free |
+| OS      | macOS 12+ / Windows 10+ | macOS 13+   |
+| Node.js | 18+                     | 20+         |
 
 More RAM allows larger models. The 7B model needs ~6 GB RAM headroom during inference.
 
@@ -43,16 +43,17 @@ More RAM allows larger models. The 7B model needs ~6 GB RAM headroom during infe
 
 During setup you choose one LLM. All models are GGUF Q4_K_M quantizations (4-bit, good quality/speed tradeoff) downloaded from HuggingFace.
 
-| Label | Underlying model | Download size | Best for |
-|---|---|---|---|
-| Gemma 2 2B | Qwen 2.5 1.5B Instruct | ~1 GB | Fast answers, low RAM (8 GB machines) |
-| Llama 3.2 3B | Llama 3.2 3B Instruct | ~2 GB | Better reasoning, still quick |
-| Qwen 2.5 7B | Qwen 2.5 7B Instruct | ~4.7 GB | Best quality (needs 16 GB RAM) |
-| Phi-3 Mini | Phi-3 Mini 4K Instruct | ~2.2 GB | Strong on technical/code content |
+| Label        | Underlying model       | Download size | Best for                              |
+| ------------ | ---------------------- | ------------- | ------------------------------------- |
+| Gemma 2 2B   | Qwen 2.5 1.5B Instruct | ~1 GB         | Fast answers, low RAM (8 GB machines) |
+| Llama 3.2 3B | Llama 3.2 3B Instruct  | ~2 GB         | Better reasoning, still quick         |
+| Qwen 2.5 7B  | Qwen 2.5 7B Instruct   | ~4.7 GB       | Best quality (needs 16 GB RAM)        |
+| Phi-3 Mini   | Phi-3 Mini 4K Instruct | ~2.2 GB       | Strong on technical/code content      |
 
 **Embedding model:** `bge-small-en-v1.5` (~23 MB) — downloaded automatically on first run. Used to turn documents and queries into vectors for semantic search.
 
 Models are stored in your system's app data folder and persist across sessions:
+
 - macOS: `~/Library/Application Support/openbook-lm/models/`
 - Windows: `%APPDATA%\openbook-lm\models\`
 
@@ -60,11 +61,11 @@ Models are stored in your system's app data folder and persist across sessions:
 
 ## Supported document types
 
-| Format | Notes |
-|---|---|
-| PDF (`.pdf`) | Text extracted page by page; page numbers tracked for citations |
-| Markdown (`.md`) | Heading structure preserved; headings tracked for citations |
-| Plain text (`.txt`) | Line numbers tracked for citations |
+| Format              | Notes                                                           |
+| ------------------- | --------------------------------------------------------------- |
+| PDF (`.pdf`)        | Text extracted page by page; page numbers tracked for citations |
+| Markdown (`.md`)    | Heading structure preserved; headings tracked for citations     |
+| Plain text (`.txt`) | Line numbers tracked for citations                              |
 
 Files larger than 50 MB are skipped. Hidden files/folders and `node_modules` are ignored.
 
@@ -126,15 +127,15 @@ On subsequent launches, the app skips onboarding and loads your last notebook an
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Desktop shell | [Electron](https://www.electronjs.org/) |
-| Build tooling | [electron-vite](https://electron-vite.org/) + Vite + esbuild |
-| UI | React 18 + TypeScript |
-| LLM inference | [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) (llama.cpp bindings) |
-| Embeddings | [@huggingface/transformers](https://huggingface.co/docs/transformers.js) — bge-small-en-v1.5 |
-| Vector store | [LanceDB](https://lancedb.github.io/lancedb/) (embedded, no separate server) |
-| PDF parsing | [pdfjs-dist](https://github.com/mozilla/pdfjs-dist) |
+| Layer         | Technology                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| Desktop shell | [Electron](https://www.electronjs.org/)                                                      |
+| Build tooling | [electron-vite](https://electron-vite.org/) + Vite + esbuild                                 |
+| UI            | React 18 + TypeScript                                                                        |
+| LLM inference | [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) (llama.cpp bindings)           |
+| Embeddings    | [@huggingface/transformers](https://huggingface.co/docs/transformers.js) — bge-small-en-v1.5 |
+| Vector store  | [LanceDB](https://lancedb.github.io/lancedb/) (embedded, no separate server)                 |
+| PDF parsing   | [pdfjs-dist](https://github.com/mozilla/pdfjs-dist)                                          |
 
 ---
 

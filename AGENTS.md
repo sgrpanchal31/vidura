@@ -3,11 +3,13 @@
 Local-first desktop app: chat with documents using an on-device LLM. Electron + React + TypeScript, built with electron-vite.
 
 ## Commits
+
 - Short subject line only (no body, no bullet points)
 - No `Co-Authored-By` lines — ever
 - Example: `Fix chevron rotation in sources panel`
 
 ## Architecture
+
 ```
 src/main/           — Electron main process
   index.ts          — IPC handlers, window setup
@@ -31,6 +33,7 @@ src/renderer/src/
 ```
 
 ## Key conventions
+
 - **IPC**: new features need a handler in `main/index.ts`, exposure in `preload/index.ts`, type in `env.d.ts`
 - **CSS tokens**: `--ink`, `--ox` (accent), `--slate`, `--cream-d/dd`, `--line/line-m` — never hardcode colors
 - **Fonts**: IBM Plex Sans (UI), Source Serif 4 (editorial), IBM Plex Mono (code)
@@ -38,18 +41,21 @@ src/renderer/src/
 - Build uses esbuild — TypeScript errors don't block `npm run build`
 
 ## Models (GGUF Q4_K_M, downloaded to userData/models/)
-| modelId | Model | Size |
-|---|---|---|
-| `gemma2-2b` | Qwen 2.5 1.5B | ~1 GB |
-| `llama3.2-3b` | Llama 3.2 3B | ~2 GB |
-| `qwen2.5-7b` | Qwen 2.5 7B | ~4.7 GB |
-| `phi3-mini` | Phi-3 Mini | ~2.2 GB |
+
+| modelId       | Model         | Size    |
+| ------------- | ------------- | ------- |
+| `gemma2-2b`   | Qwen 2.5 1.5B | ~1 GB   |
+| `llama3.2-3b` | Llama 3.2 3B  | ~2 GB   |
+| `qwen2.5-7b`  | Qwen 2.5 7B   | ~4.7 GB |
+| `phi3-mini`   | Phi-3 Mini    | ~2.2 GB |
 
 Embedding model (downloaded on first launch via HuggingFace Transformers, cached in userData/models/):
+
 - `onnx-community/Qwen3-Embedding-0.6B-ONNX` — 1024-dim, ~600 MB, last-token pooling, multilingual
 - Queries are prefixed with a retrieval instruction (`formatQueryForEmbed` in `rag.ts`); documents are embedded as-is
 
 ## Commands
+
 ```bash
 npm install   # also runs electron-rebuild for @lancedb/lancedb
 npm run dev

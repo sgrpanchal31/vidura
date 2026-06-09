@@ -1,5 +1,5 @@
 import { join, relative, extname } from 'path'
-import { readdirSync, statSync, mkdirSync, existsSync, writeFileSync, readFileSync } from 'fs'
+import { readdirSync, statSync, mkdirSync, existsSync, writeFileSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { connect } from '@lancedb/lancedb'
 import { Schema, Field, Utf8, Int32, Float32, FixedSizeList } from 'apache-arrow'
@@ -25,11 +25,7 @@ const SCHEMA = new Schema([
   new Field('lineNumber', new Int32(), true),
 ])
 
-export async function buildCorpusIndex(
-  corpusDir: string,
-  workDir: string,
-  cfg?: ChunkConfig
-): Promise<void> {
+export async function buildCorpusIndex(corpusDir: string, workDir: string, cfg?: ChunkConfig): Promise<void> {
   const indexPath = join(workDir, 'lance')
   const doneFlag = join(workDir, '.indexed')
 
@@ -45,7 +41,7 @@ export async function buildCorpusIndex(
     ? await db.openTable(TABLE_NAME)
     : await db.createEmptyTable(TABLE_NAME, SCHEMA)
 
-  const files = walkDir(corpusDir).filter(f => ['.pdf', '.md', '.txt'].includes(extname(f).toLowerCase()))
+  const files = walkDir(corpusDir).filter((f) => ['.pdf', '.md', '.txt'].includes(extname(f).toLowerCase()))
   console.log(`  [corpus] indexing ${files.length} files from ${corpusDir}`)
 
   for (const absPath of files) {
@@ -71,22 +67,24 @@ export async function buildCorpusIndex(
       if (chunks.length === 0) continue
 
       process.stdout.write(`  [corpus] ${relPath} (${chunks.length} chunks)...`)
-      const vectors = await embedTexts(chunks.map(c => c.text))
+      const vectors = await embedTexts(chunks.map((c) => c.text))
       console.log(' done')
 
-      await table.add(chunks.map((c, i) => ({
-        id: c.id,
-        vector: vectors[i],
-        text: c.text,
-        parentText: c.parentText,
-        parentId: c.parentId,
-        sourceFile: c.sourceFile,
-        chunkIndex: c.chunkIndex,
-        pageNumber: c.pageNumber ?? null,
-        headingAnchor: c.headingAnchor ?? null,
-        headingPath: c.headingPath ?? null,
-        lineNumber: c.lineNumber ?? null,
-      })))
+      await table.add(
+        chunks.map((c, i) => ({
+          id: c.id,
+          vector: vectors[i],
+          text: c.text,
+          parentText: c.parentText,
+          parentId: c.parentId,
+          sourceFile: c.sourceFile,
+          chunkIndex: c.chunkIndex,
+          pageNumber: c.pageNumber ?? null,
+          headingAnchor: c.headingAnchor ?? null,
+          headingPath: c.headingPath ?? null,
+          lineNumber: c.lineNumber ?? null,
+        }))
+      )
     } catch (e) {
       console.warn(`  [corpus] skipping ${relPath}: ${e}`)
     }

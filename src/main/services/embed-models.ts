@@ -35,7 +35,7 @@ export function embedDim(hfId: string): number {
 
 function getModelsDir(): string {
   if (process.versions.electron) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     return join(require('electron').app.getPath('userData'), 'models')
   }
   return join(process.env.OPENBOOK_MODELS_DIR ?? '', 'models')
@@ -48,7 +48,7 @@ export async function isEmbedDownloaded(hfId: string): Promise<boolean> {
     if (!existsSync(dir)) return false
     const onnxDir = join(dir, 'onnx')
     if (!existsSync(onnxDir)) return false
-    return readdirSync(onnxDir).some(f => f.endsWith('.onnx'))
+    return readdirSync(onnxDir).some((f) => f.endsWith('.onnx'))
   } catch {
     return false
   }
@@ -57,10 +57,12 @@ export async function isEmbedDownloaded(hfId: string): Promise<boolean> {
 export type EmbedModelInfo = EmbedModelEntry & { downloaded: boolean }
 
 export async function listEmbedModels(): Promise<EmbedModelInfo[]> {
-  return Promise.all(Object.values(EMBED_REGISTRY).map(async (entry) => ({
-    ...entry,
-    downloaded: await isEmbedDownloaded(entry.hfId),
-  })))
+  return Promise.all(
+    Object.values(EMBED_REGISTRY).map(async (entry) => ({
+      ...entry,
+      downloaded: await isEmbedDownloaded(entry.hfId),
+    }))
+  )
 }
 
 export async function deleteEmbed(hfId: string): Promise<void> {

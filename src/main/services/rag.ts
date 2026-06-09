@@ -20,7 +20,7 @@ function formatQueryForEmbed(question: string): string {
 const PARENT_PROMPT_CHARS = 1500
 
 export type CitationEntry = {
-  sourceNum: number    // the [N] number the model used in the answer
+  sourceNum: number // the [N] number the model used in the answer
   chunk: SearchResult
 }
 
@@ -66,7 +66,7 @@ ${sources}`
 }
 
 function extractCitations(answer: string, parents: SearchResult[]): CitationEntry[] {
-  const seen = new Map<number, CitationEntry>()  // sourceNum → entry (preserves order)
+  const seen = new Map<number, CitationEntry>() // sourceNum → entry (preserves order)
   const pattern = /\[(\d+)\]/g
   let match: RegExpExecArray | null
 
@@ -84,11 +84,7 @@ export type RetrievalConfig = {
   topK: number
 }
 
-export async function retrieve(
-  question: string,
-  folderPath: string,
-  cfg: RetrievalConfig
-): Promise<SearchResult[]> {
+export async function retrieve(question: string, folderPath: string, cfg: RetrievalConfig): Promise<SearchResult[]> {
   const embedModel = DEFAULT_EMBED
   const dim = embedDim(embedModel)
   await vectorStore.open(folderPath, { dim })
@@ -128,7 +124,7 @@ export async function ragQuery(
   let next = 1
   rawAnswer.replace(/\[(\d+)\]/g, (_, n) => {
     const num = parseInt(n, 10)
-    if (rawCitations.some(c => c.sourceNum === num) && !remap.has(num)) remap.set(num, next++)
+    if (rawCitations.some((c) => c.sourceNum === num) && !remap.has(num)) remap.set(num, next++)
     return ''
   })
   const answer = rawAnswer.replace(/\[(\d+)\]/g, (orig, n) => {
@@ -136,8 +132,8 @@ export async function ragQuery(
     return d !== undefined ? `[${d}]` : orig
   })
   const citations = rawCitations
-    .filter(c => remap.has(c.sourceNum))
-    .map(c => ({ ...c, sourceNum: remap.get(c.sourceNum)! }))
+    .filter((c) => remap.has(c.sourceNum))
+    .map((c) => ({ ...c, sourceNum: remap.get(c.sourceNum)! }))
     .sort((a, b) => a.sourceNum - b.sourceNum)
 
   return { answer, citations }

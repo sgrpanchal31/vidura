@@ -17,11 +17,7 @@ class BaselineTechnique implements RetrievalTechnique {
 
     let rows: any[]
     try {
-      rows = await table
-        .search(queryVector)
-        .distanceType('cosine')
-        .limit(topK)
-        .toArray()
+      rows = await table.search(queryVector).distanceType('cosine').limit(topK).toArray()
     } catch {
       return []
     }

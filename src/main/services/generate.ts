@@ -19,11 +19,12 @@ const MAP_CHARS_PER_DOC = 4000
 const REDUCE_BATCH_SIZE = 4
 
 function mapPrompt(task: GenerateTask, format: GenerateFormat, docSummaries: string): string {
-  const formatHint = format === 'mermaid'
-    ? 'Output valid Mermaid diagram syntax.'
-    : format === 'facts-json'
-      ? 'Output a JSON array of fact strings, e.g. ["Fact 1", "Fact 2"].'
-      : 'Write flowing prose.'
+  const formatHint =
+    format === 'mermaid'
+      ? 'Output valid Mermaid diagram syntax.'
+      : format === 'facts-json'
+        ? 'Output a JSON array of fact strings, e.g. ["Fact 1", "Fact 2"].'
+        : 'Write flowing prose.'
 
   const taskHint: Record<GenerateTask, string> = {
     overview: 'Summarize the key ideas and structure of this document in 3–5 sentences.',
@@ -40,11 +41,12 @@ ${docSummaries}`
 }
 
 function reducePrompt(task: GenerateTask, format: GenerateFormat, intermediates: string): string {
-  const formatHint = format === 'mermaid'
-    ? 'Output valid Mermaid diagram syntax only — no prose.'
-    : format === 'facts-json'
-      ? 'Output a JSON array of fact strings only — no prose.'
-      : 'Write flowing prose.'
+  const formatHint =
+    format === 'mermaid'
+      ? 'Output valid Mermaid diagram syntax only — no prose.'
+      : format === 'facts-json'
+        ? 'Output a JSON array of fact strings only — no prose.'
+        : 'Write flowing prose.'
 
   const taskHint: Record<GenerateTask, string> = {
     overview: 'Synthesize the following document summaries into a single cohesive overview.',
@@ -63,17 +65,26 @@ ${intermediates}`
 async function extractDocText(absPath: string, ext: string): Promise<string> {
   if (ext === '.pdf') {
     const parsed = await parsePdf(absPath)
-    return parsed.pages.map(p => p.text).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+    return parsed.pages
+      .map((p) => p.text)
+      .join('\n\n')
+      .slice(0, MAP_CHARS_PER_DOC)
   }
   const content = await readFile(absPath, 'utf-8')
   if (ext === '.md') {
     const sections = parseMarkdown(content)
-    return sections.map(s => s.text).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+    return sections
+      .map((s) => s.text)
+      .join('\n\n')
+      .slice(0, MAP_CHARS_PER_DOC)
   }
   if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
     const symbols = await parseCode(absPath, content)
     if (symbols.length > 0) {
-      return symbols.map(s => s.parentText).join('\n\n').slice(0, MAP_CHARS_PER_DOC)
+      return symbols
+        .map((s) => s.parentText)
+        .join('\n\n')
+        .slice(0, MAP_CHARS_PER_DOC)
     }
   }
   return parseText(content).text.slice(0, MAP_CHARS_PER_DOC)

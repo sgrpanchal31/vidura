@@ -15,29 +15,29 @@ const MODELS: Model[] = [
     name: 'Qwen 2.5 1.5B',
     desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
     size: '1.0 GB',
-    minRamGB: 0
+    minRamGB: 0,
   },
   {
     id: 'llama3.2-3b',
     name: 'Llama 3.2 3B',
     desc: 'Slightly larger. Better on dense academic text and long-form sources.',
     size: '2.0 GB',
-    minRamGB: 8
+    minRamGB: 8,
   },
   {
     id: 'qwen2.5-7b',
     name: 'Qwen 2.5 7B',
     desc: 'Highest quality. Requires 32 GB RAM or more.',
     size: '4.4 GB',
-    minRamGB: 32
+    minRamGB: 32,
   },
   {
     id: 'phi3-mini',
     name: 'Phi-3 Mini',
     desc: "Microsoft's compact model. Good on structured notes and lists.",
     size: '2.3 GB',
-    minRamGB: 0
-  }
+    minRamGB: 0,
+  },
 ]
 
 function recommendedModelId(ramGB: number): string {
@@ -85,9 +85,7 @@ export default function Onboarding({ onComplete }: Props) {
       <div className="zone">
         <div className="eyebrow">Notebook Folder</div>
         <div className="path-row">
-          <div className={`path-field${folder ? '' : ' empty'}`}>
-            {folder ?? 'No folder selected yet'}
-          </div>
+          <div className={`path-field${folder ? '' : ' empty'}`}>{folder ?? 'No folder selected yet'}</div>
           <button className="btn-primary" onClick={handlePickFolder}>
             Choose folder
           </button>
@@ -117,9 +115,7 @@ export default function Onboarding({ onComplete }: Props) {
               <div className="model-info">
                 <div className="model-name">
                   {model.name}
-                  {model.id === recommendedId && (
-                    <span className="tag-rec">Recommended</span>
-                  )}
+                  {model.id === recommendedId && <span className="tag-rec">Recommended</span>}
                 </div>
                 <div className="model-desc">{model.desc}</div>
               </div>
@@ -129,16 +125,11 @@ export default function Onboarding({ onComplete }: Props) {
         </div>
       </div>
 
-      <div className="win-footer">
-        All data stays on this machine · no account required
-      </div>
+      <div className="win-footer">All data stays on this machine · no account required</div>
 
       {folder && (
         <div className="cta-row">
-          <button
-            className="btn-primary"
-            onClick={() => onComplete(folder, modelId)}
-          >
+          <button className="btn-primary" onClick={() => onComplete(folder, modelId)}>
             Open notebook →
           </button>
         </div>
