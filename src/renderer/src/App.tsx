@@ -19,6 +19,7 @@ export default function App() {
 
   // Indexing
   const [progress, setProgress] = useState<IndexProgress | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- state set on ingest completion, reserved for a future "N files indexed" indicator
   const [summary, setSummary] = useState<IndexSummary | null>(null)
   const [ingestError, setIngestError] = useState<string | null>(null)
 
@@ -49,7 +50,7 @@ export default function App() {
     setSummary(null)
     setIngestError(null)
 
-    const unsub = window.api.onIngestProgress(p => setProgress(p))
+    const unsub = window.api.onIngestProgress((p) => setProgress(p))
     try {
       const result = await window.api.startIngest(folder, embedModel)
       setSummary(result)
@@ -72,15 +73,13 @@ export default function App() {
       window.api.getIngestState(folder),
       window.api.getParserVersion(),
     ])
-    const indexedFiles = Object.values(folderState.files ?? {}).filter(
-      f => !f.failed && f.chunkCount > 0
-    )
+    const indexedFiles = Object.values(folderState.files ?? {}).filter((f) => !f.failed && f.chunkCount > 0)
     const hasIndexedFiles = indexedFiles.length > 0
     // Only skip ingest if the notebook was already indexed with the current model
     // AND the current parser version — a version bump means the schema changed and
     // all files need to be re-parsed and re-embedded into the new structure.
     const onCurrentModel = folderState.embeddingModel === DEFAULT_EMBED_ID
-    const onCurrentParser = indexedFiles.every(f => f.parserVersion === currentParser)
+    const onCurrentParser = indexedFiles.every((f) => f.parserVersion === currentParser)
 
     if (hasIndexedFiles && onCurrentModel && onCurrentParser) {
       window.api.setWindowSize(1100, 760)
@@ -110,13 +109,13 @@ export default function App() {
 
       if (!alreadyDownloaded) {
         setModelLoadStage('download')
-        const unsub = window.api.onModelProgress(p => setModelProgress(p))
+        const unsub = window.api.onModelProgress((p) => setModelProgress(p))
         unsubsRef.current.push(unsub)
         try {
           await window.api.modelDownload(mId)
         } finally {
           unsub()
-          unsubsRef.current = unsubsRef.current.filter(u => u !== unsub)
+          unsubsRef.current = unsubsRef.current.filter((u) => u !== unsub)
         }
       }
 
@@ -127,7 +126,7 @@ export default function App() {
       const [embedInfo] = await window.api.listEmbedModels()
       if (!embedInfo?.downloaded) {
         setModelLoadStage('embed')
-        const unsub = window.api.onEmbedDownloadProgress(p => {
+        const unsub = window.api.onEmbedDownloadProgress((p) => {
           setModelProgress({ modelId: p.hfId, downloaded: p.loaded, total: p.total })
         })
         unsubsRef.current.push(unsub)
@@ -135,7 +134,7 @@ export default function App() {
           await window.api.embedEnsure()
         } finally {
           unsub()
-          unsubsRef.current = unsubsRef.current.filter(u => u !== unsub)
+          unsubsRef.current = unsubsRef.current.filter((u) => u !== unsub)
           setModelProgress(null)
         }
       }
@@ -209,7 +208,8 @@ export default function App() {
 
   if (screen === 'indexing') {
     const pct =
-      progress?.total > 0 &&
+      progress !== null &&
+      progress.total > 0 &&
       (progress.stage === 'parsing' || progress.stage === 'embedding' || progress.stage === 'model_load')
         ? Math.round((progress.processed / progress.total) * 100)
         : null
@@ -239,45 +239,86 @@ export default function App() {
         <img src={bgImg} className="vitruvian-texture" alt="" />
         <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
-          <span style={{ fontFamily: "'Source Serif 4', serif", fontStyle: 'italic', fontSize: '18px', color: 'var(--ink)', display: 'block', marginBottom: '20px' }}>
+          <span
+            style={{
+              fontFamily: "'Source Serif 4', serif",
+              fontStyle: 'italic',
+              fontSize: '18px',
+              color: 'var(--ink)',
+              display: 'block',
+              marginBottom: '20px',
+            }}
+          >
             Indexing your sources
           </span>
-          <div style={{ fontSize: '12px', color: 'var(--slate)', marginBottom: '12px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+          <div
+            style={{
+              fontSize: '12px',
+              color: 'var(--slate)',
+              marginBottom: '12px',
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+          >
             {label}
           </div>
-          <div style={{ height: '2px', background: 'var(--line-m)', borderRadius: '1px', overflow: 'hidden', width: '280px' }}>
-            <div style={{
-              height: '100%',
-              background: 'var(--ox)',
-              width: pct !== null ? `${pct}%` : '0%',
-              transition: 'width 0.2s ease'
-            }} />
+          <div
+            style={{
+              height: '2px',
+              background: 'var(--line-m)',
+              borderRadius: '1px',
+              overflow: 'hidden',
+              width: '280px',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'var(--ox)',
+                width: pct !== null ? `${pct}%` : '0%',
+                transition: 'width 0.2s ease',
+              }}
+            />
           </div>
           {ingestError && (
             <div style={{ marginTop: '16px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
               {ingestError.includes('FOLDER_UNREADABLE') ? (
                 <>
                   <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
-                    <strong>Can't open this folder.</strong> macOS is blocking access to it — this happens
-                    when the app is launched from a terminal without folder permissions. Choose the folder
-                    again to grant access, or relaunch from a terminal with Full Disk Access (e.g. iTerm).
+                    <strong>Can't open this folder.</strong> macOS is blocking access to it — this happens when the app
+                    is launched from a terminal without folder permissions. Choose the folder again to grant access, or
+                    relaunch from a terminal with Full Disk Access (e.g. iTerm).
                   </div>
                   <button
                     onClick={recoverFolderAccess}
-                    style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer' }}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '3px',
+                      border: 'none',
+                      background: 'var(--ox)',
+                      color: '#F9F0E6',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
                   >
                     Choose folder
                   </button>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>
-                    {ingestError}
-                  </div>
+                  <div style={{ fontSize: '12px', color: '#a03030', marginBottom: '12px' }}>{ingestError}</div>
                   {notebookFolder && modelId && (
                     <button
                       onClick={() => notebookFolder && modelId && startModelPrep(modelId, notebookFolder)}
-                      style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', marginRight: '8px' }}
+                      style={{
+                        padding: '7px 14px',
+                        borderRadius: '3px',
+                        border: 'none',
+                        background: 'var(--ox)',
+                        color: '#F9F0E6',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        marginRight: '8px',
+                      }}
                     >
                       Retry
                     </button>
@@ -292,59 +333,104 @@ export default function App() {
   }
 
   if (screen === 'model_prep') {
-    const pct = modelProgress && modelProgress.total > 0
-      ? Math.round((modelProgress.downloaded / modelProgress.total) * 100)
-      : null
+    const pct =
+      modelProgress && modelProgress.total > 0
+        ? Math.round((modelProgress.downloaded / modelProgress.total) * 100)
+        : null
 
-    const label = modelLoadStage === 'load'
-      ? 'Loading model into memory…'
-      : modelLoadStage === 'embed'
-        ? modelProgress
-          ? `Downloading embedding model — ${pct ?? 0}%`
-          : 'Downloading embedding model…'
-        : modelProgress
-          ? `Downloading model — ${pct ?? 0}%`
-          : 'Checking model…'
+    const label =
+      modelLoadStage === 'load'
+        ? 'Loading model into memory…'
+        : modelLoadStage === 'embed'
+          ? modelProgress
+            ? `Downloading embedding model — ${pct ?? 0}%`
+            : 'Downloading embedding model…'
+          : modelProgress
+            ? `Downloading model — ${pct ?? 0}%`
+            : 'Checking model…'
 
-    const heading = modelLoadStage === 'load'
-      ? 'Loading model'
-      : modelLoadStage === 'embed'
-        ? 'Downloading embedding model'
-        : 'Downloading model'
+    const heading =
+      modelLoadStage === 'load'
+        ? 'Loading model'
+        : modelLoadStage === 'embed'
+          ? 'Downloading embedding model'
+          : 'Downloading model'
 
     return (
       <div className="app-window">
         <img src={bgImg} className="vitruvian-texture" alt="" />
         <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
-          <span style={{ fontFamily: "'Source Serif 4', serif", fontStyle: 'italic', fontSize: '18px', color: 'var(--ink)', display: 'block', marginBottom: '20px' }}>
+          <span
+            style={{
+              fontFamily: "'Source Serif 4', serif",
+              fontStyle: 'italic',
+              fontSize: '18px',
+              color: 'var(--ink)',
+              display: 'block',
+              marginBottom: '20px',
+            }}
+          >
             {heading}
           </span>
           {modelPrepError ? (
             <div>
-              <div style={{ color: '#a03030', fontSize: '12px', fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: '16px' }}>
+              <div
+                style={{
+                  color: '#a03030',
+                  fontSize: '12px',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  marginBottom: '16px',
+                }}
+              >
                 {modelPrepError}
               </div>
               <button
                 onClick={() => modelId && startModelPrep(modelId, notebookFolder ?? undefined)}
-                style={{ padding: '7px 14px', borderRadius: '3px', border: 'none', background: 'var(--ox)', color: '#F9F0E6', fontSize: '12px', cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif" }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: '3px',
+                  border: 'none',
+                  background: 'var(--ox)',
+                  color: '#F9F0E6',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
               >
                 Retry
               </button>
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '12px', color: 'var(--slate)', marginBottom: '12px', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--slate)',
+                  marginBottom: '12px',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
+              >
                 {label}
               </div>
               {(modelLoadStage === 'download' || modelLoadStage === 'embed') && (
-                <div style={{ height: '2px', background: 'var(--line-m)', borderRadius: '1px', overflow: 'hidden', width: '280px' }}>
-                  <div style={{
-                    height: '100%',
-                    background: 'var(--ox)',
-                    width: pct !== null ? `${pct}%` : '0%',
-                    transition: 'width 0.3s ease'
-                  }} />
+                <div
+                  style={{
+                    height: '2px',
+                    background: 'var(--line-m)',
+                    borderRadius: '1px',
+                    overflow: 'hidden',
+                    width: '280px',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      background: 'var(--ox)',
+                      width: pct !== null ? `${pct}%` : '0%',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
                 </div>
               )}
             </>

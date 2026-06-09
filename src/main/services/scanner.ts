@@ -4,9 +4,22 @@ import { createReadStream } from 'fs'
 import { createHash } from 'crypto'
 
 const SUPPORTED_EXTS = new Set([
-  '.pdf', '.md', '.txt',
+  '.pdf',
+  '.md',
+  '.txt',
   // Code files — indexed via tree-sitter, falling back to text chunking if grammar unavailable
-  '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.py',
+  '.go',
+  '.rs',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.rb',
 ])
 const IGNORED_DIRS = new Set(['.openbook', '.git', '.obsidian', 'node_modules'])
 const MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -27,14 +40,17 @@ export async function scanFolder(folderPath: string): Promise<ScanResult> {
   const skipped: ScanResult['skipped'] = []
 
   async function walk(dir: string, isRoot = false): Promise<void> {
-    let entries: Awaited<ReturnType<typeof readdir>>
+    // @types/node v22 generic overload resolves to Dirent<NonSharedBuffer> via ReturnType<>;
+    // spell out the concrete type that withFileTypes:true actually returns at runtime.
+    let entries: import('fs').Dirent<string>[]
     try {
       entries = await readdir(dir, { withFileTypes: true })
     } catch {
       // A read failure on the selected folder itself is almost always macOS
       // blocking access (TCC). Surface it so the UI can prompt a re-pick;
       // a single unreadable subdir deeper in the tree is silently skipped.
-      if (isRoot) throw new Error(`FOLDER_UNREADABLE: Couldn't read "${dir}". macOS may be blocking access to this folder.`)
+      if (isRoot)
+        throw new Error(`FOLDER_UNREADABLE: Couldn't read "${dir}". macOS may be blocking access to this folder.`)
       return
     }
 

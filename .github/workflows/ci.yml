@@ -1,0 +1,43 @@
+name: CI
+
+# Run on every PR targeting dev or main.
+# A green check here is required before the PR can merge (enforced by branch protection).
+on:
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  ci:
+    runs-on:
+      macos-latest # macOS required: @lancedb/lancedb and node-llama-cpp
+      # have native bindings that must compile for the target OS.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Upgrade npm to v11
+        run: npm install -g npm@11
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Unit tests
+        run: npm run test
+
+      # Validates the full esbuild compile succeeds (renderer + main + preload).
+      # Does NOT package — that's Phase 4's release workflow.
+      - name: Build
+        run: npm run build

@@ -7,7 +7,6 @@ import type {
   IndexSummary,
   SearchResult,
   ModelProgress,
-  CitationEntry,
   ChatResult,
   NotebookState,
   LlmModelInfo,

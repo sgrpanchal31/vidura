@@ -2,7 +2,7 @@
 import type { Llama, LlamaModel } from 'node-llama-cpp'
 import { getModelPath } from './models'
 
-const MODEL_LOAD_TIMEOUT_MS = 30_000   // watchdog for OOM (TODOS TODO-2)
+const MODEL_LOAD_TIMEOUT_MS = 30_000 // watchdog for OOM (TODOS TODO-2)
 const CONTEXT_SIZE = 4096
 
 type NodeLlamaCppModule = typeof import('node-llama-cpp')
@@ -10,7 +10,7 @@ type NodeLlamaCppModule = typeof import('node-llama-cpp')
 let _mod: NodeLlamaCppModule | null = null
 
 async function mod(): Promise<NodeLlamaCppModule> {
-  if (!_mod) _mod = await import('node-llama-cpp') as NodeLlamaCppModule
+  if (!_mod) _mod = (await import('node-llama-cpp')) as NodeLlamaCppModule
   return _mod
 }
 
@@ -40,14 +40,17 @@ class LlamaService {
     // Watchdog: native llama.cpp allocations can hang on OOM rather than throwing
     let timeoutHandle!: ReturnType<typeof setTimeout>
     const loadWithWatchdog = new Promise<LlamaModel>((resolve, reject) => {
-      timeoutHandle = setTimeout(
-        () => reject(new Error('Not enough memory to run this model.')),
-        MODEL_LOAD_TIMEOUT_MS
-      )
+      timeoutHandle = setTimeout(() => reject(new Error('Not enough memory to run this model.')), MODEL_LOAD_TIMEOUT_MS)
       llama
         .loadModel({ modelPath })
-        .then((m) => { clearTimeout(timeoutHandle); resolve(m) })
-        .catch((err) => { clearTimeout(timeoutHandle); reject(err) })
+        .then((m) => {
+          clearTimeout(timeoutHandle)
+          resolve(m)
+        })
+        .catch((err) => {
+          clearTimeout(timeoutHandle)
+          reject(err)
+        })
     })
 
     this.model = await loadWithWatchdog
@@ -60,7 +63,11 @@ class LlamaService {
     this.generating = false
 
     if (this.model) {
-      try { await (this.model as any).dispose?.() } catch { /* ignore */ }
+      try {
+        await (this.model as any).dispose?.()
+      } catch {
+        /* ignore */
+      }
       this.model = null
       this.loadedModelId = null
     }
@@ -75,11 +82,7 @@ class LlamaService {
     return this.loadedModelId
   }
 
-  async generateStream(
-    systemPrompt: string,
-    userPrompt: string,
-    onToken: (token: string) => void
-  ): Promise<string> {
+  async generateStream(systemPrompt: string, userPrompt: string, onToken: (token: string) => void): Promise<string> {
     if (!this.model) throw new Error('No model loaded — call loadModel() first')
     if (this.generating) throw new Error('Already generating — call cancel() first')
 
@@ -106,7 +109,11 @@ class LlamaService {
         },
       })
     } finally {
-      try { await (context as any).dispose?.() } catch { /* ignore */ }
+      try {
+        await (context as any).dispose?.()
+      } catch {
+        /* ignore */
+      }
       this.generating = false
       this.abortController = null
     }
@@ -121,7 +128,11 @@ class LlamaService {
   async dispose(): Promise<void> {
     await this.unloadModel()
     if (this.llama) {
-      try { await (this.llama as any).dispose?.() } catch { /* ignore */ }
+      try {
+        await (this.llama as any).dispose?.()
+      } catch {
+        /* ignore */
+      }
       this.llama = null
     }
   }

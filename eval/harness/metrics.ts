@@ -1,17 +1,13 @@
 import type { DatasetEntry, RetrievedChunk, PerQueryResult, RunAggregates } from './types'
 
-export function scoreOne(
-  entry: DatasetEntry,
-  retrieved: RetrievedChunk[],
-  latencyMs: number
-): PerQueryResult {
+export function scoreOne(entry: DatasetEntry, retrieved: RetrievedChunk[], latencyMs: number): PerQueryResult {
   let firstHitRank: number | null = null
 
   for (const chunk of retrieved) {
     const rankMatches =
-      (entry.expectedChunkIds?.includes(chunk.id)) ||
+      entry.expectedChunkIds?.includes(chunk.id) ||
       (entry.expectedSubstring && chunk.text.toLowerCase().includes(entry.expectedSubstring.toLowerCase())) ||
-      (entry.expectedSourceFiles?.some(f => chunk.sourceFile.includes(f)))
+      entry.expectedSourceFiles?.some((f) => chunk.sourceFile.includes(f))
 
     if (rankMatches && firstHitRank === null) {
       firstHitRank = chunk.rank
@@ -26,7 +22,7 @@ export function scoreOne(
     reciprocalRank: firstHitRank !== null ? 1 / firstHitRank : 0,
     firstHitRank,
     latencyMs,
-    retrieved: retrieved.map(c => ({ id: c.id, sourceFile: c.sourceFile, score: c.score })),
+    retrieved: retrieved.map((c) => ({ id: c.id, sourceFile: c.sourceFile, score: c.score })),
   }
 }
 
@@ -35,11 +31,11 @@ export function aggregate(results: PerQueryResult[]): RunAggregates {
     return { recallAtK: 0, mrr: 0, p50Ms: 0, p95Ms: 0, totalQueries: 0, hitsCount: 0 }
   }
 
-  const latencies = [...results.map(r => r.latencyMs)].sort((a, b) => a - b)
+  const latencies = [...results.map((r) => r.latencyMs)].sort((a, b) => a - b)
   const p50Ms = latencies[Math.floor(latencies.length * 0.5)]
   const p95Ms = latencies[Math.floor(latencies.length * 0.95)]
 
-  const hits = results.filter(r => r.hitAtK)
+  const hits = results.filter((r) => r.hitAtK)
   const recallAtK = hits.length / results.length
   const mrr = results.reduce((sum, r) => sum + r.reciprocalRank, 0) / results.length
 

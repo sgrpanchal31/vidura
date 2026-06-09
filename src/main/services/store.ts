@@ -6,7 +6,7 @@ import type { Chunk } from './chunker'
 
 const DEFAULT_LANCE_SUBDIR = join('.openbook', 'lance')
 const TABLE_NAME = 'chunks'
-export const EMBEDDING_DIM = 1024  // default; override via VectorStoreOptions.dim
+export const EMBEDDING_DIM = 1024 // default; override via VectorStoreOptions.dim
 
 export type VectorStoreOptions = {
   subdir?: string
@@ -15,9 +15,9 @@ export type VectorStoreOptions = {
 
 export type SearchResult = {
   id: string
-  text: string           // child chunk — what was matched
-  parentText: string     // parent unit — shown to the LLM for context
-  parentId: string       // shared across siblings from the same parent
+  text: string // child chunk — what was matched
+  parentText: string // parent unit — shown to the LLM for context
+  parentId: string // shared across siblings from the same parent
   sourceFile: string
   chunkIndex: number
   pageNumber: number | undefined
@@ -65,10 +65,10 @@ export class VectorStore {
     if (names.includes(TABLE_NAME)) {
       const tbl = await this.db.openTable(TABLE_NAME)
       const tblSchema = await tbl.schema()
-      const vecField = tblSchema.fields.find(f => f.name === 'vector')
+      const vecField = tblSchema.fields.find((f) => f.name === 'vector')
       const storedDim: number | undefined = (vecField?.type as any)?.listSize
       // Drop and recreate if embedding dimension changed or schema is missing new fields
-      const hasParentText = tblSchema.fields.some(f => f.name === 'parentText')
+      const hasParentText = tblSchema.fields.some((f) => f.name === 'parentText')
       if ((storedDim !== undefined && storedDim !== dim) || !hasParentText) {
         await this.db.dropTable(TABLE_NAME)
         this.table = await this.db.createEmptyTable(TABLE_NAME, schema)
@@ -122,11 +122,8 @@ export class VectorStore {
 
     let rows: any[]
     try {
-      rows = await this.table
-        .search(queryVector)
-        .distanceType('cosine')
-        .limit(topK)
-        .toArray()
+      // cast to any: lancedb type defs removed distanceType() from VectorQuery in a minor bump
+      rows = await (this.table.search(queryVector) as any).distanceType('cosine').limit(topK).toArray()
     } catch {
       return []
     }

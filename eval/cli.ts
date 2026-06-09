@@ -63,7 +63,7 @@ async function main() {
     process.exit(1)
   }
 
-  const techniqueNames = (args.technique ?? 'baseline').split(',').map(t => t.trim())
+  const techniqueNames = (args.technique ?? 'baseline').split(',').map((t) => t.trim())
   const topK = parseInt(args.topk ?? '5', 10)
   const limit = args.limit ? parseInt(args.limit, 10) : undefined
   const workRoot = join(process.cwd(), '.openbook', 'eval')
@@ -113,7 +113,7 @@ async function main() {
   console.log('\n[cli] Results written to eval/results/')
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err)
   process.exit(1)
 })

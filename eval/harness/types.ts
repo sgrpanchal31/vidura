@@ -3,8 +3,8 @@ export type RetrievedChunk = {
   text: string
   sourceFile: string
   score: number
-  rank: number          // 1-indexed final rank after any reordering
-  vectorScore?: number  // raw cosine similarity before reranking
+  rank: number // 1-indexed final rank after any reordering
+  vectorScore?: number // raw cosine similarity before reranking
   bm25Score?: number
   rerankScore?: number
 }
@@ -12,15 +12,15 @@ export type RetrievedChunk = {
 export type DatasetEntry = {
   id: string
   question: string
-  expectedChunkIds?: string[]       // exact chunk ids (sha256 prefix) that answer the question
-  expectedSubstring?: string        // a string that must appear in the retrieved text
-  expectedSourceFiles?: string[]    // at least one of these files must appear in top-k
+  expectedChunkIds?: string[] // exact chunk ids (sha256 prefix) that answer the question
+  expectedSubstring?: string // a string that must appear in the retrieved text
+  expectedSourceFiles?: string[] // at least one of these files must appear in top-k
   meta?: Record<string, unknown>
 }
 
 export type RetrievalContext = {
-  corpusDir: string    // folder containing the documents to retrieve from
-  workDir: string      // scratch dir for this technique's index: .openbook/eval/<technique>/<configHash>/
+  corpusDir: string // folder containing the documents to retrieve from
+  workDir: string // scratch dir for this technique's index: .openbook/eval/<technique>/<configHash>/
 }
 
 export interface RetrievalTechnique {
@@ -34,16 +34,16 @@ export interface RetrievalTechnique {
 export type PerQueryResult = {
   id: string
   question: string
-  hitAtK: boolean          // did any expected source/chunk appear in top-k?
-  reciprocalRank: number   // 1/rank of first hit, or 0 if missed
+  hitAtK: boolean // did any expected source/chunk appear in top-k?
+  reciprocalRank: number // 1/rank of first hit, or 0 if missed
   firstHitRank: number | null
   latencyMs: number
   retrieved: Array<{ id: string; sourceFile: string; score: number }>
 }
 
 export type RunAggregates = {
-  recallAtK: number   // mean hitAtK
-  mrr: number         // mean reciprocal rank
+  recallAtK: number // mean hitAtK
+  mrr: number // mean reciprocal rank
   p50Ms: number
   p95Ms: number
   totalQueries: number

@@ -11,17 +11,14 @@ export type RunOptions = {
   corpusDir: string
   technique: RetrievalTechnique
   topK: number
-  workRoot: string   // e.g. .openbook/eval/
-  limit?: number     // cap query count for smoke runs
+  workRoot: string // e.g. .openbook/eval/
+  limit?: number // cap query count for smoke runs
 }
 
 export async function runEval(opts: RunOptions): Promise<RunResult> {
   const { dataset, datasetEntries, corpusDir, technique, topK, workRoot, limit } = opts
 
-  const configHash = createHash('sha256')
-    .update(`${topK}:${technique.name}`)
-    .digest('hex')
-    .slice(0, 8)
+  const configHash = createHash('sha256').update(`${topK}:${technique.name}`).digest('hex').slice(0, 8)
 
   const workDir = join(workRoot, technique.name, configHash)
   mkdirSync(workDir, { recursive: true })
@@ -47,7 +44,9 @@ export async function runEval(opts: RunOptions): Promise<RunResult> {
     const latencyMs = Math.round(performance.now() - t0)
 
     // Assign 1-indexed ranks (technique may already set them; ensure they're set)
-    retrieved.forEach((c, idx) => { c.rank = c.rank ?? idx + 1 })
+    retrieved.forEach((c, idx) => {
+      c.rank = c.rank ?? idx + 1
+    })
 
     queryResults.push(scoreOne(entry, retrieved, latencyMs))
   }

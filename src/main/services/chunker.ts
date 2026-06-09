@@ -5,11 +5,11 @@ import type { ParsedText } from './ingest/text'
 
 // Char-based size approximation: ~4 chars/token. Avoids pulling a tokenizer into the chunker.
 // Child chunk — what gets embedded for search. Small = sharper hits.
-export const CHILD_CHARS = 1024      // ≈256 tokens
+export const CHILD_CHARS = 1024 // ≈256 tokens
 // Cap on parent text sent to the LLM. Large = more context per citation.
 export const PARENT_MAX_CHARS = 6000 // ≈1500 tokens
 // Overlap between child windows within a parent.
-export const OVERLAP_CHARS = 128     // ≈32 tokens
+export const OVERLAP_CHARS = 128 // ≈32 tokens
 
 // Legacy fixed-window sizes, kept for eval A/B comparison via strategy:'fixed'.
 export const LEGACY_CHUNK_CHARS = 2048
@@ -19,9 +19,9 @@ export const LEGACY_OVERLAP_CHARS = 256
 export const PARSER_VERSION = '3' as const
 
 export type ChunkConfig = {
-  chunkChars?: number      // child chunk size (default CHILD_CHARS)
-  overlapChars?: number    // child overlap (default OVERLAP_CHARS)
-  parentMaxChars?: number  // cap on parent text shown to LLM (default PARENT_MAX_CHARS)
+  chunkChars?: number // child chunk size (default CHILD_CHARS)
+  overlapChars?: number // child overlap (default OVERLAP_CHARS)
+  parentMaxChars?: number // cap on parent text shown to LLM (default PARENT_MAX_CHARS)
   // 'parentdoc': embed small child, return large parent for LLM context (default).
   // 'fixed': legacy 2048-char sliding window; child == parent. Used for eval A/B.
   strategy?: 'fixed' | 'parentdoc'
@@ -29,13 +29,13 @@ export type ChunkConfig = {
 
 export type Chunk = {
   id: string
-  sourceFile: string     // relative path from notebook root
-  text: string           // small child chunk — embedded and searched
-  parentText: string     // larger parent unit — shown to the LLM for context
-  parentId: string       // id of the parent unit; multiple children from the same parent share this
+  sourceFile: string // relative path from notebook root
+  text: string // small child chunk — embedded and searched
+  parentText: string // larger parent unit — shown to the LLM for context
+  parentId: string // id of the parent unit; multiple children from the same parent share this
   chunkIndex: number
   parserVersion: typeof PARSER_VERSION
-  headingPath?: string   // breadcrumb: "Chapter > Section" or "class Foo > bar()"
+  headingPath?: string // breadcrumb: "Chapter > Section" or "class Foo > bar()"
   headingAnchor?: string // raw heading line, kept for backward compat
   pageNumber?: number
   lineNumber?: number
@@ -109,7 +109,7 @@ function chunkUnits(relPath: string, units: ParentUnit[], cfg?: ChunkConfig): Ch
           id,
           sourceFile: relPath,
           text: window,
-          parentText: window,  // same as text in fixed mode
+          parentText: window, // same as text in fixed mode
           parentId: id,
           chunkIndex: idx++,
           parserVersion: PARSER_VERSION,
@@ -160,7 +160,7 @@ function chunkUnits(relPath: string, units: ParentUnit[], cfg?: ChunkConfig): Ch
 }
 
 export function chunkPdf(relPath: string, pages: PdfPage[], cfg?: ChunkConfig): Chunk[] {
-  const units: ParentUnit[] = pages.map(page => ({
+  const units: ParentUnit[] = pages.map((page) => ({
     parentText: page.text,
     pageNumber: page.pageNumber,
   }))
@@ -168,7 +168,7 @@ export function chunkPdf(relPath: string, pages: PdfPage[], cfg?: ChunkConfig): 
 }
 
 export function chunkMarkdown(relPath: string, sections: MarkdownSection[], cfg?: ChunkConfig): Chunk[] {
-  const units: ParentUnit[] = sections.map(section => ({
+  const units: ParentUnit[] = sections.map((section) => ({
     // section.text already has the heading prepended (done in parseMarkdown)
     parentText: section.text,
     headingAnchor: section.headingAnchor,
@@ -191,7 +191,7 @@ export function chunkText(relPath: string, parsed: ParsedText, cfg?: ChunkConfig
   const PARENT_WINDOW = 3000
   const PARENT_OVERLAP = 512
   const parentWindows = splitIntoWindows(parsed.text, PARENT_WINDOW, PARENT_OVERLAP)
-  const units: ParentUnit[] = parentWindows.map(pw => ({
+  const units: ParentUnit[] = parentWindows.map((pw) => ({
     parentText: pw,
     lineNumber: parsed.lineNumber,
   }))
@@ -199,8 +199,8 @@ export function chunkText(relPath: string, parsed: ParsedText, cfg?: ChunkConfig
 }
 
 export type CodeSymbolUnit = {
-  parentText: string   // full symbol text (function/class body)
-  symbolPath: string   // breadcrumb: e.g. "class Foo > bar()" or "function myFunc"
+  parentText: string // full symbol text (function/class body)
+  symbolPath: string // breadcrumb: e.g. "class Foo > bar()" or "function myFunc"
   startLine: number
 }
 
@@ -208,7 +208,7 @@ export type CodeSymbolUnit = {
 // Oversized symbols get child windows; small ones become a single chunk.
 export function chunkCode(relPath: string, symbols: CodeSymbolUnit[], cfg?: ChunkConfig): Chunk[] {
   if (symbols.length === 0) return []
-  const units: ParentUnit[] = symbols.map(s => ({
+  const units: ParentUnit[] = symbols.map((s) => ({
     parentText: s.parentText,
     headingPath: s.symbolPath,
     lineNumber: s.startLine,

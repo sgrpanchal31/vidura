@@ -35,12 +35,12 @@ npm run eval -- --dataset longmemeval --technique baseline --limit 20
 
 ## What the numbers mean
 
-| Metric | Plain English |
-|--------|---------------|
-| **Recall@k** | Did the right chunk appear anywhere in the top k? Higher = better. |
-| **MRR** | How high did the right chunk rank? 1.0 = always first, 0.2 = always fifth. |
-| **p50 latency** | Median time per query in milliseconds. |
-| **p95 latency** | Worst-case time (slowest 5% of queries). |
+| Metric          | Plain English                                                              |
+| --------------- | -------------------------------------------------------------------------- |
+| **Recall@k**    | Did the right chunk appear anywhere in the top k? Higher = better.         |
+| **MRR**         | How high did the right chunk rank? 1.0 = always first, 0.2 = always fifth. |
+| **p50 latency** | Median time per query in milliseconds.                                     |
+| **p95 latency** | Worst-case time (slowest 5% of queries).                                   |
 
 ## Adding a new technique
 

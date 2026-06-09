@@ -15,9 +15,7 @@ type SourceItem = {
   ext: string
 }
 
-type TreeNode =
-  | { type: 'file'; item: SourceItem }
-  | { type: 'dir'; name: string; path: string; children: TreeNode[] }
+type TreeNode = { type: 'file'; item: SourceItem } | { type: 'dir'; name: string; path: string; children: TreeNode[] }
 
 type ChatProps = {
   folder: string
@@ -34,7 +32,11 @@ const MODEL_LABELS: Record<string, string> = {
 }
 
 function collectDirPaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<string> {
-  for (const n of nodes) if (n.type === 'dir') { out.add(n.path); collectDirPaths(n.children, out) }
+  for (const n of nodes)
+    if (n.type === 'dir') {
+      out.add(n.path)
+      collectDirPaths(n.children, out)
+    }
   return out
 }
 
@@ -49,7 +51,9 @@ function buildTree(sources: SourceItem[]): TreeNode[] {
     for (let i = 0; i < parts.length - 1; i++) {
       const name = parts[i]
       currentPath = currentPath ? `${currentPath}/${name}` : name
-      let dir = current.find(n => n.type === 'dir' && n.name === name) as Extract<TreeNode, { type: 'dir' }> | undefined
+      let dir = current.find((n) => n.type === 'dir' && n.name === name) as
+        | Extract<TreeNode, { type: 'dir' }>
+        | undefined
       if (!dir) {
         dir = { type: 'dir', name, path: currentPath, children: [] }
         current.push(dir)
@@ -79,7 +83,7 @@ function renderTree(
   collapsed: Set<string>,
   onToggle: (path: string) => void
 ): React.ReactNode {
-  return nodes.map(node => {
+  return nodes.map((node) => {
     if (node.type === 'file') {
       return (
         <div
@@ -97,15 +101,10 @@ function renderTree(
     const isCollapsed = collapsed.has(node.path)
     return (
       <div key={node.path}>
-        <div
-          className="source-dir"
-          style={{ paddingLeft: `${16 + level * 14}px` }}
-          onClick={() => onToggle(node.path)}
-        >
-          <span
-            className="source-dir-chevron"
-            style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-          >▶</span>
+        <div className="source-dir" style={{ paddingLeft: `${16 + level * 14}px` }} onClick={() => onToggle(node.path)}>
+          <span className="source-dir-chevron" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
+            ▶
+          </span>
           <span className="source-dir-name">{node.name}</span>
         </div>
         {!isCollapsed && renderTree(node.children, level + 1, collapsed, onToggle)}
@@ -141,12 +140,16 @@ function parseInline(
       return <strong key={key}>{part.slice(2, -2)}</strong>
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-      return <code key={key} className="inline-code">{part.slice(1, -1)}</code>
+      return (
+        <code key={key} className="inline-code">
+          {part.slice(1, -1)}
+        </code>
+      )
     }
     const citeMatch = part.match(/^\[(\d+)\]$/)
     if (citeMatch) {
       const num = parseInt(citeMatch[1], 10)
-      const citation = citations.find(c => c.sourceNum === num)
+      const citation = citations.find((c) => c.sourceNum === num)
       if (citation) {
         return (
           <span key={key} className="cite-inline" onClick={() => onCite(citation)}>
@@ -170,7 +173,10 @@ function renderMarkdown(
 
   while (i < lines.length) {
     const line = lines[i]
-    if (line.trim() === '') { i++; continue }
+    if (line.trim() === '') {
+      i++
+      continue
+    }
 
     if (/^\s*[-*] /.test(line)) {
       const items: string[] = []
@@ -237,19 +243,22 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   const hasMessages = messages.length > 0
 
   useEffect(() => {
-    window.api.getIngestState(folder).then((state: NotebookState) => {
-      if (!state?.files) return
-      const items: SourceItem[] = Object.values(state.files)
-        .filter(f => !f.failed && f.chunkCount > 0)
-        .map(f => ({
-          relativePath: f.relativePath,
-          filename: f.relativePath.split('/').pop() ?? f.relativePath,
-          ext: (f.relativePath.split('.').pop() ?? 'file').toUpperCase().slice(0, 3),
-        }))
-      setSources(items)
-      setCollapsedDirs(collectDirPaths(buildTree(items)))
-      setSuggestions(buildSuggestions(items))
-    }).catch(() => {})
+    window.api
+      .getIngestState(folder)
+      .then((state: NotebookState) => {
+        if (!state?.files) return
+        const items: SourceItem[] = Object.values(state.files)
+          .filter((f) => !f.failed && f.chunkCount > 0)
+          .map((f) => ({
+            relativePath: f.relativePath,
+            filename: f.relativePath.split('/').pop() ?? f.relativePath,
+            ext: (f.relativePath.split('.').pop() ?? 'file').toUpperCase().slice(0, 3),
+          }))
+        setSources(items)
+        setCollapsedDirs(collectDirPaths(buildTree(items)))
+        setSuggestions(buildSuggestions(items))
+      })
+      .catch(() => {})
   }, [folder])
 
   useEffect(() => {
@@ -258,7 +267,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   }, [messages, streamBuffer])
 
   function toggleDir(path: string) {
-    setCollapsedDirs(prev => {
+    setCollapsedDirs((prev) => {
       const next = new Set(prev)
       if (next.has(path)) next.delete(path)
       else next.add(path)
@@ -267,7 +276,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   }
 
   function handleClear() {
-    unsubsRef.current.forEach(u => u())
+    unsubsRef.current.forEach((u) => u())
     unsubsRef.current = []
     setMessages([])
     setStreamBuffer('')
@@ -278,7 +287,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   async function handleSend(text: string) {
     if (!text.trim() || isGenerating) return
 
-    unsubsRef.current.forEach(u => u())
+    unsubsRef.current.forEach((u) => u())
     unsubsRef.current = []
 
     const userMsg: Message = {
@@ -288,18 +297,16 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
       citations: [],
     }
 
-    setMessages(prev => [...prev, userMsg])
+    setMessages((prev) => [...prev, userMsg])
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setIsGenerating(true)
     setStreamBuffer('')
     setActiveCitation(null)
 
-    const unsubToken = window.api.onChatToken(tok =>
-      setStreamBuffer(prev => prev + tok)
-    )
-    const unsubDone = window.api.onChatDone(result => {
-      setMessages(prev => [
+    const unsubToken = window.api.onChatToken((tok) => setStreamBuffer((prev) => prev + tok))
+    const unsubDone = window.api.onChatDone((result) => {
+      setMessages((prev) => [
         ...prev,
         { id: `${Date.now()}-a`, role: 'assistant', content: result.answer, citations: result.citations },
       ])
@@ -307,8 +314,8 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
       setIsGenerating(false)
       cleanup()
     })
-    const unsubError = window.api.onChatError(msg => {
-      setMessages(prev => [
+    const unsubError = window.api.onChatError((msg) => {
+      setMessages((prev) => [
         ...prev,
         { id: `${Date.now()}-e`, role: 'assistant', content: `Something went wrong: ${msg}`, citations: [] },
       ])
@@ -318,7 +325,9 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
     })
 
     function cleanup() {
-      unsubToken(); unsubDone(); unsubError()
+      unsubToken()
+      unsubDone()
+      unsubError()
       unsubsRef.current = []
     }
     unsubsRef.current = [unsubToken, unsubDone, unsubError]
@@ -341,7 +350,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   }
 
   function handleCitationClick(citation: CitationEntry) {
-    setActiveCitation(prev =>
+    setActiveCitation((prev) =>
       prev?.sourceNum === citation.sourceNum && prev.chunk.id === citation.chunk.id ? null : citation
     )
   }
@@ -350,20 +359,17 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
 
   return (
     <div className="chat-layout">
-
       {/* Titlebar */}
       <div className="chat-titlebar">
         <div className="chat-titlebar-center">
           <span className="chat-folder-name">{folderName}</span>
-          <button
-            className="chat-change-folder-btn"
-            onClick={onChangeFolder}
-            disabled={isGenerating}
-          >
+          <button className="chat-change-folder-btn" onClick={onChangeFolder} disabled={isGenerating}>
             Change
           </button>
           {sources.length > 0 && (
-            <span className="chat-source-count">{sources.length} source{sources.length !== 1 ? 's' : ''}</span>
+            <span className="chat-source-count">
+              {sources.length} source{sources.length !== 1 ? 's' : ''}
+            </span>
           )}
           {sources.length > 0 && <div className="chat-titlebar-sep" />}
           <span className="chat-model-badge">{modelLabel}</span>
@@ -377,13 +383,10 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
 
       {/* Body */}
       <div className="chat-body">
-
         {/* Sources panel — folder tree */}
         <div className="sources-panel">
           <div className="sources-header">Sources</div>
-          <div className="sources-list">
-            {renderTree(tree, 0, collapsedDirs, toggleDir)}
-          </div>
+          <div className="sources-list">{renderTree(tree, 0, collapsedDirs, toggleDir)}</div>
           <button className="sources-settings-btn" onClick={onOpenSettings}>
             ⚙ Settings
           </button>
@@ -391,16 +394,14 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
 
         {/* Chat main */}
         <div className="chat-main">
-
           {hasMessages ? (
             <div className="messages-list" ref={messagesListRef}>
-              {messages.map(msg => (
+              {messages.map((msg) => (
                 <div key={msg.id} className={`message message-${msg.role}`}>
                   <div className="message-bubble">
                     {msg.role === 'user'
                       ? msg.content
-                      : renderMarkdown(msg.content, msg.citations, handleCitationClick)
-                    }
+                      : renderMarkdown(msg.content, msg.citations, handleCitationClick)}
                   </div>
                 </div>
               ))}
@@ -420,10 +421,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
                 <div className="empty-prompt">
                   What do you want to know
                   <br />
-                  {sources.length > 0
-                    ? `about your ${sources.length} sources?`
-                    : 'about your sources?'
-                  }
+                  {sources.length > 0 ? `about your ${sources.length} sources?` : 'about your sources?'}
                 </div>
                 {suggestions.length > 0 && (
                   <div className="suggestions-box">
@@ -453,7 +451,9 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
                 rows={1}
               />
               {isGenerating ? (
-                <button className="composer-cancel" onClick={() => window.api.chatCancel()}>Stop</button>
+                <button className="composer-cancel" onClick={() => window.api.chatCancel()}>
+                  Stop
+                </button>
               ) : (
                 <span className="composer-hint">⌘ Return</span>
               )}
@@ -464,10 +464,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
           <div className={`statusbar${isGenerating ? ' generating' : ''}`}>
             <div className="status-dot" />
             <span className="status-text">
-              {isGenerating
-                ? 'Generating…'
-                : `Indexed · ${sources.length} file${sources.length !== 1 ? 's' : ''}`
-              }
+              {isGenerating ? 'Generating…' : `Indexed · ${sources.length} file${sources.length !== 1 ? 's' : ''}`}
             </span>
           </div>
         </div>
@@ -490,13 +487,15 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
                 : activeCitation.chunk.lineNumber
                   ? `L${activeCitation.chunk.lineNumber}`
                   : ''}
-              {(activeCitation.chunk.pageNumber || activeCitation.chunk.lineNumber) ? ' · ' : ''}
+              {activeCitation.chunk.pageNumber || activeCitation.chunk.lineNumber ? ' · ' : ''}
               {activeCitation.chunk.sourceFile.split('/').pop()}
-              <span className="preview-dismiss" onClick={() => setActiveCitation(null)}> · dismiss</span>
+              <span className="preview-dismiss" onClick={() => setActiveCitation(null)}>
+                {' '}
+                · dismiss
+              </span>
             </div>
           </div>
         )}
-
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 export type MarkdownSection = {
-  headingAnchor: string  // raw heading line, e.g. "## Setup"
-  headingPath: string    // breadcrumb, e.g. "Guide > Setup"
-  text: string           // heading + body (heading prepended for embedding context)
+  headingAnchor: string // raw heading line, e.g. "## Setup"
+  headingPath: string // breadcrumb, e.g. "Guide > Setup"
+  text: string // heading + body (heading prepended for embedding context)
   lineNumber: number
 }
 
@@ -26,7 +26,7 @@ export function parseMarkdown(content: string): MarkdownSection[] {
           headingAnchor: currentHeading,
           headingPath: currentHeadingPath,
           text: (currentHeading ? currentHeading + '\n\n' : '') + currentBody.join('\n').trim(),
-          lineNumber: headingLine
+          lineNumber: headingLine,
         })
       }
       const level = levelMatch[1].length
@@ -56,7 +56,7 @@ export function parseMarkdown(content: string): MarkdownSection[] {
       headingAnchor: currentHeading,
       headingPath: currentHeadingPath,
       text: (currentHeading ? currentHeading + '\n\n' : '') + currentBody.join('\n').trim(),
-      lineNumber: headingLine
+      lineNumber: headingLine,
     })
   }
 

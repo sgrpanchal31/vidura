@@ -1,0 +1,52 @@
+name: Release
+
+# Triggers when you push a version tag: git tag v0.2.0 && git push origin v0.2.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Needs write access to create a GitHub Release and upload the DMG.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # macos-latest = macos-14 (ARM). Matches the arm64 target in electron-builder.yml.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm ci installs deps and runs postinstall (electron-rebuild) for native modules.
+      - name: Install dependencies
+        run: npm ci
+
+      # electron-vite compiles main + preload + renderer into out/
+      - name: Build
+        run: npm run build
+
+      # electron-builder reads electron-builder.yml and produces an unsigned .dmg in dist/
+      - name: Package DMG
+        run: npx electron-builder --mac --publish never
+
+      # Create a GitHub Release for this tag and attach the .dmg file.
+      # GITHUB_TOKEN is provided automatically — no secrets to configure.
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.dmg
+          draft: false
+          generate_release_notes: false
+          body: |
+            ## Install
+
+            Download the `.dmg` file below.
+
+            **First launch on macOS:** Apple will warn that the app is unsigned.
+            Right-click the app → **Open** → **Open** to bypass the warning.
+            You only need to do this once.

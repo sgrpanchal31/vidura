@@ -63,8 +63,8 @@ export type IndexSummary = {
 
 export type SearchResult = {
   id: string
-  text: string           // child chunk — what was matched
-  parentText: string     // parent unit — shown to the LLM for context
+  text: string // child chunk — what was matched
+  parentText: string // parent unit — shown to the LLM for context
   parentId: string
   sourceFile: string
   chunkIndex: number
@@ -96,22 +96,16 @@ export type ChatResult = {
 
 const api = {
   // ── Folder + prefs ──────────────────────────────────────────────────────────
-  pickFolder: (): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:pickFolder'),
-  getPrefs: (): Promise<Prefs> =>
-    ipcRenderer.invoke('prefs:get'),
-  setPrefs: (patch: Partial<Prefs>): Promise<void> =>
-    ipcRenderer.invoke('prefs:set', patch),
-  getSystemInfo: (): Promise<SystemInfo> =>
-    ipcRenderer.invoke('system:info'),
+  pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder'),
+  getPrefs: (): Promise<Prefs> => ipcRenderer.invoke('prefs:get'),
+  setPrefs: (patch: Partial<Prefs>): Promise<void> => ipcRenderer.invoke('prefs:set', patch),
+  getSystemInfo: (): Promise<SystemInfo> => ipcRenderer.invoke('system:info'),
 
   // ── Ingest ──────────────────────────────────────────────────────────────────
-  getParserVersion: (): Promise<string> =>
-    ipcRenderer.invoke('ingest:parserVersion'),
+  getParserVersion: (): Promise<string> => ipcRenderer.invoke('ingest:parserVersion'),
   startIngest: (folderPath: string, embeddingModel?: string): Promise<IndexSummary> =>
     ipcRenderer.invoke('ingest:start', folderPath, embeddingModel),
-  getIngestState: (folderPath: string): Promise<NotebookState> =>
-    ipcRenderer.invoke('ingest:getState', folderPath),
+  getIngestState: (folderPath: string): Promise<NotebookState> => ipcRenderer.invoke('ingest:getState', folderPath),
   onIngestProgress: (cb: (p: IndexProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: IndexProgress) => cb(p)
     ipcRenderer.on('ingest:progress', handler)
@@ -123,35 +117,24 @@ const api = {
     ipcRenderer.invoke('search:query', query, topK),
 
   // ── Model management ────────────────────────────────────────────────────────
-  modelIsDownloaded: (modelId: string): Promise<boolean> =>
-    ipcRenderer.invoke('model:isDownloaded', modelId),
-  modelDownload: (modelId: string): Promise<void> =>
-    ipcRenderer.invoke('model:download', modelId),
-  modelLoad: (modelId: string): Promise<void> =>
-    ipcRenderer.invoke('model:load', modelId),
-  modelUnload: (): Promise<void> =>
-    ipcRenderer.invoke('model:unload'),
+  modelIsDownloaded: (modelId: string): Promise<boolean> => ipcRenderer.invoke('model:isDownloaded', modelId),
+  modelDownload: (modelId: string): Promise<void> => ipcRenderer.invoke('model:download', modelId),
+  modelLoad: (modelId: string): Promise<void> => ipcRenderer.invoke('model:load', modelId),
+  modelUnload: (): Promise<void> => ipcRenderer.invoke('model:unload'),
   onModelProgress: (cb: (p: ModelProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ModelProgress) => cb(p)
     ipcRenderer.on('model:progress', handler)
     return () => ipcRenderer.off('model:progress', handler)
   },
-  modelCancelDownload: (): Promise<void> =>
-    ipcRenderer.invoke('model:cancelDownload'),
-  listModels: (): Promise<LlmModelInfo[]> =>
-    ipcRenderer.invoke('model:list'),
-  modelDelete: (modelId: string): Promise<void> =>
-    ipcRenderer.invoke('model:delete', modelId),
+  modelCancelDownload: (): Promise<void> => ipcRenderer.invoke('model:cancelDownload'),
+  listModels: (): Promise<LlmModelInfo[]> => ipcRenderer.invoke('model:list'),
+  modelDelete: (modelId: string): Promise<void> => ipcRenderer.invoke('model:delete', modelId),
 
   // ── Embed model management ───────────────────────────────────────────────────
-  listEmbedModels: (): Promise<EmbedModelInfo[]> =>
-    ipcRenderer.invoke('embed:list'),
-  embedEnsure: (): Promise<void> =>
-    ipcRenderer.invoke('embed:ensure'),
-  embedDownload: (hfId: string): Promise<void> =>
-    ipcRenderer.invoke('embed:download', hfId),
-  embedDelete: (hfId: string): Promise<void> =>
-    ipcRenderer.invoke('embed:delete', hfId),
+  listEmbedModels: (): Promise<EmbedModelInfo[]> => ipcRenderer.invoke('embed:list'),
+  embedEnsure: (): Promise<void> => ipcRenderer.invoke('embed:ensure'),
+  embedDownload: (hfId: string): Promise<void> => ipcRenderer.invoke('embed:download', hfId),
+  embedDelete: (hfId: string): Promise<void> => ipcRenderer.invoke('embed:delete', hfId),
   onEmbedDownloadProgress: (cb: (p: { hfId: string; loaded: number; total: number }) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: { hfId: string; loaded: number; total: number }) => cb(p)
     ipcRenderer.on('embed:downloadProgress', handler)
@@ -162,8 +145,7 @@ const api = {
   // chatAsk resolves immediately; tokens arrive via onChatToken, completion via onChatDone
   chatAsk: (question: string, folderPath: string, modelId: string): Promise<void> =>
     ipcRenderer.invoke('chat:ask', question, folderPath, modelId),
-  chatCancel: (): Promise<void> =>
-    ipcRenderer.invoke('chat:cancel'),
+  chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
   onChatToken: (cb: (token: string) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('chat:token', handler)
@@ -180,15 +162,13 @@ const api = {
     return () => ipcRenderer.off('chat:error', handler)
   },
 
-  setWindowSize: (width: number, height: number): Promise<void> =>
-    ipcRenderer.invoke('window:setSize', width, height),
+  setWindowSize: (width: number, height: number): Promise<void> => ipcRenderer.invoke('window:setSize', width, height),
 
   // ── Generation (map-reduce over full corpus) ─────────────────────────────
   // generateRun resolves immediately; tokens arrive via onGenerateToken, completion via onGenerateDone
   generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat): Promise<void> =>
     ipcRenderer.invoke('generate:run', folderPath, modelId, task, format),
-  generateCancel: (): Promise<void> =>
-    ipcRenderer.invoke('chat:cancel'),  // reuses the same LlamaService cancel
+  generateCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'), // reuses the same LlamaService cancel
   onGenerateToken: (cb: (token: string) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('generate:token', handler)
@@ -213,6 +193,7 @@ if (process.contextIsolated) {
     console.error(err)
   }
 } else {
-  // @ts-ignore
-  window.api = api
+  // contextBridge unavailable (dev/test). env.d.ts extends Window in the renderer
+  // context but not here — cast to bypass the type gap.
+  ;(window as any).api = api
 }

@@ -9,15 +9,15 @@ export type FileRecord = {
   hash: string
   lastIndexed: number
   chunkCount: number
-  embeddingModel?: string   // absent = not yet embedded
-  parserVersion?: string    // absent = pre-v2; if version changes, file is re-indexed
+  embeddingModel?: string // absent = not yet embedded
+  parserVersion?: string // absent = pre-v2; if version changes, file is re-indexed
   failed?: boolean
   failReason?: string
 }
 
 export type NotebookState = {
   version: 1
-  embeddingModel?: string   // HF id of the model used for this folder; absent = default
+  embeddingModel?: string // HF id of the model used for this folder; absent = default
   files: Record<string, FileRecord>
 }
 

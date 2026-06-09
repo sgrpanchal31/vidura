@@ -208,7 +208,9 @@ export async function downloadModel(
     try {
       const { size } = await stat(destPath)
       if (size === 0) await unlink(destPath)
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     throw err
   }
 
@@ -218,7 +220,7 @@ export async function downloadModel(
     await unlink(destPath).catch(() => {})
     throw new Error(
       'Downloaded file is not a valid model. ' +
-      'If the model requires a HuggingFace account, download it manually and place it in the models folder.'
+        'If the model requires a HuggingFace account, download it manually and place it in the models folder.'
     )
   }
 }

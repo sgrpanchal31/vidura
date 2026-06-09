@@ -18,8 +18,9 @@ export async function parsePdf(filePath: string): Promise<ParsedPdf> {
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
     useWorkerFetch: false,
+    // @ts-expect-error — pdfjs-dist type defs lag the runtime API; isEvalSupported is valid
     isEvalSupported: false,
-    useSystemFonts: true
+    useSystemFonts: true,
   })
 
   const pdfDocument = await loadingTask.promise

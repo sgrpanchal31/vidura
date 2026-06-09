@@ -20,8 +20,22 @@ const GRAMMAR_MAP: Record<string, string> = {
 // Node types that represent top-level symbols worth indexing as parent units.
 // Keys are grammar names; values are node types to capture.
 const SYMBOL_NODE_TYPES: Record<string, string[]> = {
-  typescript: ['function_declaration', 'method_definition', 'class_declaration', 'interface_declaration', 'type_alias_declaration', 'export_statement'],
-  tsx: ['function_declaration', 'method_definition', 'class_declaration', 'interface_declaration', 'type_alias_declaration', 'export_statement'],
+  typescript: [
+    'function_declaration',
+    'method_definition',
+    'class_declaration',
+    'interface_declaration',
+    'type_alias_declaration',
+    'export_statement',
+  ],
+  tsx: [
+    'function_declaration',
+    'method_definition',
+    'class_declaration',
+    'interface_declaration',
+    'type_alias_declaration',
+    'export_statement',
+  ],
   javascript: ['function_declaration', 'method_definition', 'class_declaration', 'export_statement'],
   python: ['function_definition', 'class_definition'],
   go: ['function_declaration', 'method_declaration', 'type_declaration'],
@@ -37,7 +51,13 @@ function unwrapExport(node: any): any {
   if (node.type === 'export_statement' && node.childCount > 0) {
     for (let i = 0; i < node.childCount; i++) {
       const child = node.child(i)
-      if (child && child.type !== 'export' && child.type !== 'default' && child.type !== 'const' && child.type !== ';') {
+      if (
+        child &&
+        child.type !== 'export' &&
+        child.type !== 'default' &&
+        child.type !== 'const' &&
+        child.type !== ';'
+      ) {
         return child
       }
     }
@@ -46,11 +66,14 @@ function unwrapExport(node: any): any {
 }
 
 // Extract a human-readable name from a symbol node
-function extractName(node: any, grammar: string): string {
+function extractName(node: any, _grammar: string): string {
   // Try 'name' child node first (most languages)
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i)
-    if (child && (child.type === 'identifier' || child.type === 'type_identifier' || child.type === 'property_identifier')) {
+    if (
+      child &&
+      (child.type === 'identifier' || child.type === 'type_identifier' || child.type === 'property_identifier')
+    ) {
       return child.text
     }
   }
@@ -75,9 +98,7 @@ function collectSymbols(
 
   if (isSymbol && depth <= 2) {
     const name = extractName(effective, grammar)
-    const symbolPath = classStack.length > 0
-      ? `${classStack.join(' > ')} > ${name}`
-      : name
+    const symbolPath = classStack.length > 0 ? `${classStack.join(' > ')} > ${name}` : name
 
     const startLine = effective.startPosition.row + 1
     const text = code.slice(effective.startIndex, effective.endIndex)
