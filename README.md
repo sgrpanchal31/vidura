@@ -71,6 +71,34 @@ Files larger than 50 MB are skipped. Hidden files/folders and `node_modules` are
 
 ---
 
+## Install (pre-built, Apple Silicon)
+
+The fastest way to get started — no Node.js or build tools needed.
+
+**One-line installer:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/openbook-lm/main/scripts/install.sh | bash
+```
+
+Downloads the latest release, installs to `/Applications`, and removes the quarantine flag so the app opens without any "damaged" warning.
+
+**Manual install (if you prefer):**
+
+1. Download `openbook-lm-arm64.dmg` from the [latest release](https://github.com/sgrpanchal31/openbook-lm/releases/latest).
+2. Open the DMG and drag `openbook-lm.app` to `/Applications`.
+3. Run this once in Terminal:
+   ```bash
+   xattr -cr /Applications/openbook-lm.app
+   ```
+4. Open the app normally.
+
+> **Why the Terminal step?** macOS marks every downloaded file as "quarantined." Because the app is self-signed rather than notarized, Gatekeeper shows "damaged" instead of offering an "open anyway" button. The `xattr` command removes that flag — the file is not actually damaged.
+
+> **Apple Silicon only.** The pre-built release targets arm64 (M1/M2/M3/M4). Intel Mac users need to build from source (see below).
+
+---
+
 ## Installation (from source)
 
 ### 1. Prerequisites
