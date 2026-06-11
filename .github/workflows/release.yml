@@ -44,8 +44,24 @@ jobs:
           body: |
             ## Install
 
-            Download the `.dmg` file below.
+            **Recommended — one-line installer (Apple Silicon only):**
 
-            **First launch on macOS:** Apple will warn that the app is unsigned.
-            Right-click the app → **Open** → **Open** to bypass the warning.
-            You only need to do this once.
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/openbook-lm/main/scripts/install.sh | bash
+            ```
+
+            This downloads the app, installs it to `/Applications`, and removes the quarantine flag so it opens cleanly.
+
+            ---
+
+            **Manual install:**
+
+            1. Download `openbook-lm-arm64.dmg` below (Apple Silicon only).
+            2. Open the DMG and drag `openbook-lm.app` to `/Applications`.
+            3. Run this once in Terminal to remove the quarantine flag:
+               ```bash
+               xattr -cr /Applications/openbook-lm.app
+               ```
+            4. Open the app normally.
+
+            > **Why the Terminal step?** macOS marks every downloaded file as quarantined. Because this app is self-signed (no Apple Developer account), Gatekeeper shows "damaged" instead of an "open anyway?" prompt. The `xattr` command removes that flag — the file is not actually damaged.
