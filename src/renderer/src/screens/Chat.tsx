@@ -332,7 +332,8 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
     }
     unsubsRef.current = [unsubToken, unsubDone, unsubError]
 
-    await window.api.chatAsk(text.trim(), folder, modelId)
+    const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
+    await window.api.chatAsk(text.trim(), folder, modelId, history)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

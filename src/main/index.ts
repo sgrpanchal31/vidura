@@ -196,21 +196,30 @@ function detectGenerateIntent(question: string): { task: GenerateTask; format: G
   return null
 }
 
-ipcMain.handle('chat:ask', async (_event, question: string, folderPath: string, modelId: string) => {
-  // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
-  const genIntent = detectGenerateIntent(question)
-  if (genIntent) {
-    generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, (token) =>
-      mainWindow?.webContents.send('chat:token', token)
-    )
-      .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
-      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
-  } else {
-    ragQuery(question, folderPath, modelId, (token) => mainWindow?.webContents.send('chat:token', token))
-      .then((result) => mainWindow?.webContents.send('chat:done', result))
-      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+ipcMain.handle(
+  'chat:ask',
+  async (
+    _event,
+    question: string,
+    folderPath: string,
+    modelId: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ) => {
+    // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
+    const genIntent = detectGenerateIntent(question)
+    if (genIntent) {
+      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, (token) =>
+        mainWindow?.webContents.send('chat:token', token)
+      )
+        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+    } else {
+      ragQuery(question, folderPath, modelId, history, (token) => mainWindow?.webContents.send('chat:token', token))
+        .then((result) => mainWindow?.webContents.send('chat:done', result))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+    }
   }
-})
+)
 
 ipcMain.handle('chat:cancel', () => {
   llamaService.cancel()

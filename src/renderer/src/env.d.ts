@@ -45,7 +45,12 @@ declare global {
       embedDelete: (hfId: string) => Promise<void>
       onEmbedDownloadProgress: (cb: (p: { hfId: string; loaded: number; total: number }) => void) => () => void
 
-      chatAsk: (question: string, folderPath: string, modelId: string) => Promise<void>
+      chatAsk: (
+        question: string,
+        folderPath: string,
+        modelId: string,
+        history?: Array<{ role: 'user' | 'assistant'; content: string }>
+      ) => Promise<void>
       chatCancel: () => Promise<void>
       onChatToken: (cb: (token: string) => void) => () => void
       onChatDone: (cb: (result: ChatResult) => void) => () => void

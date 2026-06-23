@@ -143,8 +143,12 @@ const api = {
 
   // ── Chat / RAG ──────────────────────────────────────────────────────────────
   // chatAsk resolves immediately; tokens arrive via onChatToken, completion via onChatDone
-  chatAsk: (question: string, folderPath: string, modelId: string): Promise<void> =>
-    ipcRenderer.invoke('chat:ask', question, folderPath, modelId),
+  chatAsk: (
+    question: string,
+    folderPath: string,
+    modelId: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history),
   chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
   onChatToken: (cb: (token: string) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)

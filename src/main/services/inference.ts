@@ -82,7 +82,12 @@ class LlamaService {
     return this.loadedModelId
   }
 
-  async generateStream(systemPrompt: string, userPrompt: string, onToken: (token: string) => void): Promise<string> {
+  async generateStream(
+    systemPrompt: string,
+    userPrompt: string,
+    onToken: (token: string) => void,
+    opts?: { maxTokens?: number }
+  ): Promise<string> {
     if (!this.model) throw new Error('No model loaded — call loadModel() first')
     if (this.generating) throw new Error('Already generating — call cancel() first')
 
@@ -103,6 +108,7 @@ class LlamaService {
     try {
       await session.prompt(userPrompt, {
         signal: this.abortController.signal,
+        ...(opts?.maxTokens !== undefined && { maxTokens: opts.maxTokens }),
         onTextChunk(text: string) {
           fullText += text
           onToken(text)

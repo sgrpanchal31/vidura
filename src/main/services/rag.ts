@@ -3,6 +3,7 @@ import { vectorStore } from './store'
 import type { SearchResult } from './store'
 import { llamaService } from './inference'
 import { DEFAULT_EMBED, embedDim } from './embed-models'
+import { getLangfuse } from './telemetry'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 8
@@ -18,6 +19,8 @@ function formatQueryForEmbed(question: string): string {
 // in the prompt; 5 sources × 1500 ≈ 7500 chars ≈ 1875 tokens of source material,
 // leaving ~2000 tokens of the 4096-token context for the model's response.
 const PARENT_PROMPT_CHARS = 1500
+
+export type HistoryMessage = { role: 'user' | 'assistant'; content: string }
 
 export type CitationEntry = {
   sourceNum: number // the [N] number the model used in the answer
@@ -39,7 +42,7 @@ function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
-function buildSystemPrompt(parents: SearchResult[]): string {
+function buildSystemPrompt(parents: SearchResult[], history: HistoryMessage[]): string {
   const sources = parents
     .map((c, i) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
@@ -56,13 +59,21 @@ function buildSystemPrompt(parents: SearchResult[]): string {
     })
     .join('\n\n')
 
-  return `You are a research assistant. Use the document excerpts below to answer the question.
-Cite every fact with its source number like [1] or [2].
-For broad questions, synthesize what you can from the available excerpts — do not refuse just because the excerpts are partial.
-Only say "I couldn't find that in the provided sources." if truly nothing in the excerpts is relevant.
-Write complete sentences. No preamble, no "Sure!".
+  // Include last 2 turns of history so follow-up questions have context.
+  // Each message is truncated to 300 chars to protect the context window.
+  const recentHistory = history.slice(-6)
+  const historySection =
+    recentHistory.length > 0
+      ? '\n\nRecent conversation:\n' +
+        recentHistory.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`).join('\n')
+      : ''
 
-${sources}`
+  return `You are a research assistant. Use the excerpts below to help with the question.
+Describe what you find in these excerpts that relates to the question. Always cite sources with [1] or [2].
+If the excerpts don't directly answer the question, describe the closest relevant content you find.
+Write complete sentences. No preamble. Do not say you cannot find information — instead, describe what IS in the excerpts.
+
+${sources}${historySection}`
 }
 
 function extractCitations(answer: string, parents: SearchResult[]): CitationEntry[] {
@@ -93,29 +104,103 @@ export async function retrieve(question: string, folderPath: string, cfg: Retrie
   return vectorStore.search(queryVector, cfg.topK)
 }
 
+// Ask the LLM to rewrite the user's question into 2-3 short search queries.
+// Falls back to [question] on any error so retrieval always proceeds.
+async function expandQuery(question: string, history: HistoryMessage[]): Promise<string[]> {
+  const recentContext =
+    history.length > 0
+      ? history
+          .slice(-6)
+          .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 200)}`)
+          .join('\n') + '\n\n'
+      : ''
+
+  const systemPrompt = `You are a search query generator. Given a question (and optional conversation context), output 2-3 short search queries that would find relevant document passages.
+Output one query per line. No bullets, no numbers, no punctuation at end. Nothing else.`
+
+  const userPrompt = `${recentContext}Question: ${question}`
+
+  try {
+    const raw = await llamaService.generateStream(systemPrompt, userPrompt, () => {}, { maxTokens: 120 })
+    const queries = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 3 && l.length < 200)
+    return queries.length > 0 ? queries : [question]
+  } catch {
+    return [question]
+  }
+}
+
 export async function ragQuery(
   question: string,
   folderPath: string,
   modelId: string,
+  history: HistoryMessage[],
   onToken: (token: string) => void
 ): Promise<RagResult> {
+  const lf = getLangfuse()
+  const trace = lf?.trace({ name: 'rag-query', input: question })
+
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
-  // Retrieve child chunks, then collapse to unique parent units
-  const childChunks = await retrieve(question, folderPath, { topK: RETRIEVE_TOP_K })
+  // Expand the question into multiple search queries using the LLM.
+  // This handles vague queries ("what ideas did I work on?") and follow-ups
+  // ("tell me more about that") by generating semantically richer search terms.
+  const expandSpan = trace?.span({ name: 'expand-query', input: { question, historyLength: history.length } })
+  const queries = await expandQuery(question, history)
+  expandSpan?.update({ output: queries })
+  expandSpan?.end()
 
-  if (childChunks.length === 0) {
+  // Run all queries through the vector store, then merge and deduplicate by parentId.
+  const retrieveSpan = trace?.span({ name: 'retrieve', input: queries })
+  const allChunks: SearchResult[] = []
+  for (const q of queries) {
+    const chunks = await retrieve(q, folderPath, { topK: RETRIEVE_TOP_K })
+    for (const chunk of chunks) {
+      if (!allChunks.some((c) => c.parentId === chunk.parentId)) {
+        allChunks.push(chunk)
+      }
+    }
+  }
+  retrieveSpan?.update({
+    output: allChunks.map((c, i) => ({
+      rank: i,
+      score: c.score,
+      sourceFile: c.sourceFile,
+      pageNumber: c.pageNumber ?? null,
+      headingPath: c.headingPath ?? null,
+      text: c.text.slice(0, 300),
+    })),
+  })
+  retrieveSpan?.end()
+
+  if (allChunks.length === 0) {
+    trace?.update({ output: 'no_chunks_found' })
+    lf?.flushAsync().catch(() => {})
     return {
       answer: "I couldn't find any relevant sources in this notebook.",
       citations: [],
     }
   }
 
-  const parents = dedupeByParent(childChunks)
-  const systemPrompt = buildSystemPrompt(parents)
+  const parents = dedupeByParent(allChunks)
+  const systemPrompt = buildSystemPrompt(parents, history)
+
+  const gen = trace?.generation({
+    name: 'llm',
+    model: modelId,
+    input: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: question },
+    ],
+  })
   const rawAnswer = await llamaService.generateStream(systemPrompt, question, onToken)
+  gen?.update({ output: rawAnswer })
+  gen?.end()
+
   const rawCitations = extractCitations(rawAnswer, parents)
 
   // Remap [4] → [1] etc. so the UI always shows sequential citation numbers
@@ -135,6 +220,9 @@ export async function ragQuery(
     .filter((c) => remap.has(c.sourceNum))
     .map((c) => ({ ...c, sourceNum: remap.get(c.sourceNum)! }))
     .sort((a, b) => a.sourceNum - b.sourceNum)
+
+  trace?.update({ output: answer })
+  lf?.flushAsync().catch(() => {})
 
   return { answer, citations }
 }
