@@ -8,7 +8,8 @@ const QA_FILE = join(__dirname, 'qa.json')
 type QAEntry = {
   id: string
   question: string
-  expectedSourceFiles: string[]
+  expectedSourceFiles?: string[]
+  expectedSubstring?: string
   meta?: Record<string, unknown>
 }
 
@@ -18,6 +19,7 @@ export function loadDomain(): { entries: DatasetEntry[]; corpusDir: string } {
     id: item.id,
     question: item.question,
     expectedSourceFiles: item.expectedSourceFiles,
+    expectedSubstring: item.expectedSubstring,
     meta: item.meta,
   }))
   return { entries, corpusDir: CORPUS_DIR }

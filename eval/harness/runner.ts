@@ -18,7 +18,7 @@ export type RunOptions = {
 export async function runEval(opts: RunOptions): Promise<RunResult> {
   const { dataset, datasetEntries, corpusDir, technique, topK, workRoot, limit } = opts
 
-  const configHash = createHash('sha256').update(`${topK}:${technique.name}`).digest('hex').slice(0, 8)
+  const configHash = createHash('sha256').update(`${dataset}:${topK}:${technique.name}`).digest('hex').slice(0, 8)
 
   const workDir = join(workRoot, technique.name, configHash)
   mkdirSync(workDir, { recursive: true })

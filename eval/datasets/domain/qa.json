@@ -2,121 +2,121 @@
   {
     "id": "domain-001",
     "question": "What BLEU score did the Transformer big model achieve on WMT 2014 English-to-German translation?",
-    "expectedSourceFiles": ["transformer_2017.txt"],
+    "expectedSubstring": "28.4",
     "meta": { "answer": "28.4 BLEU" }
   },
   {
     "id": "domain-002",
     "question": "How many encoder and decoder layers does the base Transformer model use, and what is its model dimension?",
-    "expectedSourceFiles": ["transformer_2017.txt"],
+    "expectedSubstring": "d_model=512",
     "meta": { "answer": "6 encoder layers and 6 decoder layers, with a model dimension of d_model=512" }
   },
   {
     "id": "domain-003",
     "question": "What are the two pretraining tasks used in BERT?",
-    "expectedSourceFiles": ["bert_2018.txt"],
+    "expectedSubstring": "Masked Language Modeling",
     "meta": { "answer": "Masked Language Modeling (MLM) and Next Sentence Prediction (NSP)" }
   },
   {
     "id": "domain-004",
     "question": "What F1 score does BERT-Large achieve on the SQuAD v1.1 benchmark?",
-    "expectedSourceFiles": ["bert_2018.txt"],
+    "expectedSubstring": "93.2 F1",
     "meta": { "answer": "93.2 F1, surpassing human performance" }
   },
   {
     "id": "domain-005",
     "question": "How many total parameters does GPT-3 have, and how many transformer layers does it use?",
-    "expectedSourceFiles": ["gpt3_2020.txt"],
+    "expectedSubstring": "175 billion parameters",
     "meta": { "answer": "175 billion parameters, 96 transformer layers" }
   },
   {
     "id": "domain-006",
     "question": "What is in-context learning as introduced in the GPT-3 paper?",
-    "expectedSourceFiles": ["gpt3_2020.txt"],
+    "expectedSubstring": "without any gradient updates",
     "meta": { "answer": "The model uses the text of the prompt, including any examples of the task, to condition its predictions without any gradient updates or fine-tuning" }
   },
   {
     "id": "domain-007",
     "question": "What does LoRA stand for and what is its core approach to fine-tuning large language models?",
-    "expectedSourceFiles": ["lora_2021.txt"],
+    "expectedSubstring": "Low-Rank Adaptation",
     "meta": { "answer": "Low-Rank Adaptation; it freezes pretrained model weights and injects trainable rank decomposition matrices into each Transformer layer, representing weight updates as W + BA where B and A have low rank" }
   },
   {
     "id": "domain-008",
     "question": "By roughly how much does LoRA reduce the number of trainable parameters compared to full fine-tuning of GPT-3 175B?",
-    "expectedSourceFiles": ["lora_2021.txt"],
+    "expectedSubstring": "4.7 million",
     "meta": { "answer": "Over 10,000 times, from 175 billion to approximately 4.7 million trainable parameters" }
   },
   {
     "id": "domain-009",
     "question": "What retrieval method does RAG use to find relevant documents, and what model serves as its generator?",
-    "expectedSourceFiles": ["rag_2020.txt"],
+    "expectedSubstring": "Dense Passage Retrieval",
     "meta": { "answer": "Dense Passage Retrieval (DPR) with a bi-encoder BERT architecture; BART-large (400M parameters) is used as the generator" }
   },
   {
     "id": "domain-010",
     "question": "What Exact Match score does RAG-Token achieve on the Natural Questions benchmark?",
-    "expectedSourceFiles": ["rag_2020.txt"],
+    "expectedSubstring": "44.5 Exact Match",
     "meta": { "answer": "44.5 Exact Match" }
   },
   {
     "id": "domain-011",
     "question": "What parameter sizes does the LLaMA family of models come in, and what is unique about its training data?",
-    "expectedSourceFiles": ["llama_2023.txt"],
+    "expectedSubstring": "publicly available datasets exclusively",
     "meta": { "answer": "7B, 13B, 33B, and 65B parameters; LLaMA is trained exclusively on publicly available data, unlike GPT-3 which uses proprietary data" }
   },
   {
     "id": "domain-012",
     "question": "How does LLaMA-13B compare to GPT-3 on benchmarks despite being much smaller?",
-    "expectedSourceFiles": ["llama_2023.txt"],
+    "expectedSubstring": "LLaMA-13B outperforms GPT-3",
     "meta": { "answer": "LLaMA-13B outperforms GPT-3 (175B) on most benchmarks, despite being 13x smaller" }
   },
   {
     "id": "domain-013",
     "question": "What is chain-of-thought prompting and at what model scale does it become beneficial?",
-    "expectedSourceFiles": ["cot_2022.txt"],
+    "expectedSubstring": "100 billion parameters",
     "meta": { "answer": "Chain-of-thought prompting provides intermediate reasoning steps as exemplars in the prompt; it becomes beneficial above roughly 100 billion parameters and shows no improvement or even degrades performance in smaller models" }
   },
   {
     "id": "domain-014",
     "question": "What accuracy does chain-of-thought prompting with PaLM 540B achieve on GSM8K math word problems?",
-    "expectedSourceFiles": ["cot_2022.txt"],
+    "expectedSubstring": "56.9%",
     "meta": { "answer": "56.9% with 8-shot chain-of-thought prompting, compared to 17.9% with standard prompting" }
   },
   {
     "id": "domain-015",
     "question": "What three-step training procedure does InstructGPT use, and what reinforcement learning algorithm is applied in the final step?",
-    "expectedSourceFiles": ["instruct_gpt_2022.txt"],
+    "expectedSubstring": "Proximal Policy Optimization",
     "meta": { "answer": "Supervised Fine-Tuning (SFT), Reward Model Training from human preference rankings, and Reinforcement Learning using Proximal Policy Optimization (PPO)" }
   },
   {
     "id": "domain-016",
     "question": "How does a 1.3B InstructGPT model compare to the 175B GPT-3 model in human evaluations?",
-    "expectedSourceFiles": ["instruct_gpt_2022.txt"],
+    "expectedSubstring": "85% of the time",
     "meta": { "answer": "Human labelers preferred InstructGPT 1.3B outputs over GPT-3 175B outputs 85% of the time in head-to-head comparisons" }
   },
   {
     "id": "domain-017",
     "question": "What is FlashAttention's key insight and how does it reduce memory usage compared to standard attention?",
-    "expectedSourceFiles": ["flash_attention_2022.txt"],
+    "expectedSubstring": "IO-aware",
     "meta": { "answer": "FlashAttention is IO-aware: it uses tiling to avoid materializing the full N×N attention matrix in HBM (high bandwidth memory), computing attention in blocks that fit in SRAM. Standard attention uses O(N²) memory; FlashAttention uses O(N) memory." }
   },
   {
     "id": "domain-018",
     "question": "What training speedup does FlashAttention achieve on GPT-2 compared to standard attention?",
-    "expectedSourceFiles": ["flash_attention_2022.txt"],
+    "expectedSubstring": "3x speedup",
     "meta": { "answer": "3x speedup on GPT-2 with sequence length 1024" }
   },
   {
     "id": "domain-019",
     "question": "What do the scaling laws from Kaplan et al. 2020 say about the optimal model size versus training tokens for a fixed compute budget?",
-    "expectedSourceFiles": ["scaling_laws_2020.txt"],
+    "expectedSubstring": "grows faster than training tokens",
     "meta": { "answer": "For a fixed compute budget, the optimal model size grows faster than training tokens: N* ∝ C^0.73 and D* ∝ C^0.27, meaning larger models are more compute-efficient than training smaller models for longer" }
   },
   {
     "id": "domain-020",
     "question": "How did the Chinchilla paper revise the scaling law conclusions of Kaplan et al.?",
-    "expectedSourceFiles": ["chinchilla_2022.txt"],
+    "expectedSubstring": "1.4T tokens",
     "meta": { "answer": "Chinchilla found that model size and training tokens should scale equally (both ∝ C^0.5), contradicting Kaplan et al. who suggested larger models are preferable. Chinchilla-70B trained on 1.4T tokens outperforms Gopher-280B trained on 300B tokens." }
   }
 ]
