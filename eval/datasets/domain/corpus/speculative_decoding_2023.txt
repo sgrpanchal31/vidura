@@ -1,0 +1,25 @@
+Fast Inference from Transformers via Speculative Decoding
+Leviathan, Kalman, Matias (2023)
+
+Inference from large autoregressive models like Transformers is slow because tokens must be generated sequentially. We present speculative decoding, a method that dramatically accelerates inference without changing the model or its outputs.
+
+The key observation: running a large model to generate K tokens takes K times as long as a single forward pass, but the model can cheaply verify K tokens in a single parallel forward pass.
+
+Algorithm:
+1. Use a small, fast draft model (e.g., 7B) to speculatively generate K tokens
+2. Run the large target model (e.g., 70B) on all K tokens in parallel (one forward pass)
+3. Accept or reject each draft token using a rejection sampling scheme that ensures the output distribution exactly matches what the target model would have produced
+4. If a token is rejected, sample a replacement from the corrected distribution and start the next round
+
+The rejection sampling scheme guarantees that the output distribution is identical to the original target model — speculative decoding is lossless.
+
+Speedup analysis:
+- If the draft model accepts α fraction of tokens on average, the speedup factor is K / (1 + K(1-α)/α) approximately
+- For a large T5-XXL model with a small T5-Small draft model: 2-3× speedup in practice
+
+Conditions for good speedup:
+- The draft model should be fast (much smaller than target)
+- The draft model should agree with the target model frequently (high acceptance rate)
+- The draft model and target model should have similar distributions on the domain
+
+Speculative decoding has been widely adopted in production inference systems including Google's PaLM inference infrastructure and is now standard in open-source serving frameworks like vLLM.

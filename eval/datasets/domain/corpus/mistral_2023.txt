@@ -1,0 +1,23 @@
+Mistral 7B
+Jiang, Sablayrolles, Mensch, Bamford, Chaplot, de Las Casas, Bressand, Lengyel, Lample, Saulnier, Renard Lavaud, Lachaux, Stock, Le Scao, Lavril, Wang, Lacroix, El Sayed (2023)
+
+We introduce Mistral 7B, a 7 billion parameter language model that outperforms Llama 2 13B on all benchmarks evaluated and Llama 1 34B on many benchmarks. Mistral 7B demonstrates that a well-engineered 7B model can match models with 2× more parameters.
+
+Key architectural innovations:
+
+Grouped Query Attention (GQA): Uses 8 key-value heads shared across 32 query heads (instead of 32 KV heads as in standard multi-head attention). This reduces memory bandwidth requirements during inference by 4×, enabling faster generation with no quality loss.
+
+Sliding Window Attention (SWA): Each attention layer attends to a window of W=4096 previous tokens rather than all previous tokens. Through the transformer's depth, information propagates across the full context. A rolling buffer KV cache further reduces memory use.
+
+Context length: 8192 tokens (with sliding window allowing effective attention beyond this).
+
+Model architecture: 32 layers, 4096 hidden dimensions, 32 attention heads (8 KV heads), 14336 feed-forward dimension.
+
+Results:
+- MMLU (5-shot): 60.1 (vs Llama 2 13B: 54.8)
+- HellaSwag: 81.3 (vs Llama 2 13B: 80.7)
+- WinoGrande: 75.3 (vs Llama 2 13B: 72.2)
+- GSM8K (5-shot): 52.2 (vs Llama 2 13B: 28.7)
+- HumanEval (pass@1): 30.5 (vs Llama 2 13B: 18.3)
+
+Mistral 7B – Instruct (fine-tuned with instruction following) outperforms all 13B chat models on human evaluation. Released under Apache 2.0 license.

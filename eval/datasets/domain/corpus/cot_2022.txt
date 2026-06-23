@@ -1,0 +1,72 @@
+Chain-of-Thought Prompting Elicits Reasoning in Large Language Models
+Wei, Wang, Schuurmans, Bosma, Ichter, Xia, Chi, Le, Zhou (2022)
+
+ABSTRACT
+
+We explore how generating a chain of thought — a series of intermediate reasoning steps — significantly improves the ability of large language models to perform complex reasoning. In particular, we show how such reasoning abilities emerge naturally in sufficiently large language models via a simple method called chain-of-thought prompting, where a few chain of thought demonstrations are provided as exemplars in prompting.
+
+WHAT IS CHAIN-OF-THOUGHT PROMPTING
+
+Chain-of-thought prompting is a variant of few-shot prompting where each exemplar in the prompt includes not just the input-output pair, but also the intermediate reasoning steps (the "chain of thought") that lead from the input to the output.
+
+Standard prompting example:
+Q: Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can has 3 tennis balls. How many tennis balls does he have now?
+A: 11.
+
+Chain-of-thought prompting example:
+Q: Roger has 5 tennis balls. He buys 2 more cans of tennis balls. Each can has 3 tennis balls. How many tennis balls does he have now?
+A: Roger started with 5 balls. 2 cans of 3 tennis balls each is 6 tennis balls. 5 + 6 = 11. The answer is 11.
+
+EMERGENCE AT SCALE
+
+Chain-of-thought prompting is an emergent ability of model scale — it does not improve performance for small models and only becomes beneficial above roughly 100 billion parameters. Experiments show:
+
+For arithmetic reasoning:
+- Models below 10B parameters show no benefit or even degraded performance from chain-of-thought prompting
+- Models above 100B parameters (GPT-3 175B, PaLM 540B) show substantial gains
+
+This threshold behavior makes chain-of-thought prompting qualitatively different from most other prompting techniques, which tend to show gradual improvements with scale.
+
+KEY BENCHMARKS
+
+Math Word Problems (GSM8K — 8-shot):
+- Standard prompting with PaLM 540B: 17.9%
+- Chain-of-thought prompting with PaLM 540B: 56.9% (+39 points)
+- Chain-of-thought with GPT-3 175B: 46.9%
+
+Math Word Problems (MAWPS — 8-shot):
+- Standard prompting with PaLM 540B: 86.4%
+- Chain-of-thought with PaLM 540B: 91.9%
+
+Commonsense Reasoning (StrategyQA):
+- Standard prompting with PaLM 540B: 65.9%
+- Chain-of-thought with PaLM 540B: 72.5%
+
+Symbolic Reasoning (Letter Concatenation, 10-step OOD):
+- Standard prompting with GPT-3 175B: 0%
+- Chain-of-thought with GPT-3 175B: 73%
+
+BIG-Bench Hard (23 tasks requiring multi-step reasoning):
+- Standard prompting: Most tasks near random baseline
+- Chain-of-thought: Exceeds average human performance on BIG-Bench Hard tasks
+
+VARIANTS AND EXTENSIONS
+
+Zero-shot chain-of-thought: Simply appending "Let's think step by step" to the query (without providing exemplars) also improves performance, suggesting the model has latent reasoning capabilities that can be unlocked with minimal prompting.
+
+Self-consistency: Instead of using greedy decoding, sample multiple reasoning chains and take the majority answer. This further improves accuracy by 1–24 points on arithmetic benchmarks.
+
+TASK TYPES THAT BENEFIT
+
+Tasks that clearly benefit:
+- Math word problems requiring multi-step arithmetic
+- Commonsense reasoning requiring world knowledge
+- Symbolic manipulation requiring precise step tracking
+
+Tasks that do NOT show large gains:
+- Simple single-step problems where standard prompting already works
+- Tasks requiring specific domain knowledge the model lacks
+
+CONCLUSION
+
+Chain-of-thought prompting is a simple technique that dramatically improves reasoning in large language models, suggesting these models have latent reasoning capabilities that are not fully elicited by standard prompting. The technique works best in the few-shot setting with models above ~100B parameters and is most useful for tasks that decompose naturally into sequential reasoning steps.

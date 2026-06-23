@@ -1,0 +1,18 @@
+Generalization through Memorization: Nearest Neighbor Language Models (kNN-LM)
+Khandelwal, Levy, Jurafsky, Zettlemoyer, Lewis (2019)
+
+We introduce kNN-LM, which extends a pre-trained neural language model by linearly interpolating its next token prediction with a k-nearest-neighbors (kNN) model. The kNN model is built by using the LM to encode every training token's context into a vector, storing all (context, next token) pairs in a datastore, and at inference time retrieving the k most similar contexts to predict the next token.
+
+At inference, for a context c:
+1. Encode c with the LM to get a representation h
+2. Retrieve k nearest neighbors from the datastore using L2 distance: (h_i, t_i) pairs
+3. Compute softmax over retrieved next tokens weighted by their distances
+4. Interpolate: p(y|c) = λ × p_kNN(y|c) + (1-λ) × p_LM(y|c) with λ=0.65
+
+Key result: Simply adding a kNN datastore built from the training data to a trained LM improves perplexity significantly:
+- WikiText-103: kNN-LM achieves 15.79 perplexity (vs GPT-2 baseline 18.65, a 15% reduction)
+- PTB: 54.56 vs 62.97
+
+Domain adaptation: A kNN-LM trained only on Wikipedia but with a domain-specific datastore achieves lower perplexity than a model fine-tuned on the domain data, without any gradient updates.
+
+kNN-LM demonstrates that memorization of training data is complementary to generalization in language models, and that retrieval-augmented inference can improve LMs without retraining.

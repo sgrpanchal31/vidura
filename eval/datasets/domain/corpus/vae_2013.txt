@@ -1,0 +1,15 @@
+Auto-Encoding Variational Bayes (VAE)
+Kingma, Welling (2013)
+
+We introduce a stochastic variational inference and learning algorithm that scales to large datasets and, under some mild differentiability conditions, even works in the intractable case. The variational auto-encoder (VAE) learns a latent variable model by jointly training an encoder (recognition model) and decoder (generative model).
+
+The core idea: learn a probabilistic mapping from data x to a latent space z, and back. The encoder outputs parameters (μ, σ) of a Gaussian distribution over z. The decoder reconstructs x from samples of z. The reparameterization trick — sampling z = μ + σ × ε where ε ~ N(0,1) — makes this differentiable and allows backpropagation.
+
+The evidence lower bound (ELBO) training objective:
+L = E_q[log p(x|z)] - KL(q(z|x) || p(z))
+
+The first term encourages reconstruction quality; the KL term acts as a regularizer pushing the latent distribution toward a standard Gaussian prior.
+
+Results on MNIST and CIFAR-10 show VAEs learn meaningful latent representations. The latent space is continuous and structured — interpolating between two points in latent space produces semantically smooth transitions in the output.
+
+VAEs enabled a new class of generative models with explicitly structured latent spaces, interpretable representations, and closed-form density estimation. They remain widely used for anomaly detection, representation learning, and semi-supervised learning.

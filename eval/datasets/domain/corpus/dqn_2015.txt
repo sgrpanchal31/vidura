@@ -1,0 +1,17 @@
+Human-Level Control Through Deep Reinforcement Learning (DQN)
+Mnih, Kavukcuoglu, Silver, Rusu, Veness, Bellemare, Graves, Riedmiller, Fidjeland, Ostrovski, Petersen, Beattie, Sadik, Antonoglou, King, Kumaran, Wierstra, Legg, Hassabis (2015)
+
+We present the first deep learning model to successfully learn control policies directly from high-dimensional sensory input using reinforcement learning. The model is a convolutional neural network trained with a variant of Q-learning called Deep Q-Networks (DQN), whose input is raw pixels and output is a value function estimating future rewards.
+
+Two key innovations make DQN stable where naive deep Q-learning fails:
+
+1. Experience Replay: Store transitions (state, action, reward, next state) in a replay memory buffer. Sample random mini-batches from this buffer for training. This breaks correlations between consecutive samples and smooths over changes in the data distribution.
+
+2. Target Network: Use a separate network with frozen parameters to compute Q-learning targets. Update this target network every C steps by copying the main network weights. This stabilizes training by decoupling the targets from the rapidly changing main network.
+
+DQN was evaluated on 49 Atari 2600 games from the Arcade Learning Environment using the same network architecture, hyperparameters, and learning algorithm:
+- Achieves human-level performance or better on 29 of 49 games
+- Outperforms previous approaches on 43 of 49 games
+- Scores 8x human performance on video Pinball, 4x on Video Pinball
+
+The same algorithm without any game-specific feature engineering achieves superhuman performance across diverse games, demonstrating that deep reinforcement learning can learn general strategies from raw pixels.

@@ -1,0 +1,23 @@
+Proximal Policy Optimization Algorithms (PPO)
+Schulman, Wolski, Dhariwal, Radford, Klimov (2017)
+
+We propose a family of policy gradient methods for reinforcement learning, which alternate between sampling data through interaction with the environment, and optimizing a surrogate objective function using stochastic gradient ascent. Whereas standard policy gradient methods perform one gradient update per data sample, we propose novel objective functions that enable multiple epochs of minibatch updates.
+
+The core PPO-Clip objective avoids the instability of large policy updates by clipping the probability ratio:
+L^CLIP(θ) = E_t[min(r_t(θ) × A_t, clip(r_t(θ), 1-ε, 1+ε) × A_t)]
+
+where r_t(θ) = π_θ(a_t|s_t) / π_θ_old(a_t|s_t) is the probability ratio and A_t is the advantage estimate.
+
+The clipping removes the incentive for moving r_t outside the interval [1-ε, 1+ε], typically using ε=0.2.
+
+PPO was evaluated on the OpenAI Gym continuous control tasks and Atari games:
+- MuJoCo locomotion: PPO outperforms TRPO and A2C on 7 of 9 continuous control tasks
+- Atari: PPO matches or outperforms A3C on most games while using fewer environment interactions
+
+Key advantages over TRPO:
+- Simpler to implement (no second-order optimization)
+- Faster wall-clock time
+- Works with recurrent policies
+- Better sample efficiency on most tasks
+
+PPO has become the de facto standard reinforcement learning algorithm for training large language models via RLHF, used in InstructGPT, ChatGPT, and most subsequent RLHF systems.

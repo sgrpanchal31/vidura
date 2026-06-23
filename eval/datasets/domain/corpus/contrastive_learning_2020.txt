@@ -1,0 +1,25 @@
+A Simple Framework for Contrastive Learning of Visual Representations (SimCLR)
+Chen, Kornblith, Norouzi, Hinton (2020)
+
+This paper presents SimCLR, a simple framework for contrastive self-supervised learning of visual representations. SimCLR learns representations by maximizing agreement between differently augmented views of the same data example.
+
+The framework:
+1. Apply two different random data augmentations to the same image, creating two views (x_i, x_j)
+2. Encode both views with a shared encoder network f (ResNet)
+3. Project to a lower-dimensional space with a small MLP head g
+4. Apply NT-Xent (normalized temperature-scaled cross entropy) loss to pull paired views together and push unpaired views apart
+
+Key findings from ablation studies:
+- Composition of multiple augmentations is critical: random cropping + color distortion dramatically outperforms individual augmentations
+- A nonlinear projection head g improves representation quality by 3-10% vs linear projection
+- Larger batch sizes (4096-8192) and longer training (800 epochs) consistently improve performance
+- Temperature τ=0.1 works best for NT-Xent loss
+
+Results on ImageNet linear evaluation (ResNet-50):
+- SimCLR: 76.5% top-1 accuracy with 100 epochs of pretraining
+- SimCLR: 69.3% top-1 with just 10 epochs of pretraining
+
+With 1% ImageNet labels (semi-supervised):
+- SimCLR achieves 85.8% top-5 accuracy (vs supervised baseline 80.4%)
+
+SimCLR closes 70% of the gap between previous self-supervised methods and supervised ResNet-50, establishing contrastive learning as a practical path to learning representations without labels.

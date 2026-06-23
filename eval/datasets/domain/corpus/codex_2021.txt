@@ -1,0 +1,17 @@
+Evaluating Large Language Models Trained on Code (Codex)
+Chen, Tworek, Jun, Yuan, Pinto, Kaplan, Edwards, Burda, Joseph, Brockman, Ray, Puri, Krueger, Petrov, Khlaaf, Sastry, Mishkin, Chan, Gray, Ryder, Pavlov, Power, Kaiser, Bavarian, Winter, Tillet, Such, Cummings, Plappert, Chantzis, Barnes, Herbert-Voss, Guss, Nichol, Paino, Tezak, Tang, Babuschkin, Balaji, Jain, Saunders, Hesse, Carr, Leike, Achiam, Misra, Morikawa, Radford, Knight, Brundage, Murati, Mayer, Welinder, McGrew, Amodei, McCandlish, Sutskever, Zaremba (2021)
+
+We introduce Codex, a GPT language model fine-tuned on publicly available code from GitHub. Codex is the model behind GitHub Copilot and demonstrates that LLMs can generate functionally correct code.
+
+Training: Codex is fine-tuned from GPT-3 on 159 GB of Python code from 54 million GitHub repositories. The 12B parameter version is the strongest model evaluated.
+
+Evaluation: We introduce HumanEval, a dataset of 164 hand-written Python programming problems. Each problem includes a function signature, docstring, body, and several unit tests. Solutions are evaluated by running them against the unit tests.
+
+HumanEval results (pass@1 = probability that the first sample is correct):
+- GPT-3 (175B): 0.0% pass@1 (cannot generate correct code)
+- Codex-12B: 28.8% pass@1 (generates correct solution for ~47 of 164 problems)
+- Codex-12B: 72.3% pass@100 (at least one correct solution in 100 samples)
+
+For problems requiring docstrings, Codex significantly outperforms GPT-3. Codex fails on problems requiring complex algorithms (dynamic programming, graph algorithms) and multi-function programs.
+
+HumanEval has since become the standard benchmark for evaluating code generation models. Codex demonstrated that code is a learnable modality for LLMs and spawned a generation of code-specialized models.

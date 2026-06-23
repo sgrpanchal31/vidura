@@ -1,0 +1,48 @@
+BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding
+Devlin, Chang, Lee, Toutanova (2018)
+
+ABSTRACT
+
+We introduce a new language representation model called BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers. As a result, the pre-trained BERT model can be fine-tuned with just one additional output layer to create state-of-the-art models for a wide range of tasks without substantial task-specific architecture modifications.
+
+PRETRAINING TASKS
+
+BERT is pretrained using two unsupervised tasks:
+
+1. Masked Language Modeling (MLM): We simply mask some percentage (15%) of the input tokens at random, and then predict those masked tokens. The final hidden vectors corresponding to the mask tokens are fed into an output softmax over the vocabulary.
+
+2. Next Sentence Prediction (NSP): Many important downstream tasks such as Question Answering and Natural Language Inference are based on understanding the relationship between two sentences, which is not directly captured by language modeling. To train a model that understands sentence relationships, we pre-train for a binarized next sentence prediction task that can be trivially generated from any monolingual corpus.
+
+MODEL ARCHITECTURE
+
+BERT uses a multi-layer bidirectional Transformer encoder. Two model sizes were released:
+
+BERT-Base: 12 transformer layers, 768 hidden dimensions, 12 attention heads, 110 million parameters
+BERT-Large: 24 transformer layers, 1024 hidden dimensions, 16 attention heads, 340 million parameters
+
+PRETRAINING DATA
+
+BERT was pretrained on BooksCorpus (800 million words) and English Wikipedia (2,500 million words), for a total of approximately 3.3 billion words.
+
+FINE-TUNING PROCEDURE
+
+For fine-tuning, BERT is initialized with the pre-trained parameters and all of the parameters are fine-tuned using labeled data from the downstream tasks. A simple classification layer is added on top of the [CLS] token representation for classification tasks.
+
+RESULTS ON KEY BENCHMARKS
+
+GLUE Benchmark: BERT-Large achieves an average score of 80.5, outperforming previous state-of-the-art by 7.7 points.
+
+SQuAD v1.1 (Stanford Question Answering Dataset):
+- BERT-Large achieves 93.2 F1 and 87.4 Exact Match, surpassing human performance (91.2 F1).
+- BERT-Base achieves 88.5 F1.
+
+SQuAD v2.0:
+- BERT-Large achieves 83.1 F1 and 80.0 Exact Match.
+
+MultiNLI: BERT-Large achieves 86.7% accuracy on matched and 85.9% on mismatched.
+
+Named Entity Recognition (CoNLL-2003): BERT-Large achieves 92.8 F1.
+
+CONCLUSION
+
+BERT advances the state of the art for eleven NLP tasks. The key takeaway is that bidirectional pre-training is critically important for NLP tasks. Unlike unidirectional language models, BERT uses masked language models to enable pre-trained deep bidirectional representations. BERT is also the first fine-tuning based representation model that achieves state-of-the-art performance on a large suite of sentence-level and token-level tasks.

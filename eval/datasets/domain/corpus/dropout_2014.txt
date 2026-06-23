@@ -1,0 +1,16 @@
+Dropout: A Simple Way to Prevent Neural Networks from Overfitting
+Srivastava, Hinton, Krizhevsky, Sutskever, Salakhutdinov (2014)
+
+Deep neural networks with a large number of parameters are very powerful machine learning systems. However, overfitting is a serious problem in such networks. Large networks are also slow to use, making it difficult to deal with overfitting by combining the predictions of many different large neural networks at test time. Dropout is a technique for addressing this problem.
+
+The key idea is to randomly drop units (along with their connections) from the neural network during training. This prevents units from co-adapting too much. During training, each unit is retained with probability p (typically 0.5 for hidden units, 0.8 for input units). At test time, all units are used but their weights are scaled by p.
+
+Dropout can be interpreted as training an ensemble of 2^n different networks simultaneously (where n is the number of units), then averaging their predictions at test time. This is far more efficient than training multiple separate models.
+
+Results on key benchmarks:
+- MNIST: 0.95% test error (best result at the time)
+- CIFAR-10: 12.61% with max-pooling CNNs (6% reduction in error vs no dropout)
+- CIFAR-100: 37.20% test error
+- SVHN: 2.68% test error
+
+Dropout reduces overfitting substantially across all tested architectures and domains. It became a standard component of neural network training and is included in virtually all modern deep learning frameworks.

@@ -1,0 +1,60 @@
+LoRA: Low-Rank Adaptation of Large Language Models
+Hu, Shen, Wallis, Allen-Zhu, Li, Wang, Wang, Chen (2021)
+
+ABSTRACT
+
+An important paradigm of natural language processing consists of large-scale pre-training on general domain data and adaptation to particular tasks or domains. As we pre-train larger models, full fine-tuning, which retrains all model parameters, becomes less feasible. Using GPT-3 175B as an example -- deploying independent instances of fine-tuned models, each with 175B parameters, is prohibitively expensive. We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks.
+
+CORE IDEA
+
+LoRA's key insight is that the change in weights during model adaptation has a low intrinsic rank. For a pre-trained weight matrix W ∈ R^{d×k}, LoRA constrains its update by representing the latter with a low-rank decomposition:
+
+W + ΔW = W + BA
+
+where B ∈ R^{d×r} and A ∈ R^{r×k}, with rank r << min(d, k).
+
+During training, W is frozen and does not receive gradient updates, while A and B contain trainable parameters. At initialization, A is initialized with a random Gaussian distribution and B is initialized to zero, so ΔW = BA is zero at the beginning of training.
+
+PARAMETER EFFICIENCY
+
+For GPT-3 175B adapted with LoRA:
+- Full fine-tuning: 175 billion trainable parameters
+- LoRA (r=4): approximately 4.7 million trainable parameters (a reduction of over 10,000x)
+- This represents a ~37.4% reduction in GPU memory consumption during training
+
+LoRA reduces the number of trainable parameters by up to 10,000 times and the GPU memory requirement by 3x compared to full fine-tuning using Adam optimizer.
+
+WHICH WEIGHTS TO ADAPT
+
+In the Transformer architecture, the attention mechanism has four weight matrices: W_q, W_k, W_v, and W_o, plus two weight matrices in the MLP module. The authors found that adapting W_q and W_v (the query and value projection matrices) with LoRA achieves the best performance-efficiency tradeoff. In practice, rank r=4 or r=8 works well for most tasks.
+
+RANK SELECTION
+
+The rank r is a key hyperparameter. Experiments show:
+- r=1 gives surprisingly competitive performance on many tasks
+- r=4 achieves most of the gains
+- r=64 is rarely needed and can hurt performance due to over-parameterization
+- A rank-4 decomposition for both W_q and W_v uses only 0.3% of trainable parameters compared to full fine-tuning
+
+RESULTS ON LANGUAGE TASKS
+
+RoBERTa (125M) fine-tuned with LoRA matches or exceeds full fine-tuning on GLUE benchmarks.
+
+GPT-2 Medium (345M) with LoRA matches full fine-tuning on E2E NLG Challenge:
+- BLEU: 70.4 (LoRA) vs 68.2 (full fine-tuning)
+- NIST: 8.85 vs 8.62
+
+GPT-3 (175B) with LoRA on WikiSQL:
+- Achieves 73.4% accuracy vs 73.8% for full fine-tuning
+- Uses only 4.7M trainable parameters vs 175B for full fine-tuning
+
+PRACTICAL ADVANTAGES
+
+1. No inference latency: LoRA weights can be merged back into the base model, so inference speed is identical to the original model.
+2. Task switching: Multiple LoRA adapters can be swapped in and out without reloading the base model.
+3. Composability: LoRA adapters trained for different tasks can be combined.
+4. Reduced storage: Instead of storing full fine-tuned models, only the small adapter weights need to be stored.
+
+CONCLUSION
+
+LoRA makes large-scale language model fine-tuning feasible on consumer hardware. By constraining weight updates to a low-rank subspace, it achieves comparable performance to full fine-tuning at a fraction of the computational cost, enabling adaptation of 175B+ parameter models on a single GPU.

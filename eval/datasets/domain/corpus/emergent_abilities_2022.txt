@@ -1,0 +1,28 @@
+Emergent Abilities of Large Language Models
+Wei, Tay, Bommasani, Raffel, Zoph, Borgeaud, Yogatama, Bosma, Zhou, Metzler, Chi, Hashimoto, Vinyals, Liang, Dean, Fedus (2022)
+
+Emergence is when quantitative changes in a system result in qualitative changes in behavior. We define an ability as emergent if it is not present in smaller-scale models but is present in larger-scale models. We review emergent abilities observed in large language models.
+
+Definition: An ability is emergent if (1) it is not present or predictably extrapolated from smaller models, and (2) it appears at a certain scale threshold.
+
+Emergent abilities documented:
+
+In few-shot prompting settings:
+- Arithmetic (3-digit addition): Emerges at ~100B parameters
+- Chain-of-thought reasoning: Emerges at ~100B parameters
+- Word unscrambling: Emerges at ~100B parameters
+- Multi-step reasoning on BIG-Bench: ~68 tasks show emergence
+
+In fine-tuning settings:
+- Grounded conceptual mappings: Emerges with scale
+- Multi-step math word problems: Emerges with scale
+- Identifying offensive language without examples: Emerges with scale
+
+Key examples from BIG-Bench:
+- Persian question answering: 0% accuracy below 60B parameters, jumps to 50%+ above 200B
+- Hindi question answering: Similar phase transition pattern
+- Logical deduction: Near-random below 50B, competitive above 100B
+
+Debate on emergence: Some researchers argue emergent abilities are artifacts of the evaluation metric (discontinuous metrics create apparent phase transitions from smooth underlying improvements). Others argue true phase transitions exist in the model's internal representations.
+
+The paper established "emergence" as a central concept in LLM scaling research and motivated much subsequent work on understanding when and why models develop qualitatively new capabilities.

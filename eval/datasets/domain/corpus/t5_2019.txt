@@ -1,0 +1,16 @@
+Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (T5)
+Raffel, Shazeer, Roberts, Lee, Narang, Matena, Zhou, Li, Liu (2019)
+
+We introduce a unified framework that converts all text-based language problems into a text-to-text format. Instead of specialized architectures for classification, span extraction, translation, or summarization, T5 (Text-to-Text Transfer Transformer) uses a single encoder-decoder model that generates text output for all tasks.
+
+Every task is framed as: given input text, generate output text. Classification becomes "cola sentence: The course is jumping well. → not acceptable." Summarization becomes "summarize: [article text] → [summary]."
+
+T5 was pretrained on the Colossal Clean Crawled Corpus (C4) — 745 GB of cleaned English text filtered from Common Crawl. The study systematically explored:
+- Model size: 60M, 220M, 770M, 3B, 11B parameters
+- Pretraining objectives: span corruption (masking spans), language modeling, deshuffling
+- Fine-tuning strategies: full fine-tuning, adapter layers, gradual unfreezing
+- Multi-task learning vs. task-specific fine-tuning
+
+T5-11B achieves state-of-the-art on 18 of 24 NLP tasks evaluated, including SuperGLUE (88.9 average score), CNN/DM summarization (21.55 ROUGE-2), WMT English-German translation (29.91 BLEU), and SQuAD (90.06 Exact Match).
+
+The text-to-text framing enabled a systematic study of transfer learning and established that scaling model size and data both reliably improve performance across all task types.

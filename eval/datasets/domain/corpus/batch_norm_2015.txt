@@ -1,0 +1,23 @@
+Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift
+Ioffe, Szegedy (2015)
+
+Training deep neural networks is complicated by the fact that the distribution of each layer's inputs changes during training, as the parameters of the previous layers change. This slows down the training by requiring lower learning rates and careful parameter initialization, and makes it notoriously hard to train models with saturating nonlinearities. We refer to this phenomenon as internal covariate shift.
+
+Batch Normalization normalizes each layer's inputs by maintaining the mean and variance of activations within a mini-batch. For a mini-batch B = {x_1...x_m}:
+- μ_B = (1/m) Σ x_i
+- σ²_B = (1/m) Σ (x_i - μ_B)²
+- x̂_i = (x_i - μ_B) / √(σ²_B + ε)
+- y_i = γ x̂_i + β  (scale and shift with learned parameters)
+
+Key benefits:
+- Allows much higher learning rates (10x or more)
+- Reduces the dependence on careful initialization
+- Acts as a regularizer, reducing the need for Dropout in many cases
+- Dramatically faster convergence
+
+Results on ImageNet:
+- Batch Normalized Inception reaches 4.9% top-5 validation error (vs 6.7% for original Inception)
+- BN-Inception trained for 7% as many training steps achieves the same accuracy as Inception trained to completion
+- Ensemble of BN-Inception networks: 4.82% top-5 test error, surpassing human accuracy (5.1%)
+
+Batch normalization is now a standard component in virtually all deep neural networks for computer vision and beyond.

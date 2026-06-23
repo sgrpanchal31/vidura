@@ -1,0 +1,62 @@
+Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks
+Lewis, Perez, Piktus, Petroni, Karpukhin, Goyal, Küttler, Lewis, Yih, Rocktäschel, Riedel, Kiela (2020)
+
+ABSTRACT
+
+Large pre-trained language models have been shown to store factual knowledge in their parameters, and achieve state-of-the-art results when fine-tuned on downstream NLP tasks. However, their ability to access and precisely manipulate knowledge is still limited, and hence on knowledge-intensive tasks, their performance lags behind task-specific architectures. Additionally, providing provenance for their decisions and updating their world knowledge remain open research problems. We explore a general-purpose fine-tuning recipe for retrieval-augmented generation (RAG) -- models which combine pre-trained parametric and non-parametric memory for language generation.
+
+ARCHITECTURE
+
+RAG combines two components:
+
+1. Retriever: Uses Dense Passage Retrieval (DPR) to retrieve relevant documents from Wikipedia. DPR uses a bi-encoder architecture: a query encoder and a document encoder, both based on BERT-base. The retriever finds the top-k documents (typically k=5 or k=10) from a Wikipedia dump of 21 million passages, each a 100-word chunk.
+
+2. Generator: Uses BART-large (400M parameters) as the sequence-to-sequence generator. BART takes the concatenation of the input query and each retrieved document as input, and generates the final answer.
+
+Two variants are proposed:
+- RAG-Sequence: Uses the same retrieved document to generate the entire sequence.
+- RAG-Token: Can use different documents at each generation step, allowing different parts of the answer to come from different documents.
+
+RETRIEVAL MECHANISM
+
+The retriever uses Maximum Inner Product Search (MIPS) over document embeddings pre-computed with the DPR document encoder. The Wikipedia corpus is encoded offline, and at inference time, only the query needs to be encoded. The top-k most similar passages are retrieved using FAISS for efficient approximate nearest neighbor search.
+
+TRAINING
+
+RAG is trained end-to-end, with the query encoder and the BART generator fine-tuned jointly using the marginal log-likelihood of generating the correct answer, marginalized over the retrieved documents. The document encoder is kept frozen during training.
+
+RESULTS
+
+Open-domain Question Answering:
+
+Natural Questions:
+- RAG-Token: 44.5 Exact Match (vs BART closed-book: 26.5, T5 closed-book: 36.6)
+- RAG-Sequence: 45.5 Exact Match
+
+TriviaQA:
+- RAG-Token: 68.0 Exact Match (outperforms all previous open-domain QA methods)
+- RAG-Sequence: 68.0 Exact Match
+
+WebQuestions:
+- RAG-Token: 45.5 Exact Match
+- RAG-Sequence: 45.2 Exact Match
+
+FEVER (Fact Verification):
+- RAG achieves 84.8% accuracy, outperforming previous non-retrieval models
+
+Jeopardy Question Generation:
+- RAG generates more factually specific and human-preferred outputs compared to BART and T5
+
+Knowledge-Grounded Dialogue (Wizard of Wikipedia):
+- RAG achieves lower perplexity than BART
+
+ADVANTAGES OVER PARAMETRIC-ONLY MODELS
+
+1. Knowledge updating: The retriever's document store can be updated without retraining the model.
+2. Provenance: Retrieved documents can be surfaced to users as citations.
+3. Factual accuracy: RAG hallucinates less than pure parametric models.
+4. Specialization: The document store can be swapped to specialize RAG for specific domains.
+
+CONCLUSION
+
+RAG outperforms both parametric-only models (BART, T5) and retrieval-only models on open-domain QA tasks. The combination of parametric and non-parametric memory allows RAG to perform accurate and verifiable generation, establishing a new paradigm for knowledge-intensive NLP.

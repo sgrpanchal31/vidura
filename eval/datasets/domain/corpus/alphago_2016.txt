@@ -1,0 +1,16 @@
+Mastering the Game of Go with Deep Neural Networks and Tree Search (AlphaGo)
+Silver, Huang, Maddison, Guez, Sifre, van den Driessche, Schrittwieser, Antonoglou, Panneershelvam, Lanctot, Dieleman, Grewe, Nham, Kalchbrenner, Sutskever, Lillicrap, Leach, Kavukcuoglu, Graepel, Hassabis (2016)
+
+The game of Go has long been viewed as the most challenging of classic games for artificial intelligence, owing to its enormous search space and the difficulty of evaluating board positions. We introduce AlphaGo, a program that combines Monte Carlo tree search (MCTS) with deep neural networks trained by supervised learning and reinforcement learning.
+
+AlphaGo uses two types of networks:
+1. Policy network: Selects which moves to explore (trained first on human expert games via supervised learning, then improved via self-play reinforcement learning)
+2. Value network: Evaluates board positions, estimating the probability of winning from a given state
+
+The SL policy network (13-layer CNN) achieves 57% accuracy predicting human expert moves on a held-out test set.
+
+The RL policy network improves over SL by playing games against previous versions of itself and updating via policy gradient.
+
+Monte Carlo Tree Search uses both networks to guide search: the policy network narrows the search beam, while the value network and fast rollouts evaluate leaf nodes.
+
+AlphaGo defeated European Go champion Fan Hui 5-0 in October 2015. It then defeated world champion Lee Sedol 4-1 in March 2016, a milestone considered 10 years ahead of its time. AlphaGo demonstrated that deep RL can achieve superhuman performance in complex strategic domains previously thought intractable for computers.

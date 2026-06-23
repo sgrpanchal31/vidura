@@ -1,0 +1,28 @@
+Long Range Arena: A Benchmark for Efficient Transformers
+Tay, Dehghani, Abnar, Shen, Bahri, Pham, Rao, Yang, Ruder, Metzler (2020)
+
+We present Long Range Arena (LRA), a systematic evaluation benchmark for efficient transformer models. Standard transformer attention has O(N²) complexity in sequence length, motivating a large body of work on efficient attention variants. However, these models are rarely compared on tasks requiring genuinely long-range dependencies.
+
+LRA consists of 6 tasks designed to challenge models on long input sequences (1K–16K tokens):
+
+1. ListOps (sequence length 2K): Hierarchical computation on a nested list of mathematical operations. Tests logical and hierarchical reasoning.
+
+2. Text Classification (sequence length 4K): Byte-level sentiment classification on IMDb. Tests language understanding at the character/byte level.
+
+3. Document Retrieval (sequence length 4K): Binary classification of document similarity pairs. Tests semantic understanding.
+
+4. Image Classification (sequence length 1K): Classify 32×32 CIFAR-10 images as a sequence of pixels. Tests 2D spatial reasoning.
+
+5. Pathfinder (sequence length 1K): Determine if two points are connected by a path of dashes on a grid. Tests long-range spatial reasoning.
+
+6. Path-X (sequence length 16K): Harder version of Pathfinder. Standard Transformers perform at chance level (50%).
+
+Results on LRA average score:
+- Transformer (standard): 36.4 (fails on Pathfinder and Path-X)
+- Longformer: 28.3 (surprisingly poor on several tasks)
+- Linear Transformer: 38.0
+- Reformer: 44.5
+- BigBird: 49.0
+- S4: 86.8 (state space model — dramatic improvement on Path-X)
+
+LRA revealed that many "efficient transformer" variants perform worse than standard transformers on tasks requiring true long-range dependency modeling, while alternatives like S4 dramatically outperform attention-based models.

@@ -1,0 +1,17 @@
+Adam: A Method for Stochastic Optimization
+Kingma, Ba (2014)
+
+We introduce Adam, an algorithm for first-order gradient-based optimization of stochastic objective functions, based on adaptive estimates of lower-order moments. The method is straightforward to implement, is computationally efficient, has little memory requirements, is invariant to diagonal rescaling of the gradients, and is well suited for problems that are large in terms of data and/or parameters.
+
+Adam computes individual adaptive learning rates for different parameters from estimates of first and second moments of the gradients. The update rule:
+- m_t = β₁ × m_{t-1} + (1 - β₁) × g_t  (first moment estimate)
+- v_t = β₂ × v_{t-1} + (1 - β₂) × g_t²  (second moment estimate)
+- m̂_t = m_t / (1 - β₁^t)  (bias-corrected first moment)
+- v̂_t = v_t / (1 - β₂^t)  (bias-corrected second moment)
+- θ_t = θ_{t-1} - α × m̂_t / (√v̂_t + ε)
+
+Recommended default hyperparameters: α=0.001, β₁=0.9, β₂=0.999, ε=10⁻⁸.
+
+Adam is shown to be superior to or competitive with AdaGrad, RMSProp, and SGD with momentum on logistic regression, multi-layer neural networks, and convolutional neural networks. Adam converges faster than simpler methods on most practical deep learning tasks.
+
+Adam has become the default optimizer for training large language models and other deep learning systems due to its stability and fast convergence across diverse problem types.

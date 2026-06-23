@@ -1,0 +1,29 @@
+A Survey of Large Language Models
+Zhao, Zhou, Li, Tang, Wang, Hou, Min, Zhang, Zhang, Dong, Du, Yang, Chen, Chen, Jiang, Ren, Li, Tang, Liu, Liu, Nie, Wen (2023)
+
+Since the introduction of Transformer, language models have rapidly scaled in size, capability, and impact. This survey provides a comprehensive overview of large language models (LLMs), covering their technical foundations, training approaches, capabilities, safety considerations, and applications.
+
+Key milestones in LLM development:
+- 2017: Transformer architecture (Vaswani et al.)
+- 2018: BERT (bidirectional pretraining), GPT (autoregressive pretraining)
+- 2019: GPT-2, T5, RoBERTa, XLNet
+- 2020: GPT-3 (175B, few-shot learning), scaling laws (Kaplan et al.)
+- 2021: FLAN (instruction tuning), Codex, Switch Transformer
+- 2022: InstructGPT (RLHF), PaLM, Chinchilla, Chain-of-Thought
+- 2023: LLaMA, GPT-4, Claude 2, Llama 2, Mistral
+
+Emergent abilities observed in LLMs (abilities not present in smaller models):
+- In-context learning (GPT-3 scale, ~100B+ parameters)
+- Chain-of-thought reasoning (~100B+ parameters)
+- Instruction following (~100B+ parameters)
+- Code generation
+
+Key training techniques:
+- Pretraining: autoregressive LM or masked LM on large text corpora
+- Instruction tuning: supervised fine-tuning on instruction-response pairs
+- RLHF: reward modeling + PPO optimization on human preference data
+- Constitutional AI: AI-generated feedback for harmlessness training
+
+Alignment challenges: Current LLMs exhibit sycophancy, hallucination, and various biases. Active areas of research include RLHF improvements, Constitutional AI, debate, and scalable oversight.
+
+LLMs are increasingly deployed as the backbone of AI agents that use tools, maintain memory, and operate in multi-step loops. RAG (retrieval-augmented generation) has emerged as the dominant approach for grounding LLMs in factual external knowledge.

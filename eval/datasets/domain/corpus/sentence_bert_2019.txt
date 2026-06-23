@@ -1,0 +1,19 @@
+Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks
+Reimers, Gurevych (2019)
+
+BERT and RoBERTa have set new state-of-the-art performance on sentence-pair regression tasks such as semantic textual similarity. However, deriving sentence embeddings from BERT requires either a cross-encoder architecture (feeding both sentences simultaneously) or averaging all token embeddings. Cross-encoders are too slow for large-scale retrieval (comparing 10,000 sentences requires 50M BERT inferences); averaged embeddings perform poorly.
+
+Sentence-BERT (SBERT) uses a Siamese network to derive semantically meaningful sentence embeddings that can be compared using cosine similarity. Two BERT networks with shared weights encode each sentence independently. The embeddings are pooled (mean pooling of all token outputs) and the distance between them is used for the regression or classification objective.
+
+Training: SBERT is fine-tuned on SNLI (570K sentence pairs) and Multi-Genre NLI (433K sentence pairs) using a classification objective with a softmax over the concatenation [u; v; |u-v|].
+
+Results on Semantic Textual Similarity (STS) tasks (Spearman correlation):
+- SBERT: 74.89 (vs BERT cross-encoder: 74.99, but 65× faster)
+- InferSent: 64.43
+- Universal Sentence Encoder: 71.78
+
+For 10,000 sentence pairs:
+- BERT cross-encoder: ~65 hours
+- SBERT with cosine similarity over pre-computed embeddings: ~5 seconds
+
+SBERT made semantic similarity search practical at scale by enabling pre-computation of embeddings. It is the foundation for most production semantic search and retrieval systems that use sentence-level embeddings.

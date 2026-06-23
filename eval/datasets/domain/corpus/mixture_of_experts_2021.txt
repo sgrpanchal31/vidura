@@ -1,0 +1,22 @@
+Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity
+Fedus, Zoph, Shazeer (2021)
+
+Neural language model training has seen rapid progress with scale, but dense model training is computationally expensive. We present the Switch Transformer, a model that uses a sparse Mixture of Experts (MoE) approach: each token is routed to only one of N expert feed-forward networks, allowing model parameter count to scale independently of compute.
+
+The key design choice: route each token to exactly one expert (top-1 routing) rather than the top-2 used in prior MoE work. This simplifies training and reduces communication costs in distributed settings.
+
+The router computes a softmax over expert logits for each token and sends it to the expert with the highest probability. A capacity factor controls how many tokens each expert can process per batch; tokens routed to an over-capacity expert are dropped.
+
+Switch Transformer scales to trillion parameter models:
+- Switch-C: 1.571 trillion parameters (2048 experts, 1024 model width)
+
+Results on C4 benchmark:
+- Switch-Base (7× speedup over T5-Base at same compute): better perplexity
+- Switch-Large outperforms T5-Large while using 7× less training time
+- A Switch-C model trained for fewer steps achieves better quality than T5-XXL (11B)
+
+Fine-tuning on SuperGLUE:
+- Switch-Base: 84.7 average (vs T5-Base 76.9)
+- Switch-Large: 87.5 average (vs T5-Large 85.3)
+
+Mixture of Experts enables scaling model capacity without proportionally scaling compute, a key efficiency for ultra-large language models.
