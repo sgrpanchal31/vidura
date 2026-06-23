@@ -1,0 +1,29 @@
+ReAct: Synergizing Reasoning and Acting in Language Models
+Yao, Zhao, Yu, Du, Shafran, Narasimhan, Cao (2022)
+
+We explore the use of LLMs to generate both reasoning traces and task-specific actions in an interleaved manner. Reasoning traces help the model induce, track, and update action plans and handle exceptions, while actions allow it to interface with and gather additional information from external sources (such as knowledge bases, web search, or code interpreters).
+
+ReAct prompts the model to produce alternating Thought → Action → Observation steps:
+- Thought: the model reasons about the current state and what to do next
+- Action: the model calls an external tool (search, lookup, finish)
+- Observation: the tool returns a result, which is fed back into the context
+
+Example interaction:
+Thought: I need to find out what year the Eiffel Tower was built.
+Action: Search[Eiffel Tower construction date]
+Observation: The Eiffel Tower was built from 1887 to 1889.
+Thought: The construction was completed in 1889.
+Action: Finish[1889]
+
+Results on HotpotQA (multi-hop QA):
+- ReAct (PaLM-540B): 66.2% EM (vs Chain-of-Thought only: 59.0%, Action-only: 50.7%)
+
+Results on Fever (fact verification):
+- ReAct: 71.3% accuracy (vs Chain-of-Thought: 57.8%)
+
+Results on ALFWorld (interactive text game):
+- ReAct: 71% success rate (vs imitation learning baseline: 35%)
+
+ReAct is robust to hallucination: the Observation step grounds the model's reasoning in factual external information. When the model's reasoning is wrong, tool results correct it.
+
+ReAct established the Thought-Action-Observation loop as the standard paradigm for LLM-based agents and directly influenced frameworks like LangChain, AutoGPT, and similar agent systems.

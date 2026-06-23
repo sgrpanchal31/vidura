@@ -1,0 +1,49 @@
+Attention Is All You Need
+Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin (2017)
+
+ABSTRACT
+
+The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The best performing models also connect the encoder and decoder through an attention mechanism. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely. Experiments on two machine translation tasks show these models to be superior in quality while being more parallelizable and requiring significantly less time to train.
+
+ARCHITECTURE
+
+The Transformer follows an encoder-decoder structure. The encoder maps an input sequence of symbol representations to a sequence of continuous representations. The decoder then generates an output sequence of symbols one element at a time.
+
+The encoder is composed of a stack of N=6 identical layers. Each layer has two sub-layers: a multi-head self-attention mechanism, and a position-wise fully connected feed-forward network. The model dimension is d_model=512. The number of attention heads is h=8, with each head having dimension d_k = d_v = 64.
+
+The decoder is also composed of a stack of N=6 identical layers. In addition to the two sub-layers in each encoder layer, the decoder inserts a third sub-layer which performs multi-head attention over the output of the encoder stack.
+
+MULTI-HEAD ATTENTION
+
+Instead of performing a single attention function with d_model-dimensional keys, values and queries, we found it beneficial to linearly project the queries, keys and values h times with different, learned linear projections to d_k, d_k and d_v dimensions respectively.
+
+Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V
+
+POSITIONAL ENCODING
+
+Since the model contains no recurrence and no convolution, positional encodings are added to the input embeddings at the bottoms of the encoder and decoder stacks. The positional encodings use sine and cosine functions of different frequencies.
+
+TRAINING
+
+The base model was trained on the WMT 2014 English-German dataset consisting of about 4.5 million sentence pairs. The big model was trained for 300,000 steps with a batch size of 25,000 source and target tokens.
+
+We used the Adam optimizer with beta_1=0.9, beta_2=0.98, and epsilon=10^-9.
+
+RESULTS
+
+On the WMT 2014 English-to-German translation task, the Transformer (big) model outperforms the best previously reported models including ensembles by more than 2.0 BLEU, establishing a new state-of-the-art BLEU score of 28.4.
+
+On the WMT 2014 English-to-French translation task, the big model achieves a BLEU score of 41.0, outperforming all previously published single models.
+
+The base Transformer model achieves 27.3 BLEU on English-to-German and 38.1 on English-to-French.
+
+Training the big model took 3.5 days on 8 P100 GPUs. The base model was trained in 0.5 days on 8 P100 GPUs.
+
+MODEL VARIANTS
+
+Base model: d_model=512, d_ff=2048, h=8, N=6, P_drop=0.1, 65M parameters
+Big model: d_model=1024, d_ff=4096, h=16, N=6, P_drop=0.3, 213M parameters
+
+CONCLUSION
+
+The Transformer is the first transduction model relying entirely on self-attention to compute representations of its input and output without using sequence-aligned RNNs or convolution. It trains significantly faster than architectures based on recurrent or convolutional layers and achieves new state-of-the-art results on English-to-German and English-to-French translation tasks.

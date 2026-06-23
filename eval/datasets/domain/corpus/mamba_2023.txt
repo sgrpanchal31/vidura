@@ -1,0 +1,21 @@
+Mamba: Linear-Time Sequence Modeling with Selective State Spaces
+Gu, Dao (2023)
+
+Foundation models based on the Transformer architecture are dominant across domains ranging from language to vision, but suffer from quadratic time complexity in sequence length. Recent subquadratic models have not matched Transformer performance in practice. We introduce Mamba, a state space model that matches Transformer quality while achieving linear time complexity.
+
+Mamba builds on Structured State Space Sequence Models (S4) with a key innovation: input-dependent (selective) state space parameters. Traditional SSMs have constant A, B, C matrices regardless of input; Mamba makes B, C, and the step size Δ functions of the input, allowing the model to selectively propagate or forget information based on content.
+
+The selective scan mechanism is implemented with a parallel hardware-aware algorithm that avoids materializing the expanded state in HBM (analogous to FlashAttention's approach for self-attention), achieving efficiency comparable to optimized convolution.
+
+Architecture: Mamba replaces the Transformer's attention and MLP blocks with Mamba blocks. Each block applies the selective SSM followed by a gated MLP.
+
+Results on language modeling:
+- Mamba-3B trained on Pile matches Transformer++ (3B) perplexity
+- Mamba-3B outperforms all attention-free baselines of the same size
+- At sequence length 2K, Mamba generates tokens 5× faster than Transformer at inference
+
+Long-sequence performance:
+- Mamba performance improves on downstream tasks up to sequence length 1M (tested on the MQAR associative recall task)
+- Transformers plateau or degrade at very long sequences due to their fixed context window
+
+Mamba offers a compelling alternative to Transformers for tasks requiring very long context, trading some mid-range performance for dramatically better long-context and inference efficiency.

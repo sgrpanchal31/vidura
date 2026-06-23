@@ -1,0 +1,21 @@
+An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale (ViT)
+Dosovitskiy, Beyer, Kolesnikov, Weissenborn, Zhai, Unterthiner, Dehghani, Minderer, Heigold, Gelly, Uszkoreit, Houlsby (2020)
+
+While the Transformer architecture has become the de-facto standard for natural language processing tasks, its applications to computer vision remain limited. In vision, attention is either applied in conjunction with convolutional networks, or used to replace certain components of convolutional networks while keeping their overall structure in place. We show that this reliance on CNNs is not necessary and a pure transformer applied directly to sequences of image patches can perform very well on image classification tasks.
+
+The Vision Transformer (ViT) splits an image into fixed-size patches (16×16 pixels), linearly embeds each patch, adds positional embeddings, and feeds the sequence into a standard Transformer encoder.
+
+For example, a 224×224 image split into 16×16 patches produces a sequence of (224/16)² = 196 patch tokens plus one [CLS] token = 197 total tokens.
+
+Model sizes:
+- ViT-Base/16: 86M parameters, 12 layers, 768 hidden size
+- ViT-Large/16: 307M parameters, 24 layers, 1024 hidden size
+- ViT-Huge/14: 632M parameters, 32 layers, 1280 hidden size
+
+Results on ImageNet (pretrained on JFT-300M):
+- ViT-Huge/14: 88.55% top-1 accuracy
+- ViT-Large/16: 87.76% top-1 accuracy
+
+Key finding: ViT requires large-scale pretraining datasets (JFT-300M) to match CNNs. When trained on small datasets like ImageNet only, ViT underperforms ResNets. But with sufficient scale, ViT achieves state-of-the-art at lower computational cost than comparable CNNs.
+
+ViT established that pure Transformer architectures are competitive with CNNs for vision tasks and spawned a large family of vision transformer variants.

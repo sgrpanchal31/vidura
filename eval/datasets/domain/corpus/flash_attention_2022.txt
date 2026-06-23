@@ -1,0 +1,56 @@
+FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness
+Dao, Fu, Ermon, Rudra, Ré (2022)
+
+ABSTRACT
+
+Transformers are slow and memory-hungry on long sequences, because the time and memory complexity of self-attention are quadratic in sequence length. Approximate attention methods have attempted to address this problem, but often do not achieve wall-clock speedup. We argue that a missing principle is making attention algorithms IO-aware — accounting for reads and writes between levels of GPU memory. We propose FlashAttention, an IO-aware exact attention algorithm that uses tiling to reduce the number of memory reads/writes between GPU high bandwidth memory (HBM) and GPU on-chip SRAM. We show that FlashAttention trains Transformers faster than existing baselines: 15% end-to-end wall-clock speedup on BERT-large (seq. length 512) and 3x speedup on GPT-2 (seq. length 1K), with no approximation.
+
+THE IO BOTTLENECK
+
+Standard attention implementations are not compute-bound but memory-bandwidth-bound. The bottleneck is reading and writing the attention matrix to GPU HBM (high bandwidth memory). For a sequence of length N:
+- Standard attention: O(N²) memory reads/writes, materializes the N×N attention matrix
+- FlashAttention: O(N²/M) memory reads/writes where M is the SRAM size (on-chip cache)
+
+GPU memory hierarchy:
+- SRAM (on-chip): ~20MB, extremely fast (~19 TB/s)
+- HBM (off-chip DRAM): ~40–80GB, slower (~1.5–2 TB/s)
+- The 10x speed difference means minimizing HBM access is critical
+
+TILING APPROACH
+
+FlashAttention avoids materializing the full N×N attention matrix by computing attention in tiles that fit in SRAM:
+1. Divide Q, K, V matrices into blocks that fit in SRAM
+2. Compute attention for each block without writing intermediate results to HBM
+3. Use the online softmax trick to compute the correct softmax incrementally
+
+This achieves exact attention (not approximate) with O(N²) FLOPs but O(N) memory usage.
+
+RECOMPUTATION IN BACKWARD PASS
+
+Standard attention stores the N×N attention matrix for the backward pass (O(N²) memory). FlashAttention instead recomputes attention during the backward pass using only the softmax normalization statistics (O(N) memory), trading compute for memory savings.
+
+RESULTS
+
+Training speed on BERT-large (seq length 512):
+- Standard attention (PyTorch): 1x baseline
+- FlashAttention: 15% faster end-to-end
+
+Training speed on GPT-2 (seq length 1024):
+- Standard attention: 1x baseline
+- FlashAttention: 3x faster
+
+Long-range attention (seq length 1K–16K):
+- Standard attention cannot run at 16K due to OOM
+- FlashAttention scales to 16K sequence length on A100
+
+Long-document language modeling (Path-X, seq length 16K):
+- Standard Transformers: 50% accuracy (random chance)
+- FlashAttention-enabled Transformer: 61.4% accuracy (first-ever above-chance result)
+
+Memory savings:
+- Standard attention: O(N²) memory (materializes full attention matrix)
+- FlashAttention: O(N) memory (5–20x reduction depending on sequence length)
+
+IMPACT
+
+FlashAttention enabled training on much longer sequences that were previously infeasible due to memory constraints. It is now standard in most transformer implementations (PyTorch 2.0+ includes it natively). FlashAttention-2 (2023) added further optimizations achieving up to 9x speedup over standard attention by reducing non-matmul FLOPs and improving parallelization.

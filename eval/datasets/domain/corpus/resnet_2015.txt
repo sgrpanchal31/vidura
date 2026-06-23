@@ -1,0 +1,16 @@
+Deep Residual Learning for Image Recognition
+He, Zhang, Ren, Sun (2015)
+
+We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize and can gain accuracy from considerably increased depth.
+
+The core idea is a skip connection (shortcut connection) that adds the input of a block directly to its output: F(x) + x. This allows gradients to flow directly through the network without passing through weight layers, mitigating the vanishing gradient problem.
+
+On the ImageNet dataset (ILSVRC 2015), a 152-layer ResNet achieves 3.57% top-5 error, winning first place. This represents an 8x increase in depth compared to VGG nets while having lower complexity.
+
+Key results:
+- ResNet-152: 3.57% top-5 error on ImageNet validation set
+- ResNet-50: 5.25% top-5 error (commonly used in practice)
+- Ensemble of 6 deep networks: 3.57% top-5 error on ILSVRC test set
+- COCO object detection: 28% improvement over baseline using ResNet features
+
+Residual networks enable training of very deep networks (100-1000+ layers) that were previously untrainable due to degradation — the counterintuitive phenomenon where deeper networks have higher training error than shallower ones.

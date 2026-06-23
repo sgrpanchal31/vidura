@@ -1,0 +1,18 @@
+Generating Long Sequences with Sparse Transformers
+Child, Gray, Radford, Sutskever (2019)
+
+Transformers are powerful sequence models, but require time and memory that grows quadratically with the sequence length. We introduce sparse factorizations of the attention matrix that reduce this to O(n√n), while still allowing the model to attend to all positions within a window. We also introduce a recomputation scheme that reduces memory usage from O(n²) to O(n) while increasing computation by only a constant factor.
+
+Two sparse attention patterns are introduced:
+1. Strided attention: attend to local neighbors plus every stride-th position
+2. Fixed attention: a subset of tokens attend to all previous tokens in the sequence
+
+Sparse Transformers model sequences 30x longer than those typically modeled with dense attention, enabling modeling of sequences up to 12,288 tokens on a single GPU.
+
+Results:
+- CIFAR-10 image generation: 2.80 bits/dim (new state-of-the-art at the time)
+- Enwiki8 text: 0.99 bits/char
+- ImageNet 64×64: 3.44 bits/dim
+- Classical music audio (raw bytes): state-of-the-art in audio generation
+
+The sparse attention patterns achieve near-identical performance to full attention on standard benchmarks while using a fraction of the compute. Sparse Transformers demonstrated that long-range dependencies in images, text, and audio can be captured efficiently without quadratic attention.

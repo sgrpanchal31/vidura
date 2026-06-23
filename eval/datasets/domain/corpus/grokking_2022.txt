@@ -1,0 +1,17 @@
+Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets
+Power, Gururangan, Dixit, Ziegler, Sohl-Dickstein, Burns, Ruderman (2022)
+
+We present evidence that neural networks sometimes exhibit "grokking" — generalization that occurs long after memorization of training data. When trained on small algorithmic datasets (e.g., modular arithmetic, permutations), neural networks initially memorize training examples (train accuracy → 100%, test accuracy stays near chance). But if training continues far past this memorization point, the model eventually discovers a general algorithm and test accuracy jumps sharply to near 100%.
+
+Experimental setup: Train transformer models on binary operations (modular addition, subtraction, division, permutation composition) with training set sizes of 40-100% of all possible input pairs. Monitor both training and validation accuracy.
+
+Key observations:
+1. Grokking occurs consistently across all binary operations tested
+2. The gap between memorization and generalization can span thousands of gradient steps
+3. Weight decay is necessary for grokking — without it, generalization rarely occurs
+4. Larger datasets reduce the training time needed to grokk but don't eliminate the phenomenon
+5. Grokking corresponds to a phase transition in the network's internal representations
+
+Why grokking happens: The hypothesis is that during the memorization phase, the network stores specific examples. As training continues with weight decay (L2 regularization), the network is pressured to find more efficient (lower-norm) representations. Eventually, it discovers the underlying algorithm which requires fewer parameters to express than memorizing individual examples.
+
+Implications: Grokking challenges the conventional wisdom that early stopping prevents overfitting. More broadly, it suggests that generalization in neural networks can be a delayed emergent phenomenon, and that regularization plays a role beyond just preventing overfitting.

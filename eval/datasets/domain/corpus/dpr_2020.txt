@@ -1,0 +1,18 @@
+Dense Passage Retrieval for Open-Domain Question Answering (DPR)
+Karpukhin, Oguz, Min, Lewis, Wu, Edunov, Chen, Yih (2020)
+
+Open-domain question answering relies on efficient passage retrieval to select candidate contexts. Traditional approaches use TF-IDF or BM25. We show that retrieval can be practically implemented using dense representations alone, where embeddings are learned by a simple dual-encoder framework.
+
+DPR trains two BERT-based encoders — a question encoder and a passage encoder — using contrastive learning. The encoders are optimized so that the dot product of the question embedding and passage embedding is high for correct passage-question pairs and low for incorrect pairs.
+
+Training uses in-batch negatives: for a batch of question-passage pairs, all other passages in the batch serve as negative examples for each question. Hard negatives — passages retrieved by BM25 that do not contain the answer — are also included.
+
+The corpus is Wikipedia split into 100-word passages (~21 million passages). FAISS is used for efficient approximate nearest-neighbor search over the encoded passages.
+
+Results on open-domain QA benchmarks:
+- Natural Questions: 41.5% top-20 accuracy (vs BM25: 59.1% but DPR 78.4% at top-100)
+- TriviaQA: 79.4% top-20 (vs BM25: 66.9%)
+- WebQuestions: 73.2% top-20 (vs BM25: 55.0%)
+- CuratedTREC: 79.4% top-20 (vs BM25: 70.9%)
+
+DPR retrieval enables a simple BERT reader to achieve state-of-the-art on open-domain QA by dramatically improving recall compared to sparse retrieval methods like BM25.

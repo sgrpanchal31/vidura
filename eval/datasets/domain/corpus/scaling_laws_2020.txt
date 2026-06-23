@@ -1,0 +1,49 @@
+Scaling Laws for Neural Language Models
+Kaplan, McCandlish, Henighan, Brown, Chess, Child, Gray, Radford, Wu, Amodei (2020)
+
+ABSTRACT
+
+We study empirical scaling laws for language model performance on the cross-entropy loss. The loss scales as a power-law with model size, dataset size, and the amount of compute used for training, with some trends spanning more than seven orders of magnitude. Other architectural details such as network width or depth have minimal effects within a wide range. Simple equations govern the dependence of overfitting on model/dataset size and the dependence of training speed on model size. These relationships allow us to determine the optimal allocation of a fixed compute budget as well as the optimal model size for a given compute budget.
+
+KEY FINDINGS
+
+Finding 1 — Power-law scaling with model size:
+Language model loss L scales as a power law with the number of non-embedding parameters N:
+L(N) ∝ N^{-0.076}
+This holds over 5+ orders of magnitude (from 10^3 to 10^9 parameters).
+
+Finding 2 — Power-law scaling with dataset size:
+L(D) ∝ D^{-0.095}
+where D is the number of tokens in the training dataset. This holds when the model is not overfitting.
+
+Finding 3 — Power-law scaling with compute:
+L(C) ∝ C^{-0.050}
+where C is the total training compute (FLOPs). This holds across models trained to convergence.
+
+Finding 4 — Optimal model size for a given compute budget:
+For a fixed compute budget C, the optimal model size N* and optimal number of training tokens D* follow:
+N* ∝ C^{0.73}
+D* ∝ C^{0.27}
+This means: as compute doubles, the optimal model size grows faster than training tokens. Larger models are more compute-efficient than training smaller models for longer.
+
+IMPLICATIONS FOR TRAINING
+
+Overfitting: A model with N parameters should be trained on approximately 5×10^3 × N tokens before overfitting begins to occur. For a 1B parameter model, this is 5 trillion tokens.
+
+Convergence: Most of the gains from scale are achieved early in training. A model trained for 10% of its optimal compute budget achieves roughly 60% of the final loss improvement.
+
+Architecture: Within a wide range, depth-to-width ratio has minimal impact on loss at a given parameter count. The scaling laws are robust across transformer architectures.
+
+SAMPLE EFFICIENCY
+
+Large models are more sample-efficient than small models:
+- A 1.5B parameter model achieves the same loss as a 40M model but using 50x fewer samples
+- This suggests scaling model size is preferable to scaling dataset size when compute is limited
+
+PRIOR TO CHINCHILLA
+
+This paper's Finding 4 suggests larger models trained on fewer tokens are optimal. However, the 2022 Chinchilla paper (Hoffmann et al.) revised this, finding that training tokens should scale equally with model size — i.e., a 70B model should be trained on 1.4T tokens, not fewer. The Chinchilla results suggest the Kaplan et al. scaling laws underestimated the value of training data.
+
+SIGNIFICANCE
+
+Scaling laws gave practitioners a principled way to predict the performance of models before training them and to allocate compute budgets optimally. They established that progress in language modeling is predictable and continuous — more compute reliably yields better models — which justified large investments in scaling. These findings directly shaped the design of GPT-3 and subsequent large language models.

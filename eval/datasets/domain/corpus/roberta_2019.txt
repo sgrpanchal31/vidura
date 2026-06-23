@@ -1,0 +1,26 @@
+RoBERTa: A Robustly Optimized BERT Pretraining Approach
+Liu, Ott, Goyal, Du, Joshi, Chen, Levy, Lewis, Zettlemoyer, Stoyanov (2019)
+
+We present a replication study of BERT pretraining and carefully measure the impact of many key hyperparameters and training data size. We find that BERT was significantly undertrained, and can match or exceed the performance of every model published after it.
+
+Key findings from the study:
+1. Training for longer with larger batch sizes over more data significantly improves performance
+2. Removing the Next Sentence Prediction (NSP) objective improves downstream task performance
+3. Training on longer sequences improves performance
+4. Using a dynamic masking pattern (changing masking each epoch) rather than static masking improves results
+
+RoBERTa training differences from BERT:
+- Trained for 500K steps (vs BERT's 1M steps but with 4x larger batches)
+- Batch size: 8,192 sequences (vs BERT's 256)
+- Training data: 160GB of text — BooksCorpus + English Wikipedia + CC-News + OpenWebText + Stories
+- No NSP objective
+- Dynamic masking
+
+Results on GLUE:
+- RoBERTa achieves 88.5 average GLUE score, outperforming BERT-Large (80.5) and XLNet (88.4)
+
+Results on SQuAD:
+- SQuAD 1.1: 94.6 F1 (vs BERT 93.2)
+- SQuAD 2.0: 89.4 F1 (vs BERT 83.1)
+
+RoBERTa demonstrated that BERT's design was sound but its training was suboptimal, and careful training at scale produces significantly better models without any architectural changes.

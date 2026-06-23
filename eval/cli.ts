@@ -7,7 +7,7 @@
  *   npm run eval -- --download
  *
  * Options:
- *   --dataset    Dataset name: longmemeval (required unless --download)
+ *   --dataset    Dataset name: longmemeval, domain (required unless --download)
  *   --technique  Comma-separated technique names: baseline,rerank,hybrid (default: baseline)
  *   --topk       Number of chunks to retrieve (default: 5)
  *   --limit      Run only first N queries (useful for quick smoke tests)
@@ -17,6 +17,7 @@
 import { downloadLongMemEval } from './datasets/longmemeval/download'
 import { loadLongMemEval } from './datasets/longmemeval/loader'
 // variant flag for longmemeval: 'oracle' (15MB, quick dev), 's' (278MB, real benchmark)
+import { loadDomain } from './datasets/domain/loader'
 import { runEval } from './harness/runner'
 import { baseline } from './techniques/baseline'
 import { structured } from './techniques/structured'
@@ -77,8 +78,12 @@ async function main() {
     const loaded = loadLongMemEval(variant)
     entries = loaded.entries
     corpusDir = loaded.corpusDir
+  } else if (datasetName === 'domain') {
+    const loaded = loadDomain()
+    entries = loaded.entries
+    corpusDir = loaded.corpusDir
   } else {
-    console.error(`Unknown dataset: ${datasetName}. Available: longmemeval`)
+    console.error(`Unknown dataset: ${datasetName}. Available: longmemeval, domain`)
     process.exit(1)
   }
 

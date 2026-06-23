@@ -1,0 +1,18 @@
+Improving Language Models by Retrieving from Trillions of Tokens (RETRO)
+Borgeaud, Mensch, Hoffmann, Cai, Rutherford, Millican, van den Driessche, Lespiau, Damoc, Clark, de Las Casas, Guy, Casanova, Graham, Brock, Paganini, Beaumont, Ziegler, Larom, Noy, Bamler, Wierstra, Vinyals, Osindero, Simonyan, Kavukcuoglu, Rae, Grefenstette, Sifre (2022)
+
+We introduce RETRO (Retrieval-Enhanced Transformer), which retrieves from a database of 2 trillion tokens during training and inference. RETRO obtains comparable performance to GPT-3 and Jurassic-1 on the Pile, despite using 25× fewer parameters.
+
+Architecture: RETRO is a decoder-only Transformer that retrieves chunks of text from a large external database at every attention layer. For each input chunk of 64 tokens, the model retrieves the k=2 nearest neighbor chunks from the database using approximate nearest-neighbor search (SCaNN). Retrieved neighbors are encoded with a frozen BERT-style encoder and integrated via cross-attention inside each Transformer layer.
+
+Database: 2 trillion tokens from MassiveText. Pre-encoded with the retrieval encoder and stored for approximate nearest-neighbor lookup at training and inference time.
+
+Model sizes evaluated: 172M, 425M, 1.5B, 7.5B parameters.
+
+Key result: RETRO-7.5B achieves comparable perplexity to GPT-3-175B on C4 and Wikitext103 benchmarks, despite having 25× fewer parameters.
+
+On knowledge-intensive question answering:
+- RETRO improves upon a standard transformer baseline by a large margin on Natural Questions and TriviaQA
+- Retrieval helps most on questions requiring rare or recent world knowledge
+
+RETRO demonstrates that scaling the retrieval database is a more efficient path than scaling model parameters for many knowledge-intensive tasks.

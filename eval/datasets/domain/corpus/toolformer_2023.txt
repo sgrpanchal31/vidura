@@ -1,0 +1,25 @@
+Toolformer: Language Models Can Teach Themselves to Use Tools
+Schick, Dwivedi-Yu, Dessì, Raileanu, Lomeli, Zettlemoyer, Cancedda, Scialom (2023)
+
+Language models (LMs) exhibit remarkable abilities across a wide range of tasks, but they are limited in that they cannot use external tools like a calculator or Wikipedia to check facts. We introduce Toolformer, a model trained to decide which APIs to call, when to call them, what arguments to pass, and how to best incorporate the results into the future token prediction.
+
+Training procedure (self-supervised):
+1. Sample positions in the training corpus where a tool call might be useful
+2. Generate candidate API calls using the LM in a prompted setting
+3. Execute each API call and get the response
+4. Filter: keep only API calls that actually improve the LM's next-token prediction (by reducing perplexity on the continuation)
+5. Fine-tune the LM on the filtered data, with API call + response interleaved in the text
+
+Tools integrated: Calculator, Wikipedia search, calendar, Q&A system, machine translation.
+
+Dataset: Starting from a filtered subset of CCNet (~2.5B tokens), approximately 30K high-quality API call examples per tool are retained after filtering, from initially generating millions.
+
+Base model: GPT-J (6B parameters). Fine-tuned to produce Toolformer.
+
+Results:
+- Calculator: Toolformer (6B) achieves 40.4% on SVAMP (vs GPT-3 175B without tools: 29.4%)
+- Wikipedia QA: 29.2% on WebQuestions (vs GPT-3 25.3%)
+- Calendar: Correctly resolves 38.1% of temporal arithmetic questions (vs GPT-J 5.6%)
+- Machine translation: Quality significantly improved by calling translation API
+
+Toolformer demonstrated that LLMs can learn tool use in a self-supervised manner, without human annotation, paving the way for autonomous AI agents that integrate external APIs.
