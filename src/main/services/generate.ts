@@ -6,6 +6,7 @@ import { parseMarkdown } from './ingest/markdown'
 import { parseText } from './ingest/text'
 import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
+import { getLangfuse } from './telemetry'
 
 export type GenerateTask = 'overview' | 'podcast' | 'facts'
 export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
@@ -108,6 +109,9 @@ export async function generateFromCorpus(
     return msg
   }
 
+  const lf = getLangfuse()
+  const trace = lf?.trace({ name: 'generate-corpus', input: { task, format, fileCount: files.length } })
+
   // Map phase: summarize each document sequentially
   const intermediates: string[] = []
   for (const file of files) {
@@ -122,8 +126,11 @@ export async function generateFromCorpus(
     if (!docText.trim()) continue
 
     const prompt = mapPrompt(task, format, `[${relPath}]\n${docText}`)
+    const mapGen = trace?.generation({ name: `map:${relPath}`, model: modelId, input: relPath })
     // Silent map calls — tokens only stream during the final reduce
     const summary = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+    mapGen?.update({ output: summary.slice(0, 200) })
+    mapGen?.end()
     if (summary.trim()) {
       intermediates.push(`[${relPath}]\n${summary.trim()}`)
     }
@@ -131,12 +138,15 @@ export async function generateFromCorpus(
 
   if (intermediates.length === 0) {
     const msg = 'Could not extract content from any documents in this notebook.'
+    trace?.update({ output: 'no_content' })
+    lf?.flushAsync().catch(() => {})
     onToken(msg)
     return msg
   }
 
   // Reduce phase: combine intermediates, batching if needed
   let current = intermediates
+  let reduceRound = 0
   while (current.length > 1) {
     const next: string[] = []
     for (let i = 0; i < current.length; i += REDUCE_BATCH_SIZE) {
@@ -146,13 +156,27 @@ export async function generateFromCorpus(
         continue
       }
       const prompt = reducePrompt(task, format, batch.join('\n\n---\n\n'))
+      const reduceGen = trace?.generation({
+        name: `reduce:r${reduceRound}:b${Math.floor(i / REDUCE_BATCH_SIZE)}`,
+        model: modelId,
+        input: `${batch.length} summaries`,
+      })
       const merged = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+      reduceGen?.update({ output: merged.slice(0, 200) })
+      reduceGen?.end()
       next.push(merged.trim())
     }
     current = next
+    reduceRound++
   }
 
   // Final reduce — stream tokens to the caller
   const finalPrompt = reducePrompt(task, format, current[0])
-  return llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
+  const finalGen = trace?.generation({ name: 'final', model: modelId, input: 'final synthesis' })
+  const result = await llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
+  finalGen?.update({ output: result.slice(0, 200) })
+  finalGen?.end()
+  trace?.update({ output: 'completed' })
+  lf?.flushAsync().catch(() => {})
+  return result
 }

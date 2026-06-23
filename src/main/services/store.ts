@@ -144,6 +144,38 @@ export class VectorStore {
     }))
   }
 
+  async listSourceFiles(): Promise<string[]> {
+    if (!this.table) throw new Error('VectorStore not open — call open() first')
+    try {
+      const rows = await (this.table.query() as any).select(['sourceFile']).toArray()
+      return [...new Set(rows.map((r: any) => r.sourceFile as string))]
+    } catch {
+      return []
+    }
+  }
+
+  async getChunksByFile(sourceFile: string): Promise<SearchResult[]> {
+    if (!this.table) throw new Error('VectorStore not open — call open() first')
+    try {
+      const rows = await (this.table.query() as any).where(`sourceFile = '${sourceFile.replace(/'/g, "''")}'`).toArray()
+      return rows.map((row: any) => ({
+        id: row.id as string,
+        text: row.text as string,
+        parentText: row.parentText as string,
+        parentId: row.parentId as string,
+        sourceFile: row.sourceFile as string,
+        chunkIndex: row.chunkIndex as number,
+        pageNumber: row.pageNumber ?? undefined,
+        headingAnchor: row.headingAnchor ?? undefined,
+        headingPath: row.headingPath ?? undefined,
+        lineNumber: row.lineNumber ?? undefined,
+        score: 1,
+      }))
+    } catch {
+      return []
+    }
+  }
+
   isOpen(): boolean {
     return this.table !== null
   }

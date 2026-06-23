@@ -9,7 +9,7 @@ import { vectorStore } from './services/store'
 import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteModel } from './services/models'
 import { listEmbedModels, deleteEmbed, DEFAULT_EMBED, embedDim } from './services/embed-models'
 import { llamaService } from './services/inference'
-import { ragQuery } from './services/rag'
+import { ragQuery, ragSummarizeFile } from './services/rag'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 
@@ -181,18 +181,36 @@ ipcMain.handle('embed:delete', async (_event, hfId: string) => {
 
 // ── Chat / RAG ────────────────────────────────────────────────────────────────
 
-// Detect whether a question is a full-corpus generation task (summary, podcast,
-// infographic) rather than a targeted lookup. Returns task+format if yes, null if no.
+// Detect whether a question is a full-corpus generation task (whole-collection overview,
+// podcast, infographic). Does NOT catch targeted summarize questions ("summarize the
+// vibe coding doc") — those are handled by findMatchedFile + ragSummarizeFile.
 function detectGenerateIntent(question: string): { task: GenerateTask; format: GenerateFormat } | null {
   const q = question.toLowerCase()
   if (/\bpodcast\b/.test(q)) return { task: 'podcast', format: 'prose' }
   if (/\b(infographic|diagram|mermaid|visuali[sz]e|chart)\b/.test(q)) return { task: 'facts', format: 'mermaid' }
-  if (/\b(summari[sz]e|summary|summaries|overview|tldr|tl;dr)\b/.test(q)) return { task: 'overview', format: 'prose' }
   if (/what('s| is) in (this|the) (folder|notebook|sources?|documents?|files?)/.test(q))
     return { task: 'overview', format: 'prose' }
-  if (/\b(key|main|core|all|every) (themes?|ideas?|topics?|concepts?|points?)\b/.test(q))
-    return { task: 'overview', format: 'prose' }
   if (/give me an overview|tell me (about )?everything/.test(q)) return { task: 'overview', format: 'prose' }
+  if (/\b(key|main|core|all|every) (themes?|topics?|concepts?|points?)\b/.test(q))
+    return { task: 'overview', format: 'prose' }
+  if (/\b(tldr|tl;dr|overview)\b/.test(q)) return { task: 'overview', format: 'prose' }
+  return null
+}
+
+// Check whether the question names a specific indexed file. Returns the matched
+// sourceFile path if found, null otherwise.
+async function findMatchedFile(question: string, folderPath: string): Promise<string | null> {
+  const dim = embedDim(DEFAULT_EMBED)
+  await vectorStore.open(folderPath, { dim })
+  const files = await vectorStore.listSourceFiles()
+  const q = question.toLowerCase()
+  for (const file of files) {
+    const name = (file.split('/').pop() ?? '')
+      .replace(/\.[^.]+$/, '')
+      .replace(/[-_]/g, ' ')
+      .toLowerCase()
+    if (name.length > 3 && q.includes(name)) return file
+  }
   return null
 }
 
@@ -206,18 +224,30 @@ ipcMain.handle(
     history: Array<{ role: 'user' | 'assistant'; content: string }> = []
   ) => {
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
-    const genIntent = detectGenerateIntent(question)
-    if (genIntent) {
-      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, (token) =>
-        mainWindow?.webContents.send('chat:token', token)
-      )
-        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
-    } else {
-      ragQuery(question, folderPath, modelId, history, (token) => mainWindow?.webContents.send('chat:token', token))
+    const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
+
+    // Tier 1 — specific file named: fetch all chunks for that file
+    const matchedFile = await findMatchedFile(question, folderPath)
+    if (matchedFile) {
+      ragSummarizeFile(question, matchedFile, folderPath, modelId, history, onToken)
         .then((result) => mainWindow?.webContents.send('chat:done', result))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+      return
     }
+
+    // Tier 2 — broad intent: full-corpus map-reduce (podcast, overview of everything, etc.)
+    const genIntent = detectGenerateIntent(question)
+    if (genIntent) {
+      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, onToken)
+        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+      return
+    }
+
+    // Tier 3 — RAG: partial/thematic queries, cross-file topics, follow-ups
+    ragQuery(question, folderPath, modelId, history, onToken)
+      .then((result) => mainWindow?.webContents.send('chat:done', result))
+      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
   }
 )
 

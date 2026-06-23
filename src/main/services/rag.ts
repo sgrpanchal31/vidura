@@ -7,7 +7,7 @@ import { getLangfuse } from './telemetry'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 8
-const MAX_UNIQUE_PARENTS = 5
+const MAX_UNIQUE_PARENTS = 8
 
 // Qwen3-Embedding is an asymmetric retrieval model: queries must be prefixed with
 // a task instruction, while document chunks are embedded as-is.
@@ -205,6 +205,78 @@ export async function ragQuery(
 
   // Remap [4] → [1] etc. so the UI always shows sequential citation numbers
   // starting from 1 regardless of which retrieval slot the model happened to cite.
+  const remap = new Map<number, number>()
+  let next = 1
+  rawAnswer.replace(/\[(\d+)\]/g, (_, n) => {
+    const num = parseInt(n, 10)
+    if (rawCitations.some((c) => c.sourceNum === num) && !remap.has(num)) remap.set(num, next++)
+    return ''
+  })
+  const answer = rawAnswer.replace(/\[(\d+)\]/g, (orig, n) => {
+    const d = remap.get(parseInt(n, 10))
+    return d !== undefined ? `[${d}]` : orig
+  })
+  const citations = rawCitations
+    .filter((c) => remap.has(c.sourceNum))
+    .map((c) => ({ ...c, sourceNum: remap.get(c.sourceNum)! }))
+    .sort((a, b) => a.sourceNum - b.sourceNum)
+
+  trace?.update({ output: answer })
+  lf?.flushAsync().catch(() => {})
+
+  return { answer, citations }
+}
+
+// Targeted summarization: fetch ALL chunks for a specific file and send the full
+// content to the LLM. Used when the user's question names a specific document.
+export async function ragSummarizeFile(
+  question: string,
+  sourceFile: string,
+  folderPath: string,
+  modelId: string,
+  history: HistoryMessage[],
+  onToken: (token: string) => void
+): Promise<RagResult> {
+  const lf = getLangfuse()
+  const trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } })
+
+  if (!llamaService.isLoaded(modelId)) {
+    await llamaService.loadModel(modelId)
+  }
+
+  const dim = embedDim(DEFAULT_EMBED)
+  await vectorStore.open(folderPath, { dim })
+
+  const retrieveSpan = trace?.span({ name: 'retrieve-file', input: sourceFile })
+  const allChunks = await vectorStore.getChunksByFile(sourceFile)
+  retrieveSpan?.update({ output: { count: allChunks.length } })
+  retrieveSpan?.end()
+
+  if (allChunks.length === 0) {
+    trace?.update({ output: 'no_chunks_found' })
+    lf?.flushAsync().catch(() => {})
+    return { answer: "I couldn't find any content for that file.", citations: [] }
+  }
+
+  // Sort by chunkIndex so the LLM sees content in document order
+  const sorted = allChunks.sort((a, b) => a.chunkIndex - b.chunkIndex)
+  const parents = dedupeByParent(sorted)
+  const systemPrompt = buildSystemPrompt(parents, history)
+
+  const gen = trace?.generation({
+    name: 'llm',
+    model: modelId,
+    input: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: question },
+    ],
+  })
+  const rawAnswer = await llamaService.generateStream(systemPrompt, question, onToken)
+  gen?.update({ output: rawAnswer })
+  gen?.end()
+
+  const rawCitations = extractCitations(rawAnswer, parents)
+
   const remap = new Map<number, number>()
   let next = 1
   rawAnswer.replace(/\[(\d+)\]/g, (_, n) => {
