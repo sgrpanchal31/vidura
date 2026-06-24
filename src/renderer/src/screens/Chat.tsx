@@ -223,8 +223,15 @@ function renderMarkdown(
   return <>{elements}</>
 }
 
+function newSessionId(): string {
+  return new Date().toISOString().replace(/[:.]/g, '-')
+}
+
 export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionCreatedAt, setSessionCreatedAt] = useState<number>(Date.now())
+  const [sessionLoaded, setSessionLoaded] = useState(false)
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [streamBuffer, setStreamBuffer] = useState('')
@@ -261,6 +268,42 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
       .catch(() => {})
   }, [folder])
 
+  // Load the most recent session on mount; create a new one if none exists
+  useEffect(() => {
+    window.api
+      .chatSessionList(folder)
+      .then((sessions) => {
+        const latest = sessions[0]
+        if (latest) {
+          return window.api.chatSessionLoad(folder, latest.id).then((session) => {
+            if (session && session.messages.length > 0) {
+              setMessages(session.messages as Message[])
+              setSessionId(session.id)
+              setSessionCreatedAt(session.createdAt)
+            } else {
+              setSessionId(newSessionId())
+            }
+            setSessionLoaded(true)
+          })
+        } else {
+          setSessionId(newSessionId())
+          setSessionLoaded(true)
+        }
+      })
+      .catch(() => {
+        setSessionId(newSessionId())
+        setSessionLoaded(true)
+      })
+  }, [folder])
+
+  // Save session to disk whenever messages change (fire-and-forget)
+  useEffect(() => {
+    if (!sessionLoaded || !sessionId) return
+    const title = messages.find((m) => m.role === 'user')?.content.slice(0, 60) ?? ''
+    window.api.chatSessionSave(folder, { id: sessionId, createdAt: sessionCreatedAt, title, messages })
+  }, [messages, sessionLoaded, sessionId])
+  // folder and sessionCreatedAt are stable for the lifetime of this session
+
   useEffect(() => {
     const el = messagesListRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -282,6 +325,9 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
     setStreamBuffer('')
     setActiveCitation(null)
     setIsGenerating(false)
+    // Start a new session; old session stays on disk for future history feature
+    setSessionId(newSessionId())
+    setSessionCreatedAt(Date.now())
   }
 
   async function handleSend(text: string) {

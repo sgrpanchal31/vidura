@@ -3,7 +3,7 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import os from 'os'
 import { indexFolder } from './services/indexer'
-import { readState } from './services/state'
+import { readState, listChatSessions, loadChatSession, saveChatSession, type ChatSession } from './services/state'
 import { embedService } from './services/embed'
 import { vectorStore } from './services/store'
 import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteModel } from './services/models'
@@ -253,6 +253,18 @@ ipcMain.handle(
 
 ipcMain.handle('chat:cancel', () => {
   llamaService.cancel()
+})
+
+ipcMain.handle('chat:session:list', async (_event, folderPath: string) => {
+  return listChatSessions(folderPath)
+})
+
+ipcMain.handle('chat:session:load', async (_event, folderPath: string, sessionId: string) => {
+  return loadChatSession(folderPath, sessionId)
+})
+
+ipcMain.handle('chat:session:save', async (_event, folderPath: string, session: ChatSession) => {
+  await saveChatSession(folderPath, session)
 })
 
 // ── Generation (map-reduce over full corpus) ─────────────────────────────────

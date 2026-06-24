@@ -89,6 +89,18 @@ export type CitationEntry = {
   chunk: SearchResult
 }
 
+export type ChatSession = {
+  id: string
+  createdAt: number
+  title: string
+  messages: Array<{
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    citations: CitationEntry[]
+  }>
+}
+
 export type ChatResult = {
   answer: string
   citations: CitationEntry[]
@@ -165,6 +177,12 @@ const api = {
     ipcRenderer.on('chat:error', handler)
     return () => ipcRenderer.off('chat:error', handler)
   },
+  chatSessionList: (folderPath: string): Promise<Array<{ id: string; createdAt: number; title: string }>> =>
+    ipcRenderer.invoke('chat:session:list', folderPath),
+  chatSessionLoad: (folderPath: string, sessionId: string): Promise<ChatSession | null> =>
+    ipcRenderer.invoke('chat:session:load', folderPath, sessionId),
+  chatSessionSave: (folderPath: string, session: ChatSession): Promise<void> =>
+    ipcRenderer.invoke('chat:session:save', folderPath, session),
 
   setWindowSize: (width: number, height: number): Promise<void> => ipcRenderer.invoke('window:setSize', width, height),
 

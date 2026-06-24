@@ -13,6 +13,7 @@ import type {
   EmbedModelInfo,
   GenerateTask,
   GenerateFormat,
+  ChatSession,
 } from '../../preload/index'
 
 declare global {
@@ -55,6 +56,9 @@ declare global {
       onChatToken: (cb: (token: string) => void) => () => void
       onChatDone: (cb: (result: ChatResult) => void) => () => void
       onChatError: (cb: (message: string) => void) => () => void
+      chatSessionList: (folderPath: string) => Promise<Array<{ id: string; createdAt: number; title: string }>>
+      chatSessionLoad: (folderPath: string, sessionId: string) => Promise<ChatSession | null>
+      chatSessionSave: (folderPath: string, session: ChatSession) => Promise<void>
 
       setWindowSize: (width: number, height: number) => Promise<void>
 
