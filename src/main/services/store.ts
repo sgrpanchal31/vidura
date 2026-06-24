@@ -148,7 +148,7 @@ export class VectorStore {
     if (!this.table) throw new Error('VectorStore not open — call open() first')
     try {
       const rows = await (this.table.query() as any).select(['sourceFile']).toArray()
-      return [...new Set(rows.map((r: any) => r.sourceFile as string))]
+      return Array.from(new Set(rows.map((r: any) => r.sourceFile as string)))
     } catch {
       return []
     }
