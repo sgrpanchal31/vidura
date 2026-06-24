@@ -406,6 +406,15 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
                   </div>
                 </div>
               ))}
+              {isGenerating && !streamBuffer && (
+                <div className="message message-assistant">
+                  <div className="message-bubble thinking-dots">
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                  </div>
+                </div>
+              )}
               {isGenerating && streamBuffer && (
                 <div className="message message-assistant">
                   <div className="message-bubble message-streaming">
