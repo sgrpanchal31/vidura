@@ -3,8 +3,6 @@ import Onboarding from './screens/Onboarding'
 import Chat from './screens/Chat'
 import Settings from './screens/Settings'
 import './styles/globals.css'
-import bgImg from './assets/background.png'
-import vitruvianManImg from './assets/vitruvian-man.png'
 import type { IndexProgress, IndexSummary, ModelProgress } from '../../preload'
 
 type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready' | 'settings'
@@ -197,8 +195,6 @@ export default function App() {
   if (screen === 'onboarding') {
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content">
           <Onboarding onComplete={handleOnboardingComplete} />
         </div>
@@ -236,8 +232,6 @@ export default function App() {
 
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -358,8 +352,6 @@ export default function App() {
 
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -443,8 +435,6 @@ export default function App() {
   if (screen === 'ready' && notebookFolder && modelId) {
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content">
           <Chat
             key={notebookFolder}
@@ -461,8 +451,6 @@ export default function App() {
   if (screen === 'settings' && notebookFolder && modelId) {
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content">
           <Settings
             folder={notebookFolder}
