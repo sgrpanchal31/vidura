@@ -16,8 +16,9 @@ function formatQueryForEmbed(question: string): string {
 }
 
 // Parent text can be up to PARENT_MAX_CHARS (~6000 chars). Show up to 1500 chars
-// in the prompt; 5 sources × 1500 ≈ 7500 chars ≈ 1875 tokens of source material,
-// leaving ~2000 tokens of the 4096-token context for the model's response.
+// in the prompt; 8 sources × 1500 ≈ 12000 chars ≈ 3000 tokens of source material,
+// plus ~700 tokens for history + instruction + question, leaving ~4500 tokens of
+// the 8192-token context for the model's response.
 const PARENT_PROMPT_CHARS = 1500
 
 export type HistoryMessage = { role: 'user' | 'assistant'; content: string }

@@ -3,7 +3,7 @@ import type { Llama, LlamaModel } from 'node-llama-cpp'
 import { getModelPath } from './models'
 
 const MODEL_LOAD_TIMEOUT_MS = 30_000 // watchdog for OOM (TODOS TODO-2)
-const CONTEXT_SIZE = 4096
+const CONTEXT_SIZE = 8192
 
 type NodeLlamaCppModule = typeof import('node-llama-cpp')
 
