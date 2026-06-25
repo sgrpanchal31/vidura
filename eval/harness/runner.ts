@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import type { RetrievalTechnique, DatasetEntry, RetrievalContext, RunResult } from './types'
 import { scoreOne, aggregate } from './metrics'
 import { writeRunResult } from './report'
+import { EVAL_EMBEDDING_MODEL } from './embedder'
 
 export type RunOptions = {
   dataset: string
@@ -18,7 +19,10 @@ export type RunOptions = {
 export async function runEval(opts: RunOptions): Promise<RunResult> {
   const { dataset, datasetEntries, corpusDir, technique, topK, workRoot, limit } = opts
 
-  const configHash = createHash('sha256').update(`${dataset}:${topK}:${technique.name}`).digest('hex').slice(0, 8)
+  const configHash = createHash('sha256')
+    .update(`${dataset}:${topK}:${technique.name}:${EVAL_EMBEDDING_MODEL}`)
+    .digest('hex')
+    .slice(0, 8)
 
   const workDir = join(workRoot, technique.name, configHash)
   mkdirSync(workDir, { recursive: true })

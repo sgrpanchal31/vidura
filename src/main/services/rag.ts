@@ -205,8 +205,21 @@ export async function ragQuery(
     }
   }
 
+  const rerankSpan = trace?.span({
+    name: 'rerank',
+    input: { candidates: allChunks.length, enabled: rerankerGgufService.isReady() },
+  })
   const rerankedChunks = await rerankChunks(question, allChunks)
   const parents = dedupeByParent(rerankedChunks)
+  rerankSpan?.update({
+    output: parents.map((c, i) => ({
+      rank: i + 1,
+      score: (c as any)._rerankScore ?? null,
+      sourceFile: c.sourceFile,
+      text: c.text.slice(0, 200),
+    })),
+  })
+  rerankSpan?.end()
   const systemPrompt = buildSystemPrompt(parents, history)
 
   const gen = trace?.generation({
