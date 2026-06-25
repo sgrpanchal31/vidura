@@ -78,7 +78,7 @@ export default function Onboarding({ onComplete }: Props) {
     <>
       {isMac && (
         <div className="titlebar">
-          <span className="win-title">vidura</span>
+          <span className="win-title">Vidura</span>
         </div>
       )}
 
