@@ -1,6 +1,6 @@
 # Retrieval Evaluation Harness
 
-Tests how accurately openbook-lm retrieves the right chunks of text for a given question.
+Tests how accurately Vidura retrieves the right chunks of text for a given question.
 Results live in `eval/results/summary.md` — one row per technique×dataset run.
 
 ## Quick start
@@ -80,7 +80,7 @@ eval/
     corpus.ts     — builds LanceDB index from a folder of docs
     report.ts     — writes JSON + appends to summary.md
   techniques/
-    baseline.ts   — current openbook-lm retrieval (vector-only, bge-small, top-k)
+    baseline.ts   — current Vidura retrieval (vector-only, bge-small, top-k)
     ...           — add more here (Phase 3)
   datasets/
     longmemeval/

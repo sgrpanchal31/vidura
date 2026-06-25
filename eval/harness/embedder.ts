@@ -15,7 +15,7 @@ const QUERY_PREFIX = "Instruct: Given a question, retrieve passages from the use
 function resolveModelCacheDir(): string {
   if (process.env.OPENBOOK_MODELS_DIR) return process.env.OPENBOOK_MODELS_DIR
   if (process.platform === 'darwin') {
-    const macPath = join(os.homedir(), 'Library', 'Application Support', 'openbook-lm', 'models')
+    const macPath = join(os.homedir(), 'Library', 'Application Support', 'vidura', 'models')
     if (existsSync(macPath)) return macPath
   }
   return join(os.homedir(), '.openbook', 'models')

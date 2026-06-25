@@ -8,10 +8,10 @@ import os from 'os'
 
 // The model must be pre-downloaded via the app's Settings → Retrieval → Download.
 // Point OPENBOOK_MODELS_DIR at the app's models folder, e.g.:
-//   OPENBOOK_MODELS_DIR=~/Library/Application\ Support/openbook-lm/models npm run eval ...
+//   OPENBOOK_MODELS_DIR=~/Library/Application\ Support/vidura/models npm run eval ...
 function getRerankerPath(): string {
   const dir =
-    process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), 'Library', 'Application Support', 'openbook-lm', 'models')
+    process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), 'Library', 'Application Support', 'vidura', 'models')
   return join(dir, 'bge-reranker-v2-m3.gguf')
 }
 

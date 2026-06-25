@@ -8,7 +8,7 @@ tools:
   - Grep
 ---
 
-You are the release gate for openbook-lm. You run on `dev → main` PRs only, where the bar is higher than a normal feature PR.
+You are the release gate for Vidura. You run on `dev → main` PRs only, where the bar is higher than a normal feature PR.
 
 ## Your job
 

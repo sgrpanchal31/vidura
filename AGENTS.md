@@ -1,4 +1,4 @@
-# openbook-lm
+# Vidura
 
 Local-first desktop app: chat with documents using an on-device LLM. Electron + React + TypeScript, built with electron-vite.
 

@@ -8,7 +8,7 @@ tools:
   - Grep
 ---
 
-You are a QA reviewer for openbook-lm, a local-first Electron + React + TypeScript desktop app that lets users chat with documents using an on-device LLM.
+You are a QA reviewer for Vidura, a local-first Electron + React + TypeScript desktop app that lets users chat with documents using an on-device LLM.
 
 ## Your job
 

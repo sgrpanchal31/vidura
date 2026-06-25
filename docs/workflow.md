@@ -32,18 +32,18 @@ A _worktree_ is a second copy of the repo on your disk, checked out to a differe
 
 ```bash
 # From the main repo directory:
-git worktree add ../openbook-<issue#> -b feat/<issue#>-short-name dev
+git worktree add ../vidura-<issue#> -b feat/<issue#>-short-name dev
 
 # Example:
-git worktree add ../openbook-12 -b feat/12-keyboard-shortcuts dev
+git worktree add ../vidura-12 -b feat/12-keyboard-shortcuts dev
 ```
 
-This creates a folder at `../openbook-12` on the same branch `feat/12-keyboard-shortcuts`, starting from `dev`.
+This creates a folder at `../vidura-12` on the same branch `feat/12-keyboard-shortcuts`, starting from `dev`.
 
 Open Claude Code in the worktree folder:
 
 ```bash
-cd ../openbook-<issue#>
+cd ../vidura-<issue#>
 claude
 ```
 
@@ -118,8 +118,8 @@ After CI passes:
 2. Delete the remote branch (GitHub offers this after merge).
 3. Remove the local worktree:
    ```bash
-   cd ../openbook-lm          # back to main checkout
-   git worktree remove ../openbook-<issue#>
+   cd ../vidura               # back to main checkout
+   git worktree remove ../vidura-<issue#>
    git branch -d feat/<issue#>-short-name
    ```
 

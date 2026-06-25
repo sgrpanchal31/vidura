@@ -1,4 +1,4 @@
-# openbook-lm TODOs
+# Vidura TODOs
 
 ## Conditional (check during build)
 

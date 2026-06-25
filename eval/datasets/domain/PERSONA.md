@@ -17,6 +17,6 @@ A researcher or graduate student who downloads academic papers to a local folder
 
 ## Notes
 
-This persona is a v1 anchor, not a permanent product definition. As openbook-lm generalizes, additional dataset personas (second brain / Obsidian vault, developer docs, legal documents) should be added as separate dataset entries.
+This persona is a v1 anchor, not a permanent product definition. As Vidura generalizes, additional dataset personas (second brain / Obsidian vault, developer docs, legal documents) should be added as separate dataset entries.
 
 The `meta.answer` field in `qa.json` stores ground-truth answers for future RAGAS integration — no schema changes will be needed when RAGAS is added.
