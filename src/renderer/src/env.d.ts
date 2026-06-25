@@ -46,6 +46,9 @@ declare global {
       embedDelete: (hfId: string) => Promise<void>
       onEmbedDownloadProgress: (cb: (p: { hfId: string; loaded: number; total: number }) => void) => () => void
 
+      rerankerGetStatus: () => Promise<{ enabled: boolean; status: string; downloaded: boolean }>
+      rerankerSetEnabled: (enabled: boolean) => Promise<void>
+
       chatAsk: (
         question: string,
         folderPath: string,

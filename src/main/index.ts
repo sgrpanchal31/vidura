@@ -12,12 +12,14 @@ import { llamaService } from './services/inference'
 import { ragQuery, ragSummarizeFile } from './services/rag'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
+import { rerankerGgufService } from './services/reranker-gguf'
 
 const PREFS_PATH = join(app.getPath('userData'), 'prefs.json')
 
 type Prefs = {
   lastFolder: string | null
   modelId: string | null
+  rerankerEnabled: boolean
 }
 
 function readPrefs(): Prefs {
@@ -28,7 +30,7 @@ function readPrefs(): Prefs {
   } catch {
     // corrupted prefs — start fresh
   }
-  return { lastFolder: null, modelId: null }
+  return { lastFolder: null, modelId: null, rerankerEnabled: false }
 }
 
 function writePrefs(prefs: Prefs): void {
@@ -179,6 +181,25 @@ ipcMain.handle('embed:delete', async (_event, hfId: string) => {
   await deleteEmbed(hfId)
 })
 
+// ── Reranker ──────────────────────────────────────────────────────────────────
+
+ipcMain.handle('reranker:getStatus', async () => ({
+  enabled: readPrefs().rerankerEnabled ?? false,
+  status: rerankerGgufService.getStatus(),
+  downloaded: await isModelDownloaded('bge-reranker-v2-m3'),
+}))
+
+ipcMain.handle('reranker:setEnabled', async (_event, enabled: boolean) => {
+  writePrefs({ ...readPrefs(), rerankerEnabled: enabled })
+  if (enabled) {
+    const downloaded = await isModelDownloaded('bge-reranker-v2-m3')
+    if (!downloaded) throw new Error('Reranker model not downloaded — download it from Settings first')
+    await rerankerGgufService.start()
+  } else {
+    rerankerGgufService.stop()
+  }
+})
+
 // ── Chat / RAG ────────────────────────────────────────────────────────────────
 
 // Detect whether a question is a full-corpus generation task (whole-collection overview,
@@ -290,6 +311,13 @@ ipcMain.handle('window:setSize', (_event, width: number, height: number) => {
 app.whenReady().then(() => {
   createWindow()
 
+  // Silently warm up reranker if enabled and model is already downloaded.
+  if (readPrefs().rerankerEnabled ?? false) {
+    isModelDownloaded('bge-reranker-v2-m3').then((downloaded) => {
+      if (downloaded) rerankerGgufService.start().catch(() => {})
+    })
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -298,11 +326,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     embedService.stop()
+    rerankerGgufService.stop()
     app.quit()
   }
 })
 
 app.on('before-quit', () => {
   embedService.stop()
+  rerankerGgufService.stop()
   llamaService.dispose()
 })

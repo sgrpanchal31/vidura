@@ -20,7 +20,7 @@ type ModelEntry = {
   sizeBytes: number
 }
 
-// Sizes are approximate Q4_K_M bytes used for progress %. Server Content-Range overrides.
+// Sizes are approximate bytes used for progress %. Server Content-Range overrides.
 const REGISTRY: Record<string, ModelEntry> = {
   'gemma2-2b': {
     filename: 'gemma2-2b.gguf',
@@ -43,7 +43,15 @@ const REGISTRY: Record<string, ModelEntry> = {
     url: 'https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-Q4_K_M.gguf',
     sizeBytes: 2_392_352_768,
   },
+  // Cross-encoder reranker — Q8_0 for quality (small rerankers are sensitive to quantization noise)
+  'bge-reranker-v2-m3': {
+    filename: 'bge-reranker-v2-m3.gguf',
+    url: 'https://huggingface.co/gpustack/bge-reranker-v2-m3-GGUF/resolve/main/bge-reranker-v2-m3-Q8_0.gguf',
+    sizeBytes: 635_676_416,
+  },
 }
+
+const LLM_IDS = ['gemma2-2b', 'llama3.2-3b', 'qwen2.5-7b', 'phi3-mini'] as const
 
 function ensureModelsDir(): void {
   mkdirSync(MODELS_DIR, { recursive: true })
@@ -234,10 +242,10 @@ export type LlmModelInfo = {
 
 export async function listModels(): Promise<LlmModelInfo[]> {
   return Promise.all(
-    Object.entries(REGISTRY).map(async ([id, entry]) => ({
+    LLM_IDS.map(async (id) => ({
       id,
-      filename: entry.filename,
-      sizeBytes: entry.sizeBytes,
+      filename: REGISTRY[id].filename,
+      sizeBytes: REGISTRY[id].sizeBytes,
       downloaded: await isModelDownloaded(id),
     }))
   )

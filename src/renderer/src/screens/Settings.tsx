@@ -27,7 +27,7 @@ function recommendedLlmId(ramGB: number): string {
   return 'gemma2-2b'
 }
 
-type Section = 'llm' | 'embed'
+type Section = 'llm' | 'embed' | 'retrieval'
 
 type Props = {
   folder: string
@@ -61,22 +61,40 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   const [embedDownloadProgress, setEmbedDownloadProgress] = useState<{ loaded: number; total: number } | null>(null)
   const [embedError, setEmbedError] = useState<string | null>(null)
 
+  // Reranker state
+  const [rerankerEnabled, setRerankerEnabled] = useState(false)
+  const [rerankerStatus, setRerankerStatus] = useState<string>('idle')
+  const [rerankerDownloaded, setRerankerDownloaded] = useState(false)
+  const [downloadingReranker, setDownloadingReranker] = useState(false)
+  const [rerankerDownloadProgress, setRerankerDownloadProgress] = useState<{ loaded: number; total: number } | null>(
+    null
+  )
+  const [rerankerError, setRerankerError] = useState<string | null>(null)
+  const rerankerDownloadUnsubRef = useRef<(() => void) | null>(null)
+
   const unsubRef = useRef<(() => void) | null>(null)
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    Promise.all([window.api.listModels(), window.api.listEmbedModels(), window.api.getSystemInfo()]).then(
-      ([llms, embeds, sysInfo]) => {
-        setLlmModels(llms)
-        setEmbedModel(embeds[0] ?? null)
-        setRamGB(sysInfo.totalRamGB)
-        setIsMac(sysInfo.platform === 'darwin')
-      }
-    )
+    Promise.all([
+      window.api.listModels(),
+      window.api.listEmbedModels(),
+      window.api.getSystemInfo(),
+      window.api.rerankerGetStatus(),
+    ]).then(([llms, embeds, sysInfo, reranker]) => {
+      setLlmModels(llms)
+      setEmbedModel(embeds[0] ?? null)
+      setRamGB(sysInfo.totalRamGB)
+      setIsMac(sysInfo.platform === 'darwin')
+      setRerankerEnabled(reranker.enabled)
+      setRerankerStatus(reranker.status)
+      setRerankerDownloaded(reranker.downloaded)
+    })
 
     return () => {
       unsubRef.current?.()
       embedUnsubRef.current?.()
+      rerankerDownloadUnsubRef.current?.()
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
     }
   }, [folder])
@@ -187,12 +205,58 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     }
   }
 
+  async function handleDownloadReranker() {
+    if (downloadingReranker) return
+    setRerankerError(null)
+    setDownloadingReranker(true)
+    setRerankerDownloadProgress(null)
+    const unsub = window.api.onModelProgress((p) => {
+      if (p.modelId === 'bge-reranker-v2-m3') {
+        setRerankerDownloadProgress({ loaded: p.downloaded, total: p.total })
+      }
+    })
+    rerankerDownloadUnsubRef.current = unsub
+    try {
+      await window.api.modelDownload('bge-reranker-v2-m3')
+      const status = await window.api.rerankerGetStatus()
+      setRerankerDownloaded(status.downloaded)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg !== 'DOWNLOAD_CANCELLED') setRerankerError(msg)
+    } finally {
+      unsub()
+      rerankerDownloadUnsubRef.current = null
+      setDownloadingReranker(false)
+      setRerankerDownloadProgress(null)
+    }
+  }
+
+  async function handleRerankerToggle(enabled: boolean) {
+    setRerankerError(null)
+    if (enabled) {
+      setRerankerStatus('starting')
+      try {
+        await window.api.rerankerSetEnabled(true)
+        setRerankerEnabled(true)
+        setRerankerStatus('ready')
+      } catch (err) {
+        setRerankerStatus('error')
+        setRerankerError(err instanceof Error ? err.message : String(err))
+      }
+    } else {
+      await window.api.rerankerSetEnabled(false)
+      setRerankerEnabled(false)
+      setRerankerStatus('idle')
+    }
+  }
+
   const recommendedLlm = recommendedLlmId(ramGB)
   const busy = !!downloadingId || !!loadingId
 
   const NAV_ITEMS: { id: Section; label: string }[] = [
     { id: 'llm', label: 'Language model' },
     { id: 'embed', label: 'Embedding model' },
+    { id: 'retrieval', label: 'Retrieval' },
   ]
 
   return (
@@ -332,6 +396,79 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                 })}
               </div>
               <div className="settings-coming-soon">Coming soon: switch models per chat</div>
+            </div>
+          )}
+
+          {/* ── Retrieval ── */}
+          {activeSection === 'retrieval' && (
+            <div className="settings-section">
+              <div className="settings-section-title">Retrieval</div>
+              <div className="settings-section-note">
+                Controls how passages are scored and ranked before being sent to the language model.
+              </div>
+              {rerankerError && <div className="settings-error">{rerankerError}</div>}
+              <div className="settings-model-list">
+                {downloadingReranker ? (
+                  <div className="settings-row-progress">
+                    <div className="settings-progress-header">
+                      <span className="settings-progress-label">
+                        Downloading BGE Reranker V2 M3
+                        {rerankerDownloadProgress && rerankerDownloadProgress.total > 0
+                          ? ` — ${Math.round((rerankerDownloadProgress.loaded / rerankerDownloadProgress.total) * 100)}%`
+                          : '…'}
+                      </span>
+                    </div>
+                    <div className="settings-progress-track">
+                      <div
+                        className="settings-progress-fill"
+                        style={{
+                          width:
+                            rerankerDownloadProgress && rerankerDownloadProgress.total > 0
+                              ? `${Math.round((rerankerDownloadProgress.loaded / rerankerDownloadProgress.total) * 100)}%`
+                              : '0%',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-model-row">
+                    <div className="settings-model-info">
+                      <div className="settings-model-name">BGE Reranker V2 M3</div>
+                      <div className="settings-model-desc">
+                        Re-scores retrieved passages with a cross-encoder for more relevant answers. Runs on-device via
+                        the same engine as the language model.
+                      </div>
+                      {rerankerEnabled && rerankerStatus === 'starting' && (
+                        <div className="settings-progress-label" style={{ marginTop: 6 }}>
+                          Loading model…
+                        </div>
+                      )}
+                    </div>
+                    <div className="settings-model-meta">
+                      <div className="settings-model-size">~600 MB</div>
+                      <div className="settings-model-actions">
+                        {rerankerDownloaded ? (
+                          <>
+                            {rerankerEnabled && rerankerStatus === 'ready' && (
+                              <span className="settings-badge active">Active</span>
+                            )}
+                            <button
+                              className={`reranker-toggle${rerankerEnabled ? ' on' : ''}`}
+                              onClick={() => handleRerankerToggle(!rerankerEnabled)}
+                              disabled={rerankerStatus === 'starting'}
+                              aria-label={rerankerEnabled ? 'Disable reranker' : 'Enable reranker'}
+                            />
+                          </>
+                        ) : (
+                          <button className="settings-download-btn" onClick={handleDownloadReranker}>
+                            Download
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

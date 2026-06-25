@@ -4,9 +4,10 @@ import type { SearchResult } from './store'
 import { llamaService } from './inference'
 import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
+import { rerankerGgufService } from './reranker-gguf'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
-const RETRIEVE_TOP_K = 8
+const RETRIEVE_TOP_K = 30
 const MAX_UNIQUE_PARENTS = 8
 
 // Qwen3-Embedding is an asymmetric retrieval model: queries must be prefixed with
@@ -31,6 +32,22 @@ export type CitationEntry = {
 export type RagResult = {
   answer: string
   citations: CitationEntry[]
+}
+
+// Rerank all candidate chunks with the cross-encoder before deduplication.
+// Running on the full pool (not just 8 parents) gives the reranker maximum headroom.
+// No-op if the reranker isn't ready (disabled or model not loaded).
+async function rerankChunks(query: string, chunks: SearchResult[]): Promise<SearchResult[]> {
+  if (!rerankerGgufService.isReady() || chunks.length === 0) return chunks
+  try {
+    const docs = chunks.map((c) => c.parentText.slice(0, 2000))
+    const scores = await rerankerGgufService.rerank(query, docs)
+    return [...chunks]
+      .map((c, i) => ({ ...c, _rerankScore: scores[i] ?? 0 }))
+      .sort((a, b) => ((b as any)._rerankScore ?? 0) - ((a as any)._rerankScore ?? 0))
+  } catch {
+    return chunks
+  }
 }
 
 // Collapse child chunks to unique parents, keeping the highest-scoring child per parent.
@@ -102,7 +119,8 @@ export async function retrieve(question: string, folderPath: string, cfg: Retrie
   await vectorStore.open(folderPath, { dim })
   await embedService.start(undefined, { modelId: embedModel })
   const [queryVector] = await embedService.embedBatched([formatQueryForEmbed(question)])
-  return vectorStore.search(queryVector, cfg.topK)
+  // Use raw question for BM25 (keywords), instruction-prefixed vector for dense search
+  return vectorStore.searchHybrid(queryVector, question, cfg.topK)
 }
 
 // Ask the LLM to rewrite the user's question into 2-3 short search queries.
@@ -187,7 +205,8 @@ export async function ragQuery(
     }
   }
 
-  const parents = dedupeByParent(allChunks)
+  const rerankedChunks = await rerankChunks(question, allChunks)
+  const parents = dedupeByParent(rerankedChunks)
   const systemPrompt = buildSystemPrompt(parents, history)
 
   const gen = trace?.generation({

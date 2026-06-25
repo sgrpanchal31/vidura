@@ -153,6 +153,11 @@ const api = {
     return () => ipcRenderer.off('embed:downloadProgress', handler)
   },
 
+  // ── Reranker ────────────────────────────────────────────────────────────────
+  rerankerGetStatus: (): Promise<{ enabled: boolean; status: string; downloaded: boolean }> =>
+    ipcRenderer.invoke('reranker:getStatus'),
+  rerankerSetEnabled: (enabled: boolean): Promise<void> => ipcRenderer.invoke('reranker:setEnabled', enabled),
+
   // ── Chat / RAG ──────────────────────────────────────────────────────────────
   // chatAsk resolves immediately; tokens arrive via onChatToken, completion via onChatDone
   chatAsk: (

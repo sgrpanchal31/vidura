@@ -21,16 +21,16 @@ import { loadDomain } from './datasets/domain/loader'
 import { runEval } from './harness/runner'
 import { baseline } from './techniques/baseline'
 import { structured } from './techniques/structured'
+import { hybridRrf } from './techniques/hybrid-rrf'
+import { rerankerTechnique } from './techniques/reranker'
 import type { RetrievalTechnique } from './harness/types'
 import { join } from 'path'
 
 const TECHNIQUES: Record<string, RetrievalTechnique> = {
   baseline,
   structured,
-  // Add more here as Phase 3 progresses:
-  // rerank: rerank,
-  // 'hybrid-rrf': hybridRRF,
-  // mmr: mmr,
+  'hybrid-rrf': hybridRrf,
+  reranker: rerankerTechnique,
 }
 
 function parseArgs(argv: string[]) {
