@@ -62,6 +62,10 @@ npm run dev
 npm run build
 ```
 
+## Writing style
+
+- No em-dashes in any user-facing text (README, release notes, UI copy). Use commas or colons instead. Em-dashes are fine in code comments and internal docs like this file.
+
 ## Workflow
 
 Development follows an issue-driven flow documented in [docs/workflow.md](docs/workflow.md). When asked to work on an issue, follow it. Rules that always apply:

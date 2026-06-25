@@ -117,6 +117,22 @@ export class VectorStore {
     }
   }
 
+  private mapRow(row: any, score: number): SearchResult {
+    return {
+      id: row.id as string,
+      text: row.text as string,
+      parentText: row.parentText as string,
+      parentId: row.parentId as string,
+      sourceFile: row.sourceFile as string,
+      chunkIndex: row.chunkIndex as number,
+      pageNumber: row.pageNumber ?? undefined,
+      headingAnchor: row.headingAnchor ?? undefined,
+      headingPath: row.headingPath ?? undefined,
+      lineNumber: row.lineNumber ?? undefined,
+      score,
+    }
+  }
+
   async search(queryVector: number[], topK = 8): Promise<SearchResult[]> {
     if (!this.table) throw new Error('VectorStore not open — call open() first')
 
@@ -128,20 +144,42 @@ export class VectorStore {
       return []
     }
 
-    return rows.map((row) => ({
-      id: row.id as string,
-      text: row.text as string,
-      parentText: row.parentText as string,
-      parentId: row.parentId as string,
-      sourceFile: row.sourceFile as string,
-      chunkIndex: row.chunkIndex as number,
-      pageNumber: row.pageNumber ?? undefined,
-      headingAnchor: row.headingAnchor ?? undefined,
-      headingPath: row.headingPath ?? undefined,
-      lineNumber: row.lineNumber ?? undefined,
+    return rows.map((row) =>
       // LanceDB cosine distance: 0 = identical, 2 = opposite; convert to [0,1] similarity
-      score: Math.max(0, 1 - (row._distance ?? 1)),
-    }))
+      this.mapRow(row, Math.max(0, 1 - (row._distance ?? 1)))
+    )
+  }
+
+  // BM25 keyword search on the 'text' column. Score is set to 0 because RRF uses rank, not score.
+  // Returns [] silently if no FTS index exists (old notebook) — searchHybrid degrades to dense-only.
+  async searchFts(queryText: string, topK = 30): Promise<SearchResult[]> {
+    if (!this.table) return []
+    try {
+      const rows = await (this.table.query() as any)
+        .fullTextSearch(queryText, { columns: 'text' })
+        .limit(topK)
+        .toArray()
+      return rows.map((row: any) => this.mapRow(row, 0))
+    } catch {
+      return []
+    }
+  }
+
+  // Runs dense + BM25 in parallel and fuses results with Reciprocal Rank Fusion.
+  async searchHybrid(queryVector: number[], queryText: string, topK = 30): Promise<SearchResult[]> {
+    const [dense, sparse] = await Promise.all([this.search(queryVector, topK), this.searchFts(queryText, topK)])
+    return reciprocalRankFusion([dense, sparse]).slice(0, topK)
+  }
+
+  // Creates (or rebuilds) the BM25 full-text index on the 'text' column.
+  // Called once at the end of indexFolder() — replace:true makes it idempotent.
+  async ensureFtsIndex(): Promise<void> {
+    if (!this.table) return
+    const { Index } = await import('@lancedb/lancedb')
+    await (this.table as any).createIndex('text', {
+      config: Index.fts({ language: 'English', stem: true }),
+      replace: true,
+    })
   }
 
   async listSourceFiles(): Promise<string[]> {
@@ -185,6 +223,21 @@ export class VectorStore {
     this.db = null
     this.openKey = ''
   }
+}
+
+// Fuses multiple ranked result lists into one using Reciprocal Rank Fusion.
+// k=60 is the standard constant; it dampens the bonus for very top ranks so
+// a chunk appearing consistently across lists beats one that only tops one list.
+function reciprocalRankFusion(lists: SearchResult[][], k = 60): SearchResult[] {
+  const scores = new Map<string, number>()
+  const byId = new Map<string, SearchResult>()
+  for (const list of lists) {
+    list.forEach((result, rank) => {
+      scores.set(result.id, (scores.get(result.id) ?? 0) + 1 / (k + rank + 1))
+      if (!byId.has(result.id)) byId.set(result.id, result)
+    })
+  }
+  return [...byId.values()].sort((a, b) => scores.get(b.id)! - scores.get(a.id)!)
 }
 
 export const vectorStore = new VectorStore()
