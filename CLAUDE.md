@@ -58,7 +58,8 @@ Embedding model (downloaded on first launch via HuggingFace Transformers, cached
 ## Commands
 
 ```bash
-npm install   # also runs electron-rebuild for @lancedb/lancedb
+npm install          # also runs electron-rebuild for @lancedb/lancedb
+npm run llama:update # compile latest llama.cpp; required for Gemma 4 (takes ~5 min)
 npm run dev
 npm run build
 ```

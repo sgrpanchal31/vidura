@@ -29,10 +29,11 @@ That's it. Nothing is uploaded anywhere.
 git clone https://github.com/sgrpanchal31/vidura.git
 cd vidura
 npm install
+npm run llama:update
 npm run dev
 ```
 
-Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select --install`). Windows needs Visual Studio Build Tools with the "Desktop development with C++" workload.
+Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select --install`). `npm run llama:update` compiles the latest llama.cpp from source and takes about 5 minutes on first run. Windows needs Visual Studio Build Tools with the "Desktop development with C++" workload.
 
 </details>
 
