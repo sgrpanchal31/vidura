@@ -123,6 +123,11 @@ const api = {
     ipcRenderer.on('ingest:progress', handler)
     return () => ipcRenderer.off('ingest:progress', handler)
   },
+  onWatchStatus: (cb: (status: { active: boolean }) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, s: { active: boolean }) => cb(s)
+    ipcRenderer.on('watch:status', handler)
+    return () => ipcRenderer.off('watch:status', handler)
+  },
 
   // ── Search ──────────────────────────────────────────────────────────────────
   searchQuery: (query: string, topK?: number): Promise<SearchResult[]> =>

@@ -67,25 +67,9 @@ export default function App() {
   // embed model and indexes files). On success, show chat.
 
   async function ensureEmbedAndIndex(folder: string) {
-    const [folderState, currentParser] = await Promise.all([
-      window.api.getIngestState(folder),
-      window.api.getParserVersion(),
-    ])
-    const indexedFiles = Object.values(folderState.files ?? {}).filter((f) => !f.failed && f.chunkCount > 0)
-    const hasIndexedFiles = indexedFiles.length > 0
-    // Only skip ingest if the notebook was already indexed with the current model
-    // AND the current parser version — a version bump means the schema changed and
-    // all files need to be re-parsed and re-embedded into the new structure.
-    const onCurrentModel = folderState.embeddingModel === DEFAULT_EMBED_ID
-    const onCurrentParser = indexedFiles.every((f) => f.parserVersion === currentParser)
-
-    if (hasIndexedFiles && onCurrentModel && onCurrentParser) {
-      window.api.setWindowSize(1100, 760)
-      setScreen('ready')
-      return
-    }
-
-    // Missing files or stale embedding model — run ingest.
+    // Always run ingest — indexFolder is incremental (hash-based) so unchanged files
+    // are skipped. This ensures new/deleted files are picked up on every launch and
+    // the file watcher is started reliably.
     const ok = await runIngest(folder, DEFAULT_EMBED_ID)
     if (ok) {
       window.api.setWindowSize(1100, 760)
