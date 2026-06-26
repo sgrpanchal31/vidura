@@ -15,18 +15,16 @@ const GGUF_MAGIC = Buffer.from('GGUF', 'ascii')
 type ModelEntry = {
   filename: string
   // HuggingFace /resolve/main/ URLs — Electron net follows CDN redirects automatically.
-  // NOTE: gemma2-2b uses the Qwen2.5-1.5B GGUF because Gemma 2 requires HF auth (gated model).
   url: string
   sizeBytes: number
 }
 
 // Sizes are approximate bytes used for progress %. Server Content-Range overrides.
 const REGISTRY: Record<string, ModelEntry> = {
-  'gemma2-2b': {
-    filename: 'gemma2-2b.gguf',
-    // Replaces gated Gemma 2 2B with Qwen 2.5 1.5B (comparable size, fully open, Apache-2.0).
-    url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
-    sizeBytes: 986_710_016,
+  'gemma4-e2b': {
+    filename: 'gemma4-e2b.gguf',
+    url: 'https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/main/gemma-4-E2B_q4_0-it.gguf',
+    sizeBytes: 3_350_000_000,
   },
   'llama3.2-3b': {
     filename: 'llama3.2-3b.gguf',
@@ -38,10 +36,15 @@ const REGISTRY: Record<string, ModelEntry> = {
     url: 'https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf',
     sizeBytes: 4_685_701_120,
   },
-  'phi3-mini': {
-    filename: 'phi3-mini.gguf',
-    url: 'https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-Q4_K_M.gguf',
-    sizeBytes: 2_392_352_768,
+  'gemma4-e4b': {
+    filename: 'gemma4-e4b.gguf',
+    url: 'https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B_q4_0-it.gguf',
+    sizeBytes: 5_150_000_000,
+  },
+  'gemma4-12b': {
+    filename: 'gemma4-12b.gguf',
+    url: 'https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf',
+    sizeBytes: 6_980_000_000,
   },
   // Cross-encoder reranker — Q8_0 for quality (small rerankers are sensitive to quantization noise)
   'bge-reranker-v2-m3': {
@@ -51,7 +54,7 @@ const REGISTRY: Record<string, ModelEntry> = {
   },
 }
 
-const LLM_IDS = ['gemma2-2b', 'llama3.2-3b', 'qwen2.5-7b', 'phi3-mini'] as const
+const LLM_IDS = ['gemma4-e2b', 'llama3.2-3b', 'qwen2.5-7b', 'gemma4-e4b', 'gemma4-12b'] as const
 
 function ensureModelsDir(): void {
   mkdirSync(MODELS_DIR, { recursive: true })

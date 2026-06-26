@@ -3,9 +3,9 @@ import './Settings.css'
 import type { LlmModelInfo, EmbedModelInfo, ModelProgress } from '../../../preload/index'
 
 const LLM_META: Record<string, { name: string; desc: string }> = {
-  'gemma2-2b': {
-    name: 'Qwen 2.5 1.5B',
-    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
+  'gemma4-e2b': {
+    name: 'Gemma 4 E2B',
+    desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
   },
   'llama3.2-3b': {
     name: 'Llama 3.2 3B',
@@ -15,16 +15,20 @@ const LLM_META: Record<string, { name: string; desc: string }> = {
     name: 'Qwen 2.5 7B',
     desc: 'Highest quality. Requires 32 GB RAM or more.',
   },
-  'phi3-mini': {
-    name: 'Phi-3 Mini',
-    desc: "Microsoft's compact model. Good on structured notes and lists.",
+  'gemma4-e4b': {
+    name: 'Gemma 4 E4B',
+    desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
+  },
+  'gemma4-12b': {
+    name: 'Gemma 4 12B',
+    desc: 'Best quality in the Gemma 4 family. Requires 16 GB RAM or more.',
   },
 }
 
 function recommendedLlmId(ramGB: number): string {
   if (ramGB >= 32) return 'qwen2.5-7b'
-  if (ramGB >= 16) return 'llama3.2-3b'
-  return 'gemma2-2b'
+  if (ramGB >= 16) return 'gemma4-12b'
+  return 'gemma4-e4b'
 }
 
 type Section = 'llm' | 'embed' | 'retrieval'

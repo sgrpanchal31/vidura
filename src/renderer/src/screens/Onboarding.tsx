@@ -11,10 +11,10 @@ type Model = {
 
 const MODELS: Model[] = [
   {
-    id: 'gemma2-2b',
-    name: 'Qwen 2.5 1.5B',
-    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
-    size: '1.0 GB',
+    id: 'gemma4-e2b',
+    name: 'Gemma 4 E2B',
+    desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
+    size: '3.4 GB',
     minRamGB: 0,
   },
   {
@@ -32,18 +32,25 @@ const MODELS: Model[] = [
     minRamGB: 32,
   },
   {
-    id: 'phi3-mini',
-    name: 'Phi-3 Mini',
-    desc: "Microsoft's compact model. Good on structured notes and lists.",
-    size: '2.3 GB',
-    minRamGB: 0,
+    id: 'gemma4-e4b',
+    name: 'Gemma 4 E4B',
+    desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
+    size: '5.2 GB',
+    minRamGB: 8,
+  },
+  {
+    id: 'gemma4-12b',
+    name: 'Gemma 4 12B',
+    desc: 'Best quality in the Gemma 4 family. Requires 16 GB RAM or more.',
+    size: '7.0 GB',
+    minRamGB: 16,
   },
 ]
 
 function recommendedModelId(ramGB: number): string {
   if (ramGB >= 32) return 'qwen2.5-7b'
-  if (ramGB >= 16) return 'llama3.2-3b'
-  return 'gemma2-2b'
+  if (ramGB >= 16) return 'gemma4-12b'
+  return 'gemma4-e4b'
 }
 
 type Props = {
@@ -52,9 +59,9 @@ type Props = {
 
 export default function Onboarding({ onComplete }: Props) {
   const [folder, setFolder] = useState<string | null>(null)
-  const [modelId, setModelId] = useState('gemma2-2b')
+  const [modelId, setModelId] = useState('gemma4-e4b')
   const [ramGB, setRamGB] = useState<number | null>(null)
-  const [recommendedId, setRecommendedId] = useState('gemma2-2b')
+  const [recommendedId, setRecommendedId] = useState('gemma4-e4b')
   const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
