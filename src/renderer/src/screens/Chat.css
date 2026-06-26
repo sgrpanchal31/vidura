@@ -124,19 +124,39 @@
   gap: 8px;
 }
 
-.sources-updating {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  color: var(--ox);
-  text-transform: uppercase;
-  opacity: 0.8;
+.sources-progress {
+  height: 2px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.sources-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: var(--ox);
+  animation: sources-sweep 1.4s ease-in-out infinite;
+}
+@keyframes sources-sweep {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .sources-list {
   flex: 1;
+  transition: opacity 0.25s;
   overflow-y: auto;
   padding: 6px 0;
+}
+.sources-list.reindexing {
+  opacity: 0.4;
 }
 
 /* ── Folder tree ── */

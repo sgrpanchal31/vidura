@@ -446,11 +446,11 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
       <div className="chat-body">
         {/* Sources panel — folder tree */}
         <div className="sources-panel">
-          <div className="sources-header">
-            Sources
-            {isReindexing && <span className="sources-updating">Updating...</span>}
+          <div className="sources-header">Sources</div>
+          {isReindexing && <div className="sources-progress" />}
+          <div className={isReindexing ? 'sources-list reindexing' : 'sources-list'}>
+            {renderTree(tree, 0, collapsedDirs, toggleDir)}
           </div>
-          <div className="sources-list">{renderTree(tree, 0, collapsedDirs, toggleDir)}</div>
           <button className="sources-settings-btn" onClick={onOpenSettings}>
             ⚙ Settings
           </button>
