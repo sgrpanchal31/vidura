@@ -28,6 +28,7 @@ declare global {
       startIngest: (folderPath: string, embeddingModel?: string) => Promise<IndexSummary>
       getIngestState: (folderPath: string) => Promise<NotebookState>
       onIngestProgress: (cb: (p: IndexProgress) => void) => () => void
+      onWatchStatus: (cb: (status: { active: boolean }) => void) => () => void
 
       searchQuery: (query: string, topK?: number) => Promise<SearchResult[]>
 

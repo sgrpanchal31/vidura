@@ -240,6 +240,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   const [sources, setSources] = useState<SourceItem[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
+  const [isReindexing, setIsReindexing] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -250,7 +251,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   const modelLabel = MODEL_LABELS[modelId] ?? modelId
   const hasMessages = messages.length > 0
 
-  useEffect(() => {
+  function refreshSources() {
     window.api
       .getIngestState(folder)
       .then((state: NotebookState) => {
@@ -267,6 +268,18 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
         setSuggestions(buildSuggestions(items))
       })
       .catch(() => {})
+  }
+
+  useEffect(() => {
+    refreshSources()
+  }, [folder])
+
+  useEffect(() => {
+    const unsub = window.api.onWatchStatus(({ active }) => {
+      setIsReindexing(active)
+      if (!active) refreshSources()
+    })
+    return unsub
   }, [folder])
 
   // Load the most recent session on mount; create a new one if none exists
@@ -433,7 +446,10 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
       <div className="chat-body">
         {/* Sources panel — folder tree */}
         <div className="sources-panel">
-          <div className="sources-header">Sources</div>
+          <div className="sources-header">
+            Sources
+            {isReindexing && <span className="sources-updating">Updating...</span>}
+          </div>
           <div className="sources-list">{renderTree(tree, 0, collapsedDirs, toggleDir)}</div>
           <button className="sources-settings-btn" onClick={onOpenSettings}>
             ⚙ Settings

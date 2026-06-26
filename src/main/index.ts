@@ -13,6 +13,25 @@ import { ragQuery, ragSummarizeFile } from './services/rag'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 import { rerankerGgufService } from './services/reranker-gguf'
+import { folderWatcher } from './services/watcher'
+
+let isBackgroundIndexing = false
+
+async function runBackgroundIndex(folderPath: string, embeddingModel?: string): Promise<void> {
+  if (isBackgroundIndexing) return
+  isBackgroundIndexing = true
+  mainWindow?.webContents.send('watch:status', { active: true })
+  try {
+    await indexFolder(
+      folderPath,
+      (progress) => mainWindow?.webContents.send('ingest:progress', progress),
+      embeddingModel
+    )
+  } finally {
+    isBackgroundIndexing = false
+    mainWindow?.webContents.send('watch:status', { active: false })
+  }
+}
 
 const PREFS_PATH = join(app.getPath('userData'), 'prefs.json')
 
@@ -103,6 +122,7 @@ ipcMain.handle('ingest:start', async (_event, folderPath: string, embeddingModel
     },
     embeddingModel
   )
+  folderWatcher.start(folderPath, () => runBackgroundIndex(folderPath, embeddingModel))
   return result.summary
 })
 
@@ -332,6 +352,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  folderWatcher.stop()
   embedService.stop()
   rerankerGgufService.stop()
   llamaService.dispose()
