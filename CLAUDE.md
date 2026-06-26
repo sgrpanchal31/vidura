@@ -42,13 +42,13 @@ src/renderer/src/
 
 ## Models (GGUF QAT Q4_0 / Q4_K_M, downloaded to userData/models/)
 
-| modelId       | Model        | Size    |
-| ------------- | ------------ | ------- |
-| `gemma4-e2b`  | Gemma 4 E2B  | ~3.4 GB |
-| `llama3.2-3b` | Llama 3.2 3B | ~2 GB   |
-| `qwen2.5-7b`  | Qwen 2.5 7B  | ~4.7 GB |
-| `gemma4-e4b`  | Gemma 4 E4B  | ~5.2 GB |
-| `gemma4-12b`  | Gemma 4 12B  | ~7 GB   |
+| modelId       | Model        | Size     |
+| ------------- | ------------ | -------- |
+| `gemma4-e2b`  | Gemma 4 E2B  | ~3.4 GB  |
+| `llama3.2-3b` | Llama 3.2 3B | ~2 GB    |
+| `gemma4-e4b`  | Gemma 4 E4B  | ~5.2 GB  |
+| `gemma4-12b`  | Gemma 4 12B  | ~7 GB    |
+| `gpt-oss-20b` | GPT-OSS 20B  | ~11.6 GB |
 
 Embedding model (downloaded on first launch via HuggingFace Transformers, cached in userData/models/):
 

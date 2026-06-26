@@ -25,13 +25,6 @@ const MODELS: Model[] = [
     minRamGB: 8,
   },
   {
-    id: 'qwen2.5-7b',
-    name: 'Qwen 2.5 7B',
-    desc: 'Highest quality. Requires 32 GB RAM or more.',
-    size: '4.4 GB',
-    minRamGB: 32,
-  },
-  {
     id: 'gemma4-e4b',
     name: 'Gemma 4 E4B',
     desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
@@ -41,14 +34,21 @@ const MODELS: Model[] = [
   {
     id: 'gemma4-12b',
     name: 'Gemma 4 12B',
-    desc: 'Best quality in the Gemma 4 family. Requires 16 GB RAM or more.',
+    desc: 'High quality. Requires 16 GB RAM or more.',
     size: '7.0 GB',
     minRamGB: 16,
+  },
+  {
+    id: 'gpt-oss-20b',
+    name: 'GPT-OSS 20B',
+    desc: "OpenAI's open-weight model. Best reasoning quality. Needs 32 GB RAM.",
+    size: '11.6 GB',
+    minRamGB: 32,
   },
 ]
 
 function recommendedModelId(ramGB: number): string {
-  if (ramGB >= 32) return 'qwen2.5-7b'
+  if (ramGB >= 32) return 'gpt-oss-20b'
   if (ramGB >= 16) return 'gemma4-12b'
   return 'gemma4-e4b'
 }

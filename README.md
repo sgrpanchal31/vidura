@@ -53,13 +53,13 @@ Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select -
 
 Choose one during setup. All models run fully on your device, downloaded once from HuggingFace.
 
-| Model        | Size    | Notes                           |
-| ------------ | ------- | ------------------------------- |
-| Gemma 4 E2B  | ~3.4 GB | Google's compact model, any Mac |
-| Llama 3.2 3B | ~2 GB   | Better reasoning, still quick   |
-| Gemma 4 E4B  | ~5.2 GB | Efficient edge model, 8 GB+ RAM |
-| Gemma 4 12B  | ~7 GB   | Best quality, needs 16 GB RAM   |
-| Qwen 2.5 7B  | ~4.7 GB | Alternative top-tier, 32 GB RAM |
+| Model        | Size     | Notes                                        |
+| ------------ | -------- | -------------------------------------------- |
+| Gemma 4 E2B  | ~3.4 GB  | Google's compact model, any Mac              |
+| Llama 3.2 3B | ~2 GB    | Better reasoning, still quick                |
+| Gemma 4 E4B  | ~5.2 GB  | Efficient edge model, 8 GB+ RAM              |
+| Gemma 4 12B  | ~7 GB    | High quality, needs 16 GB RAM                |
+| GPT-OSS 20B  | ~11.6 GB | OpenAI open-weight, best quality, 32 GB+ RAM |
 
 Apple Silicon gets Metal GPU acceleration automatically. Intel Mac and Windows use CPU inference.
 

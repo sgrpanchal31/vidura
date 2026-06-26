@@ -31,11 +31,6 @@ const REGISTRY: Record<string, ModelEntry> = {
     url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
     sizeBytes: 2_019_377_152,
   },
-  'qwen2.5-7b': {
-    filename: 'qwen2.5-7b.gguf',
-    url: 'https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf',
-    sizeBytes: 4_685_701_120,
-  },
   'gemma4-e4b': {
     filename: 'gemma4-e4b.gguf',
     url: 'https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/main/gemma-4-E4B_q4_0-it.gguf',
@@ -46,6 +41,11 @@ const REGISTRY: Record<string, ModelEntry> = {
     url: 'https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/main/gemma-4-12b-it-qat-q4_0.gguf',
     sizeBytes: 6_980_000_000,
   },
+  'gpt-oss-20b': {
+    filename: 'gpt-oss-20b.gguf',
+    url: 'https://huggingface.co/unsloth/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-Q4_K_M.gguf',
+    sizeBytes: 11_600_000_000,
+  },
   // Cross-encoder reranker — Q8_0 for quality (small rerankers are sensitive to quantization noise)
   'bge-reranker-v2-m3': {
     filename: 'bge-reranker-v2-m3.gguf',
@@ -54,7 +54,7 @@ const REGISTRY: Record<string, ModelEntry> = {
   },
 }
 
-const LLM_IDS = ['gemma4-e2b', 'llama3.2-3b', 'qwen2.5-7b', 'gemma4-e4b', 'gemma4-12b'] as const
+const LLM_IDS = ['gemma4-e2b', 'llama3.2-3b', 'gemma4-e4b', 'gemma4-12b', 'gpt-oss-20b'] as const
 
 function ensureModelsDir(): void {
   mkdirSync(MODELS_DIR, { recursive: true })
