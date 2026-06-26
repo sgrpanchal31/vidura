@@ -3,7 +3,7 @@ import type { Llama, LlamaModel } from 'node-llama-cpp'
 import { getModelPath } from './models'
 
 const MODEL_LOAD_TIMEOUT_MS = 30_000 // watchdog for OOM (TODOS TODO-2)
-const CONTEXT_SIZE = 4096
+const CONTEXT_SIZE = 8192
 
 type NodeLlamaCppModule = typeof import('node-llama-cpp')
 
@@ -42,7 +42,7 @@ class LlamaService {
     const loadWithWatchdog = new Promise<LlamaModel>((resolve, reject) => {
       timeoutHandle = setTimeout(() => reject(new Error('Not enough memory to run this model.')), MODEL_LOAD_TIMEOUT_MS)
       llama
-        .loadModel({ modelPath })
+        .loadModel({ modelPath, gpuLayers: { fitContext: { contextSize: CONTEXT_SIZE } } })
         .then((m) => {
           clearTimeout(timeoutHandle)
           resolve(m)
