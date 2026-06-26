@@ -99,7 +99,10 @@ class LlamaService {
 
     try {
       // Fresh context per query — no history leakage between RAG calls
-      context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
+      // swaFullCache=true: Gemma 4 uses SWA (sliding window attention); without this
+      // flag node-llama-cpp checkpoints the KV cache after every token, and the
+      // checkpoint writer crashes on Gemma 4 E4B's shared-KV layer structure.
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE, swaFullCache: true })
       const session = new LlamaChatSession({
         contextSequence: context.getSequence(),
         systemPrompt,
