@@ -56,10 +56,10 @@ Choose one during setup. All models run fully on your device, downloaded once fr
 
 | Model        | Size     | Notes                                        |
 | ------------ | -------- | -------------------------------------------- |
-| Gemma 4 E2B  | ~3.4 GB  | Google's compact model, any Mac              |
+| Gemma 4 E2B  | ~3.4 GB  | Google's compact model, 8 GB+ RAM            |
 | Llama 3.2 3B | ~2 GB    | Better reasoning, still quick                |
-| Gemma 4 E4B  | ~5.2 GB  | Efficient edge model, 8 GB+ RAM              |
-| Gemma 4 12B  | ~7 GB    | High quality, needs 16 GB RAM                |
+| Gemma 4 E4B  | ~5.2 GB  | Efficient edge model, 16 GB+ RAM             |
+| Gemma 4 12B  | ~7 GB    | High quality, needs 24 GB+ RAM               |
 | GPT-OSS 20B  | ~11.6 GB | OpenAI open-weight, best quality, 32 GB+ RAM |
 
 Apple Silicon gets Metal GPU acceleration automatically. Intel Mac and Windows use CPU inference.

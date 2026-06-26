@@ -42,7 +42,7 @@ class LlamaService {
     const loadWithWatchdog = new Promise<LlamaModel>((resolve, reject) => {
       timeoutHandle = setTimeout(() => reject(new Error('Not enough memory to run this model.')), MODEL_LOAD_TIMEOUT_MS)
       llama
-        .loadModel({ modelPath, gpuLayers: { fitContext: { contextSize: CONTEXT_SIZE } } })
+        .loadModel({ modelPath })
         .then((m) => {
           clearTimeout(timeoutHandle)
           resolve(m)
@@ -99,12 +99,7 @@ class LlamaService {
 
     try {
       // Fresh context per query — no history leakage between RAG calls
-      context = await this.model.createContext({
-        contextSize: CONTEXT_SIZE,
-        flashAttention: true,
-        experimentalKvCacheKeyType: 'Q8_0',
-        experimentalKvCacheValueType: 'Q8_0',
-      })
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
       const session = new LlamaChatSession({
         contextSequence: context.getSequence(),
         systemPrompt,
