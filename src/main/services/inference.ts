@@ -99,7 +99,7 @@ class LlamaService {
 
     try {
       // Fresh context per query — no history leakage between RAG calls
-      context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE, flashAttention: true })
       const session = new LlamaChatSession({
         contextSequence: context.getSequence(),
         systemPrompt,
