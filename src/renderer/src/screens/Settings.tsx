@@ -3,28 +3,32 @@ import './Settings.css'
 import type { LlmModelInfo, EmbedModelInfo, ModelProgress } from '../../../preload/index'
 
 const LLM_META: Record<string, { name: string; desc: string }> = {
-  'gemma2-2b': {
-    name: 'Qwen 2.5 1.5B',
-    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
+  'gemma4-e2b': {
+    name: 'Gemma 4 E2B',
+    desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
   },
   'llama3.2-3b': {
     name: 'Llama 3.2 3B',
     desc: 'Slightly larger. Better on dense academic text and long-form sources.',
   },
-  'qwen2.5-7b': {
-    name: 'Qwen 2.5 7B',
-    desc: 'Highest quality. Requires 32 GB RAM or more.',
+  'gemma4-e4b': {
+    name: 'Gemma 4 E4B',
+    desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
   },
-  'phi3-mini': {
-    name: 'Phi-3 Mini',
-    desc: "Microsoft's compact model. Good on structured notes and lists.",
+  'gemma4-12b': {
+    name: 'Gemma 4 12B',
+    desc: 'High quality. Requires 16 GB RAM or more.',
+  },
+  'gpt-oss-20b': {
+    name: 'GPT-OSS 20B',
+    desc: "OpenAI's open-weight model. Top-tier reasoning and comprehension. Needs 32 GB RAM.",
   },
 }
 
 function recommendedLlmId(ramGB: number): string {
-  if (ramGB >= 32) return 'qwen2.5-7b'
-  if (ramGB >= 16) return 'llama3.2-3b'
-  return 'gemma2-2b'
+  if (ramGB >= 32) return 'gpt-oss-20b'
+  if (ramGB >= 16) return 'gemma4-12b'
+  return 'gemma4-e4b'
 }
 
 type Section = 'llm' | 'embed' | 'retrieval'

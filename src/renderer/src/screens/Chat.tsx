@@ -25,10 +25,11 @@ type ChatProps = {
 }
 
 const MODEL_LABELS: Record<string, string> = {
-  'gemma2-2b': 'Gemma 2 2B',
+  'gemma4-e2b': 'Gemma 4 E2B',
   'llama3.2-3b': 'Llama 3.2 3B',
-  'qwen2.5-7b': 'Qwen 2.5 7B',
-  'phi3-mini': 'Phi-3 Mini',
+  'gemma4-e4b': 'Gemma 4 E4B',
+  'gemma4-12b': 'Gemma 4 12B',
+  'gpt-oss-20b': 'GPT-OSS 20B',
 }
 
 function collectDirPaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<string> {

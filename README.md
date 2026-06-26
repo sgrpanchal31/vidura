@@ -29,10 +29,11 @@ That's it. Nothing is uploaded anywhere.
 git clone https://github.com/sgrpanchal31/vidura.git
 cd vidura
 npm install
+npm run llama:update
 npm run dev
 ```
 
-Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select --install`). Windows needs Visual Studio Build Tools with the "Desktop development with C++" workload.
+Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select --install`). `npm run llama:update` compiles the latest llama.cpp from source and takes about 5 minutes on first run. Windows needs Visual Studio Build Tools with the "Desktop development with C++" workload.
 
 </details>
 
@@ -51,14 +52,15 @@ Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select -
 
 ## Models
 
-Choose one during setup. All are GGUF Q4_K_M quantizations downloaded from HuggingFace.
+Choose one during setup. All models run fully on your device, downloaded once from HuggingFace.
 
-| Model         | Size    | Notes                         |
-| ------------- | ------- | ----------------------------- |
-| Qwen 2.5 1.5B | ~1 GB   | Fast, works on 8 GB RAM       |
-| Llama 3.2 3B  | ~2 GB   | Better reasoning, still quick |
-| Qwen 2.5 7B   | ~4.7 GB | Best quality, needs 16 GB RAM |
-| Phi-3 Mini    | ~2.2 GB | Strong on technical content   |
+| Model        | Size     | Notes                                        |
+| ------------ | -------- | -------------------------------------------- |
+| Gemma 4 E2B  | ~3.4 GB  | Google's compact model, any Mac              |
+| Llama 3.2 3B | ~2 GB    | Better reasoning, still quick                |
+| Gemma 4 E4B  | ~5.2 GB  | Efficient edge model, 8 GB+ RAM              |
+| Gemma 4 12B  | ~7 GB    | High quality, needs 16 GB RAM                |
+| GPT-OSS 20B  | ~11.6 GB | OpenAI open-weight, best quality, 32 GB+ RAM |
 
 Apple Silicon gets Metal GPU acceleration automatically. Intel Mac and Windows use CPU inference.
 
