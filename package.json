@@ -16,7 +16,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "prepare": "husky",
-    "llama:update": "npx --no node-llama-cpp source download --release latest",
+    "llama:update": "npx --no node-llama-cpp source download --release b8750",
     "dist:mac": "npm run llama:update && npm run build && bash scripts/package-mac.sh; npm install",
     "langfuse:start": "docker compose -f scripts/langfuse.docker-compose.yml up -d",
     "langfuse:stop": "docker compose -f scripts/langfuse.docker-compose.yml down"
