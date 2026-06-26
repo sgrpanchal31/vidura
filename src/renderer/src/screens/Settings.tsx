@@ -13,11 +13,11 @@ const LLM_META: Record<string, { name: string; desc: string }> = {
   },
   'gemma4-e4b': {
     name: 'Gemma 4 E4B',
-    desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
+    desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
   },
   'gemma4-12b': {
     name: 'Gemma 4 12B',
-    desc: 'High quality. Requires 16 GB RAM or more.',
+    desc: 'High quality. Requires 24 GB RAM or more.',
   },
   'gpt-oss-20b': {
     name: 'GPT-OSS 20B',
@@ -27,7 +27,7 @@ const LLM_META: Record<string, { name: string; desc: string }> = {
 
 function recommendedLlmId(ramGB: number): string {
   if (ramGB >= 32) return 'gpt-oss-20b'
-  if (ramGB >= 16) return 'gemma4-12b'
+  if (ramGB >= 24) return 'gemma4-12b'
   return 'gemma4-e4b'
 }
 

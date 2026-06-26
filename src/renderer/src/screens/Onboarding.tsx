@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './Onboarding.css'
+import logoUrl from '../assets/logo.svg'
 
 type Model = {
   id: string
@@ -27,16 +28,16 @@ const MODELS: Model[] = [
   {
     id: 'gemma4-e4b',
     name: 'Gemma 4 E4B',
-    desc: "Google's efficient edge model. Better quality than E2B, good for 8 GB Macs.",
+    desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
     size: '5.2 GB',
     minRamGB: 8,
   },
   {
     id: 'gemma4-12b',
     name: 'Gemma 4 12B',
-    desc: 'High quality. Requires 16 GB RAM or more.',
+    desc: 'High quality. Requires 24 GB RAM or more.',
     size: '7.0 GB',
-    minRamGB: 16,
+    minRamGB: 24,
   },
   {
     id: 'gpt-oss-20b',
@@ -49,7 +50,7 @@ const MODELS: Model[] = [
 
 function recommendedModelId(ramGB: number): string {
   if (ramGB >= 32) return 'gpt-oss-20b'
-  if (ramGB >= 16) return 'gemma4-12b'
+  if (ramGB >= 24) return 'gemma4-12b'
   return 'gemma4-e4b'
 }
 
@@ -88,6 +89,10 @@ export default function Onboarding({ onComplete }: Props) {
           <span className="win-title">Vidura</span>
         </div>
       )}
+
+      <div className="logo-hero">
+        <img src={logoUrl} alt="" className="logo-mark" />
+      </div>
 
       <div className="zone">
         <div className="eyebrow">Notebook Folder</div>
