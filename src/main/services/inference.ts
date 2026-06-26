@@ -95,17 +95,17 @@ class LlamaService {
 
     this.generating = true
     this.abortController = new AbortController()
-
-    // Fresh context per query — no history leakage between RAG calls
-    const context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
-    const session = new LlamaChatSession({
-      contextSequence: context.getSequence(),
-      systemPrompt,
-    })
-
-    let fullText = ''
+    let context: Awaited<ReturnType<typeof this.model.createContext>> | null = null
 
     try {
+      // Fresh context per query — no history leakage between RAG calls
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
+      const session = new LlamaChatSession({
+        contextSequence: context.getSequence(),
+        systemPrompt,
+      })
+
+      let fullText = ''
       await session.prompt(userPrompt, {
         signal: this.abortController.signal,
         ...(opts?.maxTokens !== undefined && { maxTokens: opts.maxTokens }),
@@ -114,21 +114,21 @@ class LlamaService {
           onToken(text)
         },
       })
+      return fullText
     } finally {
       try {
-        await (context as any).dispose?.()
+        await (context as any)?.dispose?.()
       } catch {
         /* ignore */
       }
       this.generating = false
       this.abortController = null
     }
-
-    return fullText
   }
 
   cancel(): void {
     this.abortController?.abort()
+    this.generating = false
   }
 
   async dispose(): Promise<void> {
