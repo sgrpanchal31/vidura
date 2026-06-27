@@ -113,6 +113,7 @@ function extractCitations(answer: string, parents: SearchResult[]): CitationEntr
 
 export type RetrievalConfig = {
   topK: number
+  sourceFileFilter?: string[]
 }
 
 export async function retrieve(question: string, folderPath: string, cfg: RetrievalConfig): Promise<SearchResult[]> {
@@ -122,7 +123,7 @@ export async function retrieve(question: string, folderPath: string, cfg: Retrie
   await embedService.start(undefined, { modelId: embedModel })
   const [queryVector] = await embedService.embedBatched([formatQueryForEmbed(question)])
   // Use raw question for BM25 (keywords), instruction-prefixed vector for dense search
-  return vectorStore.searchHybrid(queryVector, question, cfg.topK)
+  return vectorStore.searchHybrid(queryVector, question, cfg.topK, cfg.sourceFileFilter)
 }
 
 // Ask the LLM to rewrite the user's question into 2-3 short search queries.
@@ -159,7 +160,8 @@ export async function ragQuery(
   modelId: string,
   history: HistoryMessage[],
   onToken: (token: string) => void,
-  onProgress?: (p: ChatProgress) => void
+  onProgress?: (p: ChatProgress) => void,
+  sourceFileFilter?: string[]
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
@@ -182,7 +184,7 @@ export async function ragQuery(
   const retrieveSpan = trace?.span({ name: 'retrieve', input: queries })
   const allChunks: SearchResult[] = []
   for (const q of queries) {
-    const chunks = await retrieve(q, folderPath, { topK: RETRIEVE_TOP_K })
+    const chunks = await retrieve(q, folderPath, { topK: RETRIEVE_TOP_K, sourceFileFilter })
     for (const chunk of chunks) {
       if (!allChunks.some((c) => c.parentId === chunk.parentId)) {
         allChunks.push(chunk)

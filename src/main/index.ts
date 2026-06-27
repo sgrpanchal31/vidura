@@ -260,16 +260,18 @@ ipcMain.handle(
     question: string,
     folderPath: string,
     modelId: string,
-    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    selectedFiles?: string[] // relative paths; undefined = all files
   ) => {
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
     const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
 
     const onChatProgress = (p: unknown) => mainWindow?.webContents.send('chat:progress', p)
 
-    // Tier 1 — specific file named: fetch all chunks for that file
+    // Tier 1 — specific file named: fetch all chunks for that file.
+    // Skip if the matched file was deselected by the user (fall through to filtered RAG).
     const matchedFile = await findMatchedFile(question, folderPath)
-    if (matchedFile) {
+    if (matchedFile && (!selectedFiles || selectedFiles.includes(matchedFile))) {
       ragSummarizeFile(question, matchedFile, folderPath, modelId, history, onToken, onChatProgress)
         .then((result) => mainWindow?.webContents.send('chat:done', result))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
@@ -279,8 +281,14 @@ ipcMain.handle(
     // Tier 2 — slash command: full-corpus map-reduce (/podcast, etc.)
     const genIntent = detectGenerateIntent(question)
     if (genIntent) {
-      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, onToken, (p) =>
-        mainWindow?.webContents.send('generate:progress', p)
+      generateFromCorpus(
+        folderPath,
+        modelId,
+        genIntent.task,
+        genIntent.format,
+        onToken,
+        (p) => mainWindow?.webContents.send('generate:progress', p),
+        selectedFiles
       )
         .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
@@ -288,7 +296,7 @@ ipcMain.handle(
     }
 
     // Tier 3 — RAG: partial/thematic queries, cross-file topics, follow-ups
-    ragQuery(question, folderPath, modelId, history, onToken, onChatProgress)
+    ragQuery(question, folderPath, modelId, history, onToken, onChatProgress, selectedFiles)
       .then((result) => mainWindow?.webContents.send('chat:done', result))
       .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
   }
@@ -318,7 +326,14 @@ ipcMain.handle('chat:session:delete', async (_event, folderPath: string, session
 
 ipcMain.handle(
   'generate:run',
-  async (_event, folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => {
+  async (
+    _event,
+    folderPath: string,
+    modelId: string,
+    task: GenerateTask,
+    format: GenerateFormat,
+    selectedFiles?: string[]
+  ) => {
     // Returns immediately; streams tokens via 'generate:token', terminates with 'generate:done' or 'generate:error'
     generateFromCorpus(
       folderPath,
@@ -326,7 +341,8 @@ ipcMain.handle(
       task,
       format,
       (token) => mainWindow?.webContents.send('generate:token', token),
-      (p) => mainWindow?.webContents.send('generate:progress', p)
+      (p) => mainWindow?.webContents.send('generate:progress', p),
+      selectedFiles
     )
       .then((result) => mainWindow?.webContents.send('generate:done', result))
       .catch((err) => mainWindow?.webContents.send('generate:error', String(err)))

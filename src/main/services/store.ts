@@ -133,13 +133,23 @@ export class VectorStore {
     }
   }
 
-  async search(queryVector: number[], topK = 8): Promise<SearchResult[]> {
+  // Build a LanceDB WHERE clause that restricts results to the given files.
+  // Returns null when no filter is needed (all files selected).
+  private fileFilterClause(sourceFileFilter?: string[]): string | null {
+    if (!sourceFileFilter || sourceFileFilter.length === 0) return null
+    return '(' + sourceFileFilter.map((f) => `sourceFile = '${f.replace(/'/g, "''")}'`).join(' OR ') + ')'
+  }
+
+  async search(queryVector: number[], topK = 8, sourceFileFilter?: string[]): Promise<SearchResult[]> {
     if (!this.table) throw new Error('VectorStore not open — call open() first')
 
+    const where = this.fileFilterClause(sourceFileFilter)
     let rows: any[]
     try {
       // cast to any: lancedb type defs removed distanceType() from VectorQuery in a minor bump
-      rows = await (this.table.search(queryVector) as any).distanceType('cosine').limit(topK).toArray()
+      let q = (this.table.search(queryVector) as any).distanceType('cosine').limit(topK)
+      if (where) q = q.where(where)
+      rows = await q.toArray()
     } catch {
       return []
     }
@@ -152,13 +162,13 @@ export class VectorStore {
 
   // BM25 keyword search on the 'text' column. Score is set to 0 because RRF uses rank, not score.
   // Returns [] silently if no FTS index exists (old notebook) — searchHybrid degrades to dense-only.
-  async searchFts(queryText: string, topK = 30): Promise<SearchResult[]> {
+  async searchFts(queryText: string, topK = 30, sourceFileFilter?: string[]): Promise<SearchResult[]> {
     if (!this.table) return []
+    const where = this.fileFilterClause(sourceFileFilter)
     try {
-      const rows = await (this.table.query() as any)
-        .fullTextSearch(queryText, { columns: 'text' })
-        .limit(topK)
-        .toArray()
+      let q = (this.table.query() as any).fullTextSearch(queryText, { columns: 'text' }).limit(topK)
+      if (where) q = q.where(where)
+      const rows = await q.toArray()
       return rows.map((row: any) => this.mapRow(row, 0))
     } catch {
       return []
@@ -166,8 +176,16 @@ export class VectorStore {
   }
 
   // Runs dense + BM25 in parallel and fuses results with Reciprocal Rank Fusion.
-  async searchHybrid(queryVector: number[], queryText: string, topK = 30): Promise<SearchResult[]> {
-    const [dense, sparse] = await Promise.all([this.search(queryVector, topK), this.searchFts(queryText, topK)])
+  async searchHybrid(
+    queryVector: number[],
+    queryText: string,
+    topK = 30,
+    sourceFileFilter?: string[]
+  ): Promise<SearchResult[]> {
+    const [dense, sparse] = await Promise.all([
+      this.search(queryVector, topK, sourceFileFilter),
+      this.searchFts(queryText, topK, sourceFileFilter),
+    ])
     return reciprocalRankFusion([dense, sparse]).slice(0, topK)
   }
 

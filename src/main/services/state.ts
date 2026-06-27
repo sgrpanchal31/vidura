@@ -61,6 +61,8 @@ export type ChatSession = {
   updatedAt: number
   title: string
   type?: 'chat' | 'podcast'
+  // undefined = all files selected; explicit array = subset of relative paths
+  selectedFiles?: string[]
   messages: PersistedMessage[]
 }
 

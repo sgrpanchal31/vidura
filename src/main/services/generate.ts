@@ -98,13 +98,15 @@ export async function generateFromCorpus(
   task: GenerateTask,
   format: GenerateFormat,
   onToken: (token: string) => void,
-  onProgress?: (p: GenerateProgress) => void
+  onProgress?: (p: GenerateProgress) => void,
+  allowedFiles?: string[] // relative paths; undefined = all files
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
-  const { files } = await scanFolder(folderPath)
+  const { files: allFiles } = await scanFolder(folderPath)
+  const files = allowedFiles ? allFiles.filter((f) => allowedFiles.includes(relative(folderPath, f.path))) : allFiles
   if (files.length === 0) {
     const msg = 'No documents found in this notebook.'
     onToken(msg)

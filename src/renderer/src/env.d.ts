@@ -57,7 +57,8 @@ declare global {
         question: string,
         folderPath: string,
         modelId: string,
-        history?: Array<{ role: 'user' | 'assistant'; content: string }>
+        history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+        selectedFiles?: string[]
       ) => Promise<void>
       chatCancel: () => Promise<void>
       onChatToken: (cb: (token: string) => void) => () => void
@@ -74,7 +75,13 @@ declare global {
 
       setWindowSize: (width: number, height: number) => Promise<void>
 
-      generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => Promise<void>
+      generateRun: (
+        folderPath: string,
+        modelId: string,
+        task: GenerateTask,
+        format: GenerateFormat,
+        selectedFiles?: string[]
+      ) => Promise<void>
       generateCancel: () => Promise<void>
       onGenerateProgress: (cb: (p: GenerateProgress) => void) => () => void
       onGenerateToken: (cb: (token: string) => void) => () => void

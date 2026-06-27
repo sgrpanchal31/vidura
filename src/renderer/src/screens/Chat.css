@@ -127,6 +127,15 @@
   gap: 8px;
 }
 
+.sources-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--slate);
+  opacity: 0.7;
+}
+
 .sources-progress {
   height: 2px;
   flex-shrink: 0;
@@ -203,6 +212,64 @@
   padding: 5px 0;
   cursor: default;
   user-select: none;
+}
+
+/* Shared checkbox style used in source rows and the sources header */
+.source-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--slate);
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
+  position: relative;
+  opacity: 0.55;
+  transition:
+    opacity 0.1s,
+    background 0.1s;
+  background: transparent;
+}
+.source-check:hover {
+  opacity: 1;
+}
+.source-check:checked {
+  background: var(--ox);
+  border-color: var(--ox);
+  opacity: 1;
+}
+.source-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0px;
+  width: 5px;
+  height: 8px;
+  border: 1.5px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+.source-check:indeterminate {
+  background: var(--ox);
+  border-color: var(--ox);
+  opacity: 0.75;
+}
+.source-check:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 7px;
+  height: 1.5px;
+  background: #fff;
+}
+
+/* dir rows use gap:5px; remove the checkbox margin so spacing isn't doubled */
+.source-dir .source-check {
+  margin-right: 0;
 }
 
 .source-icon {
