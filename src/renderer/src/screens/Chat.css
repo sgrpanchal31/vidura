@@ -242,6 +242,7 @@
   display: flex;
   flex-direction: column;
   gap: 28px;
+  align-items: center;
 }
 
 .message {
@@ -250,7 +251,6 @@
 }
 
 .message-user {
-  align-self: flex-end;
   text-align: right;
 }
 
@@ -266,7 +266,6 @@
 }
 
 .message-assistant {
-  align-self: flex-start;
 }
 
 .message-assistant .message-bubble {
@@ -486,6 +485,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  max-width: 680px;
+  margin: 0 auto;
 }
 
 .composer-textarea {
