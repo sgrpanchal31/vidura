@@ -64,6 +64,19 @@ npm run dev
 npm run build
 ```
 
+## UX design principles
+
+Every UI feature should be designed with the mental model of how users behave in mature apps. Before implementing, ask: what does the user expect based on every other app they use?
+
+Key patterns to always consider:
+
+- **Don't destroy typed text.** If the user typed something and clicked a navigation item, that text must survive. Use draft refs keyed by session or context. Examples: clicking "New Chat" when already on a blank chat should focus, not reset; switching between Chat and Podcast tiles should swap drafts, not wipe them.
+- **Background work keeps running.** If a long operation (generation, download) is in progress and the user navigates away, it should continue. Don't unmount the component doing the work — hide it with `display: none` instead. When the user returns, they see the result.
+- **Only one generation at a time, but free navigation.** Block the send action during generation, not the ability to browse or type. Users expect to be able to read other sessions while waiting.
+- **Indicate state where the work is happening, not just where the user is.** If session A is generating and the user is viewing session B, the sidebar must show which session is generating (spinner dot). Don't just disable global UI — point to the specific item.
+- **Disabled visual state should not inadvertently reveal hidden elements.** CSS `:disabled` can override `opacity: 0` rules and make previously invisible elements appear. Always check `:disabled` overrides when adding disabled states to elements that are hidden by default.
+- **Navigation guards should be minimal.** Only block navigation if it would cause data loss or two parallel conflicting operations. "User is generating" is not a reason to block switching sessions — it's a reason to block starting another generation.
+
 ## Writing style
 
 - No em-dashes in any user-facing text (README, release notes, UI copy). Use commas or colons instead. Em-dashes are fine in code comments and internal docs like this file.

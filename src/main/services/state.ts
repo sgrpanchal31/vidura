@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 
@@ -58,7 +58,9 @@ export type PersistedMessage = {
 export type ChatSession = {
   id: string
   createdAt: number
+  updatedAt: number
   title: string
+  type?: 'chat' | 'podcast'
   messages: PersistedMessage[]
 }
 
@@ -72,23 +74,44 @@ function sessionPath(folderPath: string, sessionId: string): string {
 
 export async function listChatSessions(
   folderPath: string
-): Promise<Array<{ id: string; createdAt: number; title: string }>> {
+): Promise<Array<{ id: string; createdAt: number; updatedAt: number; title: string; type?: 'chat' | 'podcast' }>> {
   const dir = chatsDir(folderPath)
   try {
     const files = await readdir(dir)
-    const sessions: Array<{ id: string; createdAt: number; title: string }> = []
+    const sessions: Array<{
+      id: string
+      createdAt: number
+      updatedAt: number
+      title: string
+      type?: 'chat' | 'podcast'
+    }> = []
     for (const file of files.filter((f) => f.endsWith('.json'))) {
       try {
         const raw = await readFile(join(dir, file), 'utf-8')
         const s = JSON.parse(raw) as ChatSession
-        sessions.push({ id: s.id, createdAt: s.createdAt, title: s.title })
+        if (!s.messages || s.messages.length === 0) continue
+        sessions.push({
+          id: s.id,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt ?? s.createdAt,
+          title: s.title,
+          type: s.type,
+        })
       } catch {
         // skip corrupt files
       }
     }
-    return sessions.sort((a, b) => b.createdAt - a.createdAt)
+    return sessions.sort((a, b) => b.updatedAt - a.updatedAt)
   } catch {
     return []
+  }
+}
+
+export async function deleteChatSession(folderPath: string, sessionId: string): Promise<void> {
+  try {
+    await unlink(sessionPath(folderPath, sessionId))
+  } catch {
+    // already gone
   }
 }
 
