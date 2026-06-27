@@ -318,6 +318,7 @@ export default function Chat({
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [streamBuffer, setStreamBuffer] = useState('')
+  const [showWaitToast, setShowWaitToast] = useState(false)
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null)
   const [sources, setSources] = useState<SourceItem[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -340,6 +341,7 @@ export default function Chat({
   const generatingSessionIdRef = useRef<string | null>(null)
   const currentSessionIdRef = useRef<string | null>(null)
   const generatingSnapshotRef = useRef<GeneratingSnapshot | null>(null)
+  const waitToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const newChatDraftRef = useRef<string>('')
   const newPodcastDraftRef = useRef<string>('')
 
@@ -591,7 +593,13 @@ export default function Chat({
     if (sid === sessionId) return
     const session = await window.api.chatSessionLoad(folder, sid)
     if (!session) return
-    if (sessionId) draftRef.current.set(sessionId, input)
+    if (sessionId) {
+      draftRef.current.set(sessionId, input)
+      if (messages.length === 0) {
+        if (currentSessionType === 'chat') newChatDraftRef.current = input
+        else newPodcastDraftRef.current = input
+      }
+    }
     currentSessionIdRef.current = session.id
     setMessages(session.messages as Message[])
     setSessionId(session.id)
@@ -624,7 +632,15 @@ export default function Chat({
   }
 
   async function handleSend(text: string) {
-    if (!text.trim() || isGenerating) return
+    if (!text.trim()) return
+    if (isGenerating) {
+      if (generatingSessionId !== sessionId) {
+        if (waitToastTimerRef.current) clearTimeout(waitToastTimerRef.current)
+        setShowWaitToast(true)
+        waitToastTimerRef.current = setTimeout(() => setShowWaitToast(false), 2500)
+      }
+      return
+    }
 
     unsubsRef.current.forEach((u) => u())
     unsubsRef.current = []
@@ -814,6 +830,7 @@ export default function Chat({
   }
 
   const tree = buildTree(sources)
+  const isCurrentSessionGenerating = isGenerating && generatingSessionId === sessionId
 
   // Compute tooltip position: fixed to viewport, smart top/bottom based on citation location
   const tooltipStyle: React.CSSProperties | null = activeCitation
@@ -924,7 +941,7 @@ export default function Chat({
                   </div>
                 </div>
               ))}
-              {isGenerating && !streamBuffer && (
+              {isCurrentSessionGenerating && !streamBuffer && (
                 <div className="message message-assistant">
                   <div className="message-bubble thinking-loader">
                     <span className="thinking-spinner" />
@@ -932,7 +949,7 @@ export default function Chat({
                   </div>
                 </div>
               )}
-              {isGenerating && streamBuffer && (
+              {isCurrentSessionGenerating && streamBuffer && (
                 <div className="message message-assistant">
                   <div className="message-bubble message-streaming">
                     {streamBuffer}
@@ -966,6 +983,9 @@ export default function Chat({
 
           {/* Composer */}
           <div className="composer">
+            {showWaitToast && (
+              <div className="wait-toast">Another chat is generating. You can send once it finishes.</div>
+            )}
             <div className="composer-inner">
               <textarea
                 ref={textareaRef}
@@ -976,7 +996,7 @@ export default function Chat({
                 placeholder="Ask your notebook…"
                 rows={1}
               />
-              {isGenerating ? (
+              {isCurrentSessionGenerating ? (
                 <button className="composer-cancel" onClick={() => window.api.chatCancel()}>
                   Stop
                 </button>
