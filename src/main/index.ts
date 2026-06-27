@@ -3,7 +3,14 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import os from 'os'
 import { indexFolder } from './services/indexer'
-import { readState, listChatSessions, loadChatSession, saveChatSession, type ChatSession } from './services/state'
+import {
+  readState,
+  listChatSessions,
+  loadChatSession,
+  saveChatSession,
+  deleteChatSession,
+  type ChatSession,
+} from './services/state'
 import { embedService } from './services/embed'
 import { vectorStore } from './services/store'
 import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteModel } from './services/models'
@@ -64,7 +71,7 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 860,
     height: 680,
-    minWidth: 720,
+    minWidth: 900,
     minHeight: 560,
     show: false,
     backgroundColor: '#272320',
@@ -222,19 +229,10 @@ ipcMain.handle('reranker:setEnabled', async (_event, enabled: boolean) => {
 
 // ── Chat / RAG ────────────────────────────────────────────────────────────────
 
-// Detect whether a question is a full-corpus generation task (whole-collection overview,
-// podcast, infographic). Does NOT catch targeted summarize questions ("summarize the
-// vibe coding doc") — those are handled by findMatchedFile + ragSummarizeFile.
+// Detect whether a question is a full-corpus generation task triggered by a slash command.
+// /podcast routes to map-reduce podcast generation; other slash commands can be added here.
 function detectGenerateIntent(question: string): { task: GenerateTask; format: GenerateFormat } | null {
-  const q = question.toLowerCase()
-  if (/\bpodcast\b/.test(q)) return { task: 'podcast', format: 'prose' }
-  if (/\b(infographic|diagram|mermaid|visuali[sz]e|chart)\b/.test(q)) return { task: 'facts', format: 'mermaid' }
-  if (/what('s| is) in (this|the) (folder|notebook|sources?|documents?|files?)/.test(q))
-    return { task: 'overview', format: 'prose' }
-  if (/give me an overview|tell me (about )?everything/.test(q)) return { task: 'overview', format: 'prose' }
-  if (/\b(key|main|core|all|every) (themes?|topics?|concepts?|points?)\b/.test(q))
-    return { task: 'overview', format: 'prose' }
-  if (/\b(tldr|tl;dr|overview)\b/.test(q)) return { task: 'overview', format: 'prose' }
+  if (question.trimStart().startsWith('/podcast')) return { task: 'podcast', format: 'prose' }
   return null
 }
 
@@ -278,7 +276,7 @@ ipcMain.handle(
       return
     }
 
-    // Tier 2 — broad intent: full-corpus map-reduce (podcast, overview of everything, etc.)
+    // Tier 2 — slash command: full-corpus map-reduce (/podcast, etc.)
     const genIntent = detectGenerateIntent(question)
     if (genIntent) {
       generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, onToken, (p) =>
@@ -310,6 +308,10 @@ ipcMain.handle('chat:session:load', async (_event, folderPath: string, sessionId
 
 ipcMain.handle('chat:session:save', async (_event, folderPath: string, session: ChatSession) => {
   await saveChatSession(folderPath, session)
+})
+
+ipcMain.handle('chat:session:delete', async (_event, folderPath: string, sessionId: string) => {
+  await deleteChatSession(folderPath, sessionId)
 })
 
 // ── Generation (map-reduce over full corpus) ─────────────────────────────────

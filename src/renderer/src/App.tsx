@@ -14,6 +14,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('loading')
   const [notebookFolder, setNotebookFolder] = useState<string | null>(null)
   const [modelId, setModelId] = useState<string | null>(null)
+  const [lastActiveSessionId, setLastActiveSessionId] = useState<string | null>(null)
 
   // Indexing
   const [progress, setProgress] = useState<IndexProgress | null>(null)
@@ -72,7 +73,7 @@ export default function App() {
     // the file watcher is started reliably.
     const ok = await runIngest(folder, DEFAULT_EMBED_ID)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
     // On failure: stay on indexing screen showing the error + Back button
@@ -129,7 +130,7 @@ export default function App() {
     if (folder) {
       await ensureEmbedAndIndex(folder)
     } else {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -152,7 +153,7 @@ export default function App() {
     setNotebookFolder(folder)
     const ok = await runIngest(folder, DEFAULT_EMBED_ID)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -167,7 +168,7 @@ export default function App() {
 
     const ok = await runIngest(newFolder)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -416,33 +417,31 @@ export default function App() {
     )
   }
 
-  if (screen === 'ready' && notebookFolder && modelId) {
+  if ((screen === 'ready' || screen === 'settings') && notebookFolder && modelId) {
     return (
       <div className="app-window">
-        <div className="screen-content">
+        {/* Chat stays mounted even when Settings is open so generation keeps running */}
+        <div className="screen-content" style={{ display: screen === 'settings' ? 'none' : undefined }}>
           <Chat
             key={notebookFolder}
             folder={notebookFolder}
             modelId={modelId}
             onChangeFolder={handleChangeFolder}
             onOpenSettings={() => setScreen('settings')}
+            initialSessionId={lastActiveSessionId}
+            onSessionIdChange={(id) => setLastActiveSessionId(id)}
           />
         </div>
-      </div>
-    )
-  }
-
-  if (screen === 'settings' && notebookFolder && modelId) {
-    return (
-      <div className="app-window">
-        <div className="screen-content">
-          <Settings
-            folder={notebookFolder}
-            modelId={modelId}
-            onClose={() => setScreen('ready')}
-            onModelChanged={(id) => setModelId(id)}
-          />
-        </div>
+        {screen === 'settings' && (
+          <div className="screen-content">
+            <Settings
+              folder={notebookFolder}
+              modelId={modelId}
+              onClose={() => setScreen('ready')}
+              onModelChanged={(id) => setModelId(id)}
+            />
+          </div>
+        )}
       </div>
     )
   }

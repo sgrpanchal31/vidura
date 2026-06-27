@@ -63,9 +63,14 @@ declare global {
       onChatToken: (cb: (token: string) => void) => () => void
       onChatDone: (cb: (result: ChatResult) => void) => () => void
       onChatError: (cb: (message: string) => void) => () => void
-      chatSessionList: (folderPath: string) => Promise<Array<{ id: string; createdAt: number; title: string }>>
+      chatSessionList: (
+        folderPath: string
+      ) => Promise<
+        Array<{ id: string; createdAt: number; updatedAt: number; title: string; type?: 'chat' | 'podcast' }>
+      >
       chatSessionLoad: (folderPath: string, sessionId: string) => Promise<ChatSession | null>
       chatSessionSave: (folderPath: string, session: ChatSession) => Promise<void>
+      chatSessionDelete: (folderPath: string, sessionId: string) => Promise<void>
 
       setWindowSize: (width: number, height: number) => Promise<void>
 
