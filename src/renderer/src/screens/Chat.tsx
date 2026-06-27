@@ -701,7 +701,7 @@ export default function Chat({
       if (currentSessionIdRef.current === snapshot?.sessionId) {
         // Still viewing the generating session — normal state update (save effect handles disk)
         setMessages((prev) => [...prev, assistantMsg])
-      } else if (snapshot) {
+      } else if (snapshot && !deletedSessionIdsRef.current.has(snapshot.sessionId)) {
         // User navigated away — save completed session directly to disk
         const firstUserContent = snapshot.messages.find((m) => m.role === 'user')?.content ?? ''
         const cleanContent =
@@ -740,7 +740,7 @@ export default function Chat({
 
       if (currentSessionIdRef.current === snapshot?.sessionId) {
         setMessages((prev) => [...prev, errorMsg])
-      } else if (snapshot) {
+      } else if (snapshot && !deletedSessionIdsRef.current.has(snapshot.sessionId)) {
         const firstUserContent = snapshot.messages.find((m) => m.role === 'user')?.content ?? ''
         const cleanContent =
           snapshot.type === 'podcast' ? firstUserContent.replace(/^\/podcast\s*/i, '').trim() : firstUserContent
