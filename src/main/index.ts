@@ -232,7 +232,9 @@ ipcMain.handle('reranker:setEnabled', async (_event, enabled: boolean) => {
 // Detect whether a question is a full-corpus generation task triggered by a slash command.
 // /podcast routes to map-reduce podcast generation; other slash commands can be added here.
 function detectGenerateIntent(question: string): { task: GenerateTask; format: GenerateFormat } | null {
-  if (question.trimStart().startsWith('/podcast')) return { task: 'podcast', format: 'prose' }
+  const q = question.trimStart()
+  if (q.startsWith('/podcast')) return { task: 'podcast', format: 'prose' }
+  if (/\b(summarize|summarise|summary|overview)\b/i.test(q)) return { task: 'overview', format: 'prose' }
   return null
 }
 
