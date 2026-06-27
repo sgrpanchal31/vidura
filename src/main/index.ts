@@ -267,10 +267,12 @@ ipcMain.handle(
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
     const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
 
+    const onChatProgress = (p: unknown) => mainWindow?.webContents.send('chat:progress', p)
+
     // Tier 1 — specific file named: fetch all chunks for that file
     const matchedFile = await findMatchedFile(question, folderPath)
     if (matchedFile) {
-      ragSummarizeFile(question, matchedFile, folderPath, modelId, history, onToken)
+      ragSummarizeFile(question, matchedFile, folderPath, modelId, history, onToken, onChatProgress)
         .then((result) => mainWindow?.webContents.send('chat:done', result))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
       return
@@ -279,14 +281,16 @@ ipcMain.handle(
     // Tier 2 — broad intent: full-corpus map-reduce (podcast, overview of everything, etc.)
     const genIntent = detectGenerateIntent(question)
     if (genIntent) {
-      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, onToken)
+      generateFromCorpus(folderPath, modelId, genIntent.task, genIntent.format, onToken, (p) =>
+        mainWindow?.webContents.send('generate:progress', p)
+      )
         .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
       return
     }
 
     // Tier 3 — RAG: partial/thematic queries, cross-file topics, follow-ups
-    ragQuery(question, folderPath, modelId, history, onToken)
+    ragQuery(question, folderPath, modelId, history, onToken, onChatProgress)
       .then((result) => mainWindow?.webContents.send('chat:done', result))
       .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
   }
@@ -314,8 +318,13 @@ ipcMain.handle(
   'generate:run',
   async (_event, folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => {
     // Returns immediately; streams tokens via 'generate:token', terminates with 'generate:done' or 'generate:error'
-    generateFromCorpus(folderPath, modelId, task, format, (token) =>
-      mainWindow?.webContents.send('generate:token', token)
+    generateFromCorpus(
+      folderPath,
+      modelId,
+      task,
+      format,
+      (token) => mainWindow?.webContents.send('generate:token', token),
+      (p) => mainWindow?.webContents.send('generate:progress', p)
     )
       .then((result) => mainWindow?.webContents.send('generate:done', result))
       .catch((err) => mainWindow?.webContents.send('generate:error', String(err)))

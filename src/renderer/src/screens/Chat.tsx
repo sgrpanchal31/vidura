@@ -241,6 +241,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
   const [isReindexing, setIsReindexing] = useState(false)
+  const [generateStatus, setGenerateStatus] = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -337,6 +338,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
     unsubsRef.current = []
     setMessages([])
     setStreamBuffer('')
+    setGenerateStatus('')
     setActiveCitation(null)
     setIsGenerating(false)
     // Start a new session; old session stays on disk for future history feature
@@ -362,8 +364,20 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setIsGenerating(true)
     setStreamBuffer('')
+    setGenerateStatus('')
     setActiveCitation(null)
 
+    const unsubChatProgress = window.api.onChatProgress((p) => {
+      if (p.stage === 'reading') setGenerateStatus('Reading documents...')
+      else if (p.stage === 'reranking') setGenerateStatus('Finding best matches...')
+      else if (p.stage === 'generating') setGenerateStatus('Writing response...')
+    })
+    const unsubProgress = window.api.onGenerateProgress((p) => {
+      if (p.stage === 'map') setGenerateStatus('Reading documents...')
+      else if (p.stage === 'reduce') setGenerateStatus('Organizing ideas...')
+      else if (p.stage === 'final')
+        setGenerateStatus(p.type === 'podcast' ? 'Writing your podcast...' : 'Writing your summary...')
+    })
     const unsubToken = window.api.onChatToken((tok) => setStreamBuffer((prev) => prev + tok))
     const unsubDone = window.api.onChatDone((result) => {
       setMessages((prev) => [
@@ -371,6 +385,7 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
         { id: `${Date.now()}-a`, role: 'assistant', content: result.answer, citations: result.citations },
       ])
       setStreamBuffer('')
+      setGenerateStatus('')
       setIsGenerating(false)
       cleanup()
     })
@@ -380,17 +395,20 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
         { id: `${Date.now()}-e`, role: 'assistant', content: `Something went wrong: ${msg}`, citations: [] },
       ])
       setStreamBuffer('')
+      setGenerateStatus('')
       setIsGenerating(false)
       cleanup()
     })
 
     function cleanup() {
+      unsubChatProgress()
+      unsubProgress()
       unsubToken()
       unsubDone()
       unsubError()
       unsubsRef.current = []
     }
-    unsubsRef.current = [unsubToken, unsubDone, unsubError]
+    unsubsRef.current = [unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
     await window.api.chatAsk(text.trim(), folder, modelId, history)
@@ -471,10 +489,9 @@ export default function Chat({ folder, modelId, onChangeFolder, onOpenSettings }
               ))}
               {isGenerating && !streamBuffer && (
                 <div className="message message-assistant">
-                  <div className="message-bubble thinking-dots">
-                    <span className="thinking-dot" />
-                    <span className="thinking-dot" />
-                    <span className="thinking-dot" />
+                  <div className="message-bubble thinking-loader">
+                    <span className="thinking-spinner" />
+                    <span className="thinking-label">{generateStatus || 'Thinking...'}</span>
                   </div>
                 </div>
               )}

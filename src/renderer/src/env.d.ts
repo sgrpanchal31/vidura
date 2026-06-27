@@ -13,6 +13,8 @@ import type {
   EmbedModelInfo,
   GenerateTask,
   GenerateFormat,
+  GenerateProgress,
+  ChatProgress,
   ChatSession,
 } from '../../preload/index'
 
@@ -50,6 +52,7 @@ declare global {
       rerankerGetStatus: () => Promise<{ enabled: boolean; status: string; downloaded: boolean }>
       rerankerSetEnabled: (enabled: boolean) => Promise<void>
 
+      onChatProgress: (cb: (p: ChatProgress) => void) => () => void
       chatAsk: (
         question: string,
         folderPath: string,
@@ -68,6 +71,7 @@ declare global {
 
       generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => Promise<void>
       generateCancel: () => Promise<void>
+      onGenerateProgress: (cb: (p: GenerateProgress) => void) => () => void
       onGenerateToken: (cb: (token: string) => void) => () => void
       onGenerateDone: (cb: (result: string) => void) => () => void
       onGenerateError: (cb: (message: string) => void) => () => void

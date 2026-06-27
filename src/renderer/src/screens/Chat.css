@@ -328,37 +328,52 @@
   font-size: 12px;
 }
 
-.thinking-dots {
+.thinking-loader {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 0;
+  gap: 10px;
+  padding: 2px 0;
 }
 
-.thinking-dot {
-  width: 6px;
-  height: 6px;
+.thinking-spinner {
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--slate);
-  opacity: 0.35;
-  animation: dot-pulse 1.4s ease-in-out infinite;
+  border: 2px solid var(--line-m);
+  border-top-color: var(--ox);
+  animation: spin 0.85s linear infinite;
+  flex-shrink: 0;
 }
 
-.thinking-dot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.thinking-dot:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes dot-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
-  50% {
-    opacity: 0.9;
+}
+
+.thinking-label {
+  font-size: 13px;
+  background: linear-gradient(
+    90deg,
+    var(--slate) 0%,
+    var(--slate) 25%,
+    var(--ox) 50%,
+    var(--slate) 75%,
+    var(--slate) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
   }
 }
 

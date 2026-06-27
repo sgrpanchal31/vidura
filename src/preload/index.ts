@@ -77,6 +77,8 @@ export type SearchResult = {
 
 export type GenerateTask = 'overview' | 'podcast' | 'facts'
 export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
+export type GenerateProgress = { stage: 'map' } | { stage: 'reduce' } | { stage: 'final'; type: GenerateTask }
+export type ChatProgress = { stage: 'reading' } | { stage: 'reranking' } | { stage: 'generating' }
 
 export type ModelProgress = {
   modelId: string
@@ -172,6 +174,11 @@ const api = {
     history: Array<{ role: 'user' | 'assistant'; content: string }> = []
   ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history),
   chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
+  onChatProgress: (cb: (p: ChatProgress) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: ChatProgress) => cb(p)
+    ipcRenderer.on('chat:progress', handler)
+    return () => ipcRenderer.off('chat:progress', handler)
+  },
   onChatToken: (cb: (token: string) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('chat:token', handler)
@@ -201,6 +208,11 @@ const api = {
   generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat): Promise<void> =>
     ipcRenderer.invoke('generate:run', folderPath, modelId, task, format),
   generateCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'), // reuses the same LlamaService cancel
+  onGenerateProgress: (cb: (p: GenerateProgress) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: GenerateProgress) => cb(p)
+    ipcRenderer.on('generate:progress', handler)
+    return () => ipcRenderer.off('generate:progress', handler)
+  },
   onGenerateToken: (cb: (token: string) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('generate:token', handler)

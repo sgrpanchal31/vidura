@@ -10,6 +10,7 @@ import { getLangfuse } from './telemetry'
 
 export type GenerateTask = 'overview' | 'podcast' | 'facts'
 export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
+export type GenerateProgress = { stage: 'map' } | { stage: 'reduce' } | { stage: 'final'; type: GenerateTask }
 
 const SYSTEM_PROMPT =
   "You are a research assistant. You read documents and produce clear, well-structured summaries and syntheses. Follow the user's formatting instructions exactly. No preamble."
@@ -96,7 +97,8 @@ export async function generateFromCorpus(
   modelId: string,
   task: GenerateTask,
   format: GenerateFormat,
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  onProgress?: (p: GenerateProgress) => void
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -125,6 +127,7 @@ export async function generateFromCorpus(
     }
     if (!docText.trim()) continue
 
+    onProgress?.({ stage: 'map' })
     const prompt = mapPrompt(task, format, `[${relPath}]\n${docText}`)
     const mapGen = trace?.generation({ name: `map:${relPath}`, model: modelId, input: relPath })
     // Silent map calls — tokens only stream during the final reduce
@@ -145,6 +148,7 @@ export async function generateFromCorpus(
   }
 
   // Reduce phase: combine intermediates, batching if needed
+  onProgress?.({ stage: 'reduce' })
   let current = intermediates
   let reduceRound = 0
   while (current.length > 1) {
@@ -171,6 +175,7 @@ export async function generateFromCorpus(
   }
 
   // Final reduce — stream tokens to the caller
+  onProgress?.({ stage: 'final', type: task })
   const finalPrompt = reducePrompt(task, format, current[0])
   const finalGen = trace?.generation({ name: 'final', model: modelId, input: 'final synthesis' })
   const result = await llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)

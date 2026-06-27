@@ -24,6 +24,8 @@ const PARENT_PROMPT_CHARS = 1500
 
 export type HistoryMessage = { role: 'user' | 'assistant'; content: string }
 
+export type ChatProgress = { stage: 'reading' } | { stage: 'reranking' } | { stage: 'generating' }
+
 export type CitationEntry = {
   sourceNum: number // the [N] number the model used in the answer
   chunk: SearchResult
@@ -156,8 +158,11 @@ export async function ragQuery(
   folderPath: string,
   modelId: string,
   history: HistoryMessage[],
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  onProgress?: (p: ChatProgress) => void
 ): Promise<RagResult> {
+  onProgress?.({ stage: 'reading' })
+
   const lf = getLangfuse()
   const trace = lf?.trace({ name: 'rag-query', input: question })
 
@@ -205,6 +210,7 @@ export async function ragQuery(
     }
   }
 
+  if (rerankerGgufService.isReady()) onProgress?.({ stage: 'reranking' })
   const rerankSpan = trace?.span({
     name: 'rerank',
     input: { candidates: allChunks.length, enabled: rerankerGgufService.isReady() },
@@ -222,6 +228,7 @@ export async function ragQuery(
   rerankSpan?.end()
   const systemPrompt = buildSystemPrompt(parents, history)
 
+  onProgress?.({ stage: 'generating' })
   const gen = trace?.generation({
     name: 'llm',
     model: modelId,
@@ -268,8 +275,11 @@ export async function ragSummarizeFile(
   folderPath: string,
   modelId: string,
   history: HistoryMessage[],
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  onProgress?: (p: ChatProgress) => void
 ): Promise<RagResult> {
+  onProgress?.({ stage: 'reading' })
+
   const lf = getLangfuse()
   const trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } })
 
@@ -296,6 +306,7 @@ export async function ragSummarizeFile(
   const parents = dedupeByParent(sorted)
   const systemPrompt = buildSystemPrompt(parents, history)
 
+  onProgress?.({ stage: 'generating' })
   const gen = trace?.generation({
     name: 'llm',
     model: modelId,
