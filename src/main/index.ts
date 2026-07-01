@@ -255,8 +255,8 @@ ipcMain.handle(
     const availableFiles = await vectorStore.listSourceFiles()
     const decision = await routeQuery(question, availableFiles, trace)
 
-    // Flush routing span immediately — pipeline fires async and creates its own trace
-    lf?.flushAsync().catch(() => {})
+    // Surface the routing decision on the trace so it's visible at the top level
+    trace?.update({ output: { scope: decision.scope, task: decision.task, targetFile: decision.targetFile } })
 
     // If the router picked a specific file that the user has deselected, drop to rag
     if (
@@ -269,11 +269,20 @@ ipcMain.handle(
       decision.targetFile = null
     }
 
+    // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
+    const flushTrace = () => lf?.flushAsync().catch(() => {})
+
     if (decision.scope === 'file' && decision.task === 'chat') {
       // Q&A about a specific named file
-      ragSummarizeFile(question, decision.targetFile!, folderPath, modelId, history, onToken, onChatProgress)
-        .then((result) => mainWindow?.webContents.send('chat:done', result))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+      ragSummarizeFile(question, decision.targetFile!, folderPath, modelId, history, onToken, onChatProgress, trace)
+        .then((result) => {
+          mainWindow?.webContents.send('chat:done', result)
+          flushTrace()
+        })
+        .catch((err) => {
+          mainWindow?.webContents.send('chat:error', String(err))
+          flushTrace()
+        })
     } else if (decision.scope === 'file') {
       // Podcast or overview about a single named file — map-reduce over just that file
       generateFromCorpus(
@@ -283,10 +292,17 @@ ipcMain.handle(
         'prose',
         onToken,
         (p) => mainWindow?.webContents.send('generate:progress', p),
-        [decision.targetFile!]
+        [decision.targetFile!],
+        trace
       )
-        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+        .then((answer) => {
+          mainWindow?.webContents.send('chat:done', { answer, citations: [] })
+          flushTrace()
+        })
+        .catch((err) => {
+          mainWindow?.webContents.send('chat:error', String(err))
+          flushTrace()
+        })
     } else if (decision.scope === 'corpus') {
       // Map-reduce over all/selected files
       const task = decision.task === 'chat' ? 'overview' : decision.task
@@ -297,10 +313,17 @@ ipcMain.handle(
         'prose',
         onToken,
         (p) => mainWindow?.webContents.send('generate:progress', p),
-        selectedFiles
+        selectedFiles,
+        trace
       )
-        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+        .then((answer) => {
+          mainWindow?.webContents.send('chat:done', { answer, citations: [] })
+          flushTrace()
+        })
+        .catch((err) => {
+          mainWindow?.webContents.send('chat:error', String(err))
+          flushTrace()
+        })
     } else {
       // RAG: targeted search, optionally with format synthesis (podcast/overview from retrieved chunks)
       ragQuery(
@@ -311,10 +334,17 @@ ipcMain.handle(
         onToken,
         onChatProgress,
         selectedFiles,
-        decision.task === 'chat' ? undefined : decision.task
+        decision.task === 'chat' ? undefined : decision.task,
+        trace
       )
-        .then((result) => mainWindow?.webContents.send('chat:done', result))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+        .then((result) => {
+          mainWindow?.webContents.send('chat:done', result)
+          flushTrace()
+        })
+        .catch((err) => {
+          mainWindow?.webContents.send('chat:error', String(err))
+          flushTrace()
+        })
     }
   }
 )

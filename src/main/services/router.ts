@@ -17,15 +17,20 @@ type TraceClient = {
 const SYSTEM_PROMPT = `You are a query router for a document chat app. Output ONLY a JSON object, no explanation, no markdown.
 
 Rules:
-- scope "file": query names a specific document — use the file list to correct typos, set targetFile to the corrected path
-- scope "corpus": summary, overview, or generation covering many or all documents; default to corpus for open-ended questions and summaries
-- scope "rag": targeted question searching for specific information within documents
+- scope "file": a word or phrase in the query matches a specific document from the file list — match case-insensitively and ignore the file extension (e.g. "CLAUDE" matches "CLAUDE.md", "notes" matches "notes.pdf"); set targetFile to the EXACT relative path from the file list
+- scope "corpus": broad summary, overview, or generation across many or all documents; use corpus when no specific file is named
+- scope "rag": targeted question searching for specific information
 
-- task "podcast": /podcast command or user explicitly wants a podcast format
+- task "podcast": /podcast command or user explicitly wants a podcast
 - task "overview": user wants a summary or overview
 - task "chat": standard question and answer
 
-Output format (JSON only):
+Example:
+Query: "summarize CLAUDE"
+Available files: CLAUDE.md, notes.md
+Output: {"scope":"file","task":"overview","targetFile":"CLAUDE.md"}
+
+Output format (JSON only, no extra text):
 {"scope":"...","task":"...","targetFile":null}`
 
 export async function routeQuery(

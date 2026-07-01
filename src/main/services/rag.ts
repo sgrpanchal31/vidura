@@ -5,6 +5,7 @@ import { llamaService } from './inference'
 import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
 import { rerankerGgufService } from './reranker-gguf'
+import type { LangfuseParent } from './generate'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 30
@@ -191,12 +192,22 @@ export async function ragQuery(
   onToken: (token: string) => void,
   onProgress?: (p: ChatProgress) => void,
   sourceFileFilter?: string[],
-  task?: 'podcast' | 'overview'
+  task?: 'podcast' | 'overview',
+  externalTrace?: LangfuseParent | null
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
   const lf = getLangfuse()
-  const trace = lf?.trace({ name: 'rag-query', input: question })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'rag-query', input: { question } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'rag-query', input: question }) ?? null
+  }
 
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -275,7 +286,8 @@ export async function ragQuery(
     gen?.update({ output: answer })
     gen?.end()
     trace?.update({ output: answer })
-    lf?.flushAsync().catch(() => {})
+    pipelineSpan?.end()
+    if (!externalTrace) lf?.flushAsync().catch(() => {})
     return { answer, citations: [] }
   }
 
@@ -315,7 +327,8 @@ export async function ragQuery(
     .sort((a, b) => a.sourceNum - b.sourceNum)
 
   trace?.update({ output: answer })
-  lf?.flushAsync().catch(() => {})
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
 
   return { answer, citations }
 }
@@ -329,12 +342,22 @@ export async function ragSummarizeFile(
   modelId: string,
   history: HistoryMessage[],
   onToken: (token: string) => void,
-  onProgress?: (p: ChatProgress) => void
+  onProgress?: (p: ChatProgress) => void,
+  externalTrace?: LangfuseParent | null
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
   const lf = getLangfuse()
-  const trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'rag-summarize-file', input: { question, sourceFile } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } }) ?? null
+  }
 
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -350,7 +373,8 @@ export async function ragSummarizeFile(
 
   if (allChunks.length === 0) {
     trace?.update({ output: 'no_chunks_found' })
-    lf?.flushAsync().catch(() => {})
+    pipelineSpan?.end()
+    if (!externalTrace) lf?.flushAsync().catch(() => {})
     return { answer: "I couldn't find any content for that file.", citations: [] }
   }
 
@@ -391,7 +415,8 @@ export async function ragSummarizeFile(
     .sort((a, b) => a.sourceNum - b.sourceNum)
 
   trace?.update({ output: answer })
-  lf?.flushAsync().catch(() => {})
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
 
   return { answer, citations }
 }
