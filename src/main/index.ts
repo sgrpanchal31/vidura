@@ -269,6 +269,11 @@ ipcMain.handle(
       decision.targetFile = null
     }
 
+    // corpus/chat is a router mistake — map-reduce makes no sense for a Q&A question
+    if (decision.scope === 'corpus' && decision.task === 'chat') {
+      decision.scope = 'rag'
+    }
+
     // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
     const flushTrace = () => lf?.flushAsync().catch(() => {})
 

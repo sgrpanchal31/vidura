@@ -17,18 +17,26 @@ type TraceClient = {
 const SYSTEM_PROMPT = `You are a query router for a document chat app. Output ONLY a JSON object, no explanation, no markdown.
 
 Rules:
-- scope "file": a word or phrase in the query matches a specific document from the file list — match case-insensitively and ignore the file extension (e.g. "CLAUDE" matches "CLAUDE.md", "notes" matches "notes.pdf"); set targetFile to the EXACT relative path from the file list
-- scope "corpus": broad summary, overview, or generation across many or all documents; use corpus when no specific file is named
-- scope "rag": targeted question searching for specific information
+- scope "file": a word or phrase in the query names a specific document — match case-insensitively, ignore extension (e.g. "CLAUDE" matches "CLAUDE.md"); set targetFile to the EXACT relative path from the file list
+- scope "corpus": ONLY when the user explicitly asks to synthesize or summarize ALL or MOST documents (e.g. "give me an overview of everything", "summarize all my notes", "/podcast"); always pairs with task "overview" or "podcast", NEVER with task "chat"
+- scope "rag": DEFAULT for all Q&A and factual questions, even when no specific file is named; use whenever the user is asking a question rather than requesting broad synthesis across all documents
 
 - task "podcast": /podcast command or user explicitly wants a podcast
 - task "overview": user wants a summary or overview
 - task "chat": standard question and answer
 
-Example:
+Examples:
 Query: "summarize CLAUDE"
 Available files: CLAUDE.md, notes.md
 Output: {"scope":"file","task":"overview","targetFile":"CLAUDE.md"}
+
+Query: "what is the person currently doing"
+Available files: about/bio.md, about/working-style.md
+Output: {"scope":"rag","task":"chat","targetFile":null}
+
+Query: "give me an overview of all my notes"
+Available files: notes.md, journal.md
+Output: {"scope":"corpus","task":"overview","targetFile":null}
 
 Output format (JSON only, no extra text):
 {"scope":"...","task":"...","targetFile":null}`
