@@ -19,6 +19,8 @@ import { llamaService } from './services/inference'
 import { ragQuery, ragSummarizeFile } from './services/rag'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
+import { routeQuery } from './services/router'
+import { getLangfuse } from './services/telemetry'
 import { rerankerGgufService } from './services/reranker-gguf'
 import { folderWatcher } from './services/watcher'
 
@@ -229,32 +231,6 @@ ipcMain.handle('reranker:setEnabled', async (_event, enabled: boolean) => {
 
 // ── Chat / RAG ────────────────────────────────────────────────────────────────
 
-// Detect whether a question is a full-corpus generation task triggered by a slash command.
-// /podcast routes to map-reduce podcast generation; other slash commands can be added here.
-function detectGenerateIntent(question: string): { task: GenerateTask; format: GenerateFormat } | null {
-  const q = question.trimStart()
-  if (q.startsWith('/podcast')) return { task: 'podcast', format: 'prose' }
-  if (/\b(summarize|summarise|summary|overview)\b/i.test(q)) return { task: 'overview', format: 'prose' }
-  return null
-}
-
-// Check whether the question names a specific indexed file. Returns the matched
-// sourceFile path if found, null otherwise.
-async function findMatchedFile(question: string, folderPath: string): Promise<string | null> {
-  const dim = embedDim(DEFAULT_EMBED)
-  await vectorStore.open(folderPath, { dim })
-  const files = await vectorStore.listSourceFiles()
-  const q = question.toLowerCase()
-  for (const file of files) {
-    const name = (file.split('/').pop() ?? '')
-      .replace(/\.[^.]+$/, '')
-      .replace(/[-_]/g, ' ')
-      .toLowerCase()
-    if (name.length > 3 && q.includes(name)) return file
-  }
-  return null
-}
-
 ipcMain.handle(
   'chat:ask',
   async (
@@ -267,40 +243,79 @@ ipcMain.handle(
   ) => {
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
     const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
-
     const onChatProgress = (p: unknown) => mainWindow?.webContents.send('chat:progress', p)
 
-    // Tier 1 — specific file named: fetch all chunks for that file.
-    // Skip if the matched file was deselected by the user (fall through to filtered RAG).
-    const matchedFile = await findMatchedFile(question, folderPath)
-    if (matchedFile && (!selectedFiles || selectedFiles.includes(matchedFile))) {
-      ragSummarizeFile(question, matchedFile, folderPath, modelId, history, onToken, onChatProgress)
-        .then((result) => mainWindow?.webContents.send('chat:done', result))
-        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
-      return
+    // Create a top-level Langfuse trace for this chat:ask call.
+    // The route span (showing scope/task/targetFile/usedFallback) is attached inside routeQuery.
+    const lf = getLangfuse()
+    const trace = lf?.trace({ name: 'chat-ask', input: { question } })
+
+    const dim = embedDim(DEFAULT_EMBED)
+    await vectorStore.open(folderPath, { dim })
+    const availableFiles = await vectorStore.listSourceFiles()
+    const decision = await routeQuery(question, availableFiles, trace)
+
+    // Flush routing span immediately — pipeline fires async and creates its own trace
+    lf?.flushAsync().catch(() => {})
+
+    // If the router picked a specific file that the user has deselected, drop to rag
+    if (
+      decision.scope === 'file' &&
+      decision.targetFile &&
+      selectedFiles &&
+      !selectedFiles.includes(decision.targetFile)
+    ) {
+      decision.scope = 'rag'
+      decision.targetFile = null
     }
 
-    // Tier 2 — slash command: full-corpus map-reduce (/podcast, etc.)
-    const genIntent = detectGenerateIntent(question)
-    if (genIntent) {
+    if (decision.scope === 'file' && decision.task === 'chat') {
+      // Q&A about a specific named file
+      ragSummarizeFile(question, decision.targetFile!, folderPath, modelId, history, onToken, onChatProgress)
+        .then((result) => mainWindow?.webContents.send('chat:done', result))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+    } else if (decision.scope === 'file') {
+      // Podcast or overview about a single named file — map-reduce over just that file
       generateFromCorpus(
         folderPath,
         modelId,
-        genIntent.task,
-        genIntent.format,
+        decision.task as GenerateTask,
+        'prose',
+        onToken,
+        (p) => mainWindow?.webContents.send('generate:progress', p),
+        [decision.targetFile!]
+      )
+        .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
+    } else if (decision.scope === 'corpus') {
+      // Map-reduce over all/selected files
+      const task = decision.task === 'chat' ? 'overview' : decision.task
+      generateFromCorpus(
+        folderPath,
+        modelId,
+        task as GenerateTask,
+        'prose',
         onToken,
         (p) => mainWindow?.webContents.send('generate:progress', p),
         selectedFiles
       )
         .then((answer) => mainWindow?.webContents.send('chat:done', { answer, citations: [] }))
         .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
-      return
+    } else {
+      // RAG: targeted search, optionally with format synthesis (podcast/overview from retrieved chunks)
+      ragQuery(
+        question,
+        folderPath,
+        modelId,
+        history,
+        onToken,
+        onChatProgress,
+        selectedFiles,
+        decision.task === 'chat' ? undefined : decision.task
+      )
+        .then((result) => mainWindow?.webContents.send('chat:done', result))
+        .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
     }
-
-    // Tier 3 — RAG: partial/thematic queries, cross-file topics, follow-ups
-    ragQuery(question, folderPath, modelId, history, onToken, onChatProgress, selectedFiles)
-      .then((result) => mainWindow?.webContents.send('chat:done', result))
-      .catch((err) => mainWindow?.webContents.send('chat:error', String(err)))
   }
 )
 

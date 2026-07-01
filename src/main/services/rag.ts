@@ -62,6 +62,35 @@ function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
+function buildPodcastPrompt(parents: SearchResult[]): string {
+  const passages = parents
+    .map((c) => {
+      const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
+      return `${filename}:\n${c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)}`
+    })
+    .join('\n\n')
+  return `You are creating a podcast script from retrieved document passages.
+Combine the key ideas into a natural, engaging narrative as if a host is speaking to an audience.
+Do not use citation numbers or mention source filenames. Write in flowing spoken prose.
+
+Passages:
+${passages}`
+}
+
+function buildOverviewPrompt(parents: SearchResult[]): string {
+  const passages = parents
+    .map((c) => {
+      const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
+      return `${filename}:\n${c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)}`
+    })
+    .join('\n\n')
+  return `Write a clear, cohesive overview synthesizing the key ideas from these retrieved passages.
+Write in flowing prose. Do not use citation numbers or mention source filenames.
+
+Passages:
+${passages}`
+}
+
 function buildSystemPrompt(parents: SearchResult[], history: HistoryMessage[]): string {
   const sources = parents
     .map((c, i) => {
@@ -161,7 +190,8 @@ export async function ragQuery(
   history: HistoryMessage[],
   onToken: (token: string) => void,
   onProgress?: (p: ChatProgress) => void,
-  sourceFileFilter?: string[]
+  sourceFileFilter?: string[],
+  task?: 'podcast' | 'overview'
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
@@ -228,6 +258,27 @@ export async function ragQuery(
     })),
   })
   rerankSpan?.end()
+
+  // Format path: podcast/overview synthesis from retrieved chunks, no citations
+  if (task) {
+    const sysPrompt = task === 'podcast' ? buildPodcastPrompt(parents) : buildOverviewPrompt(parents)
+    onProgress?.({ stage: 'generating' })
+    const gen = trace?.generation({
+      name: 'llm',
+      model: modelId,
+      input: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: question },
+      ],
+    })
+    const answer = await llamaService.generateStream(sysPrompt, question, onToken)
+    gen?.update({ output: answer })
+    gen?.end()
+    trace?.update({ output: answer })
+    lf?.flushAsync().catch(() => {})
+    return { answer, citations: [] }
+  }
+
   const systemPrompt = buildSystemPrompt(parents, history)
 
   onProgress?.({ stage: 'generating' })
