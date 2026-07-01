@@ -106,7 +106,8 @@ export async function generateFromCorpus(
   onToken: (token: string) => void,
   onProgress?: (p: GenerateProgress) => void,
   allowedFiles?: string[], // relative paths; undefined = all files
-  externalTrace?: LangfuseParent | null
+  externalTrace?: LangfuseParent | null,
+  question?: string // original user question, prepended to the final synthesis prompt
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -206,7 +207,8 @@ export async function generateFromCorpus(
 
   // Final reduce — stream tokens to the caller
   onProgress?.({ stage: 'final', type: task })
-  const finalPrompt = reducePrompt(task, format, current[0])
+  const basePrompt = reducePrompt(task, format, current[0])
+  const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
   const finalGen = trace?.generation({
     name: 'final',
     model: modelId,

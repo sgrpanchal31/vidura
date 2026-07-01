@@ -256,17 +256,12 @@ ipcMain.handle(
     const decision = await routeQuery(question, availableFiles, trace)
 
     // Surface the routing decision on the trace so it's visible at the top level
-    trace?.update({ output: { scope: decision.scope, task: decision.task, targetFile: decision.targetFile } })
+    trace?.update({ output: { scope: decision.scope, task: decision.task, targetFiles: decision.targetFiles } })
 
-    // If the router picked a specific file that the user has deselected, drop to rag
-    if (
-      decision.scope === 'file' &&
-      decision.targetFile &&
-      selectedFiles &&
-      !selectedFiles.includes(decision.targetFile)
-    ) {
-      decision.scope = 'rag'
-      decision.targetFile = null
+    // If the router named specific files but any are deselected by the user, filter them out
+    if (decision.scope === 'file' && selectedFiles && decision.targetFiles.length > 0) {
+      decision.targetFiles = decision.targetFiles.filter((f) => selectedFiles.includes(f))
+      if (decision.targetFiles.length === 0) decision.scope = 'rag'
     }
 
     // corpus/chat is a router mistake — map-reduce makes no sense for a Q&A question
@@ -278,18 +273,50 @@ ipcMain.handle(
     const flushTrace = () => lf?.flushAsync().catch(() => {})
 
     if (decision.scope === 'file' && decision.task === 'chat') {
-      // Q&A about a specific named file
-      ragSummarizeFile(question, decision.targetFile!, folderPath, modelId, history, onToken, onChatProgress, trace)
-        .then((result) => {
-          mainWindow?.webContents.send('chat:done', result)
-          flushTrace()
-        })
-        .catch((err) => {
-          mainWindow?.webContents.send('chat:error', String(err))
-          flushTrace()
-        })
+      if (decision.targetFiles.length === 1) {
+        // Q&A about a single named file
+        ragSummarizeFile(
+          question,
+          decision.targetFiles[0],
+          folderPath,
+          modelId,
+          history,
+          onToken,
+          onChatProgress,
+          trace
+        )
+          .then((result) => {
+            mainWindow?.webContents.send('chat:done', result)
+            flushTrace()
+          })
+          .catch((err) => {
+            mainWindow?.webContents.send('chat:error', String(err))
+            flushTrace()
+          })
+      } else {
+        // Q&A about multiple named files — RAG with file filter
+        ragQuery(
+          question,
+          folderPath,
+          modelId,
+          history,
+          onToken,
+          onChatProgress,
+          decision.targetFiles.length > 0 ? decision.targetFiles : selectedFiles,
+          undefined,
+          trace
+        )
+          .then((result) => {
+            mainWindow?.webContents.send('chat:done', result)
+            flushTrace()
+          })
+          .catch((err) => {
+            mainWindow?.webContents.send('chat:error', String(err))
+            flushTrace()
+          })
+      }
     } else if (decision.scope === 'file') {
-      // Podcast or overview about a single named file — map-reduce over just that file
+      // Podcast or overview about one or more named files — map-reduce over just those files
       generateFromCorpus(
         folderPath,
         modelId,
@@ -297,8 +324,9 @@ ipcMain.handle(
         'prose',
         onToken,
         (p) => mainWindow?.webContents.send('generate:progress', p),
-        [decision.targetFile!],
-        trace
+        decision.targetFiles,
+        trace,
+        question
       )
         .then((answer) => {
           mainWindow?.webContents.send('chat:done', { answer, citations: [] })
@@ -319,7 +347,8 @@ ipcMain.handle(
         onToken,
         (p) => mainWindow?.webContents.send('generate:progress', p),
         selectedFiles,
-        trace
+        trace,
+        question
       )
         .then((answer) => {
           mainWindow?.webContents.send('chat:done', { answer, citations: [] })
