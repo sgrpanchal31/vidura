@@ -57,6 +57,7 @@
     "@lancedb/lancedb": "^0.27.2",
     "apache-arrow": "^18.1.0",
     "chokidar": "^3.6.0",
+    "kokoro-js": "^1.2.1",
     "langfuse": "^2.8.0",
     "node-llama-cpp": "^3.18.1",
     "pdfjs-dist": "^5.7.284",
