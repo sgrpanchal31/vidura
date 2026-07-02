@@ -48,11 +48,18 @@ export async function writeState(folderPath: string, state: NotebookState): Prom
 
 // ── Chat sessions ─────────────────────────────────────────────────────────────
 
+export type MessageAudio = {
+  file: string // relative to notebook folder, e.g. .openbook/audio/<session>-<message>.wav
+  durationSec: number
+  chapters: Array<{ title: string; startSec: number }>
+}
+
 export type PersistedMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
   citations: unknown[] // CitationEntry[] — typed on the renderer side, opaque here
+  audio?: MessageAudio // generated podcast audio, if any
 }
 
 export type ChatSession = {
@@ -114,6 +121,15 @@ export async function deleteChatSession(folderPath: string, sessionId: string): 
     await unlink(sessionPath(folderPath, sessionId))
   } catch {
     // already gone
+  }
+  // Best-effort cleanup of podcast audio generated for this session
+  try {
+    const audioDir = join(folderPath, OPENBOOK_DIR, 'audio')
+    for (const file of await readdir(audioDir)) {
+      if (file.startsWith(`${sessionId}-`)) await unlink(join(audioDir, file))
+    }
+  } catch {
+    // no audio dir or file already gone
   }
 }
 

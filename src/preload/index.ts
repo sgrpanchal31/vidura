@@ -91,6 +91,12 @@ export type CitationEntry = {
   chunk: SearchResult
 }
 
+export type MessageAudio = {
+  file: string // relative to notebook folder
+  durationSec: number
+  chapters: Array<{ title: string; startSec: number }>
+}
+
 export type ChatSession = {
   id: string
   createdAt: number
@@ -103,13 +109,27 @@ export type ChatSession = {
     role: 'user' | 'assistant'
     content: string
     citations: CitationEntry[]
+    audio?: MessageAudio
   }>
 }
 
 export type ChatResult = {
   answer: string
   citations: CitationEntry[]
+  // Present when this was a podcast task: main will follow up with podcast:progress
+  // events and attach audio to the message with this id via podcast:done
+  podcast?: { sessionId: string; messageId: string }
 }
+
+export type PodcastProgress = { sessionId: string; messageId: string } & (
+  | { stage: 'model_download'; loaded: number; total: number }
+  | { stage: 'loading' }
+  | { stage: 'synthesizing'; done: number; total: number }
+  | { stage: 'writing' }
+)
+
+export type PodcastDone = { sessionId: string; messageId: string; audio: MessageAudio }
+export type PodcastError = { sessionId: string; messageId: string; cancelled: boolean; error: string }
 
 const api = {
   // ── Folder + prefs ──────────────────────────────────────────────────────────
@@ -175,8 +195,9 @@ const api = {
     folderPath: string,
     modelId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
-    selectedFiles?: string[]
-  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history, selectedFiles),
+    selectedFiles?: string[],
+    sessionId?: string
+  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history, selectedFiles, sessionId),
   chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
   onChatProgress: (cb: (p: ChatProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ChatProgress) => cb(p)
@@ -240,6 +261,26 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, message: string) => cb(message)
     ipcRenderer.on('generate:error', handler)
     return () => ipcRenderer.off('generate:error', handler)
+  },
+
+  // ── Podcast audio ───────────────────────────────────────────────────────────
+  podcastCancel: (sessionId: string): Promise<void> => ipcRenderer.invoke('podcast:cancel', sessionId),
+  audioRead: (folderPath: string, relFile: string): Promise<Uint8Array> =>
+    ipcRenderer.invoke('audio:read', folderPath, relFile),
+  onPodcastProgress: (cb: (p: PodcastProgress) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastProgress) => cb(p)
+    ipcRenderer.on('podcast:progress', handler)
+    return () => ipcRenderer.off('podcast:progress', handler)
+  },
+  onPodcastDone: (cb: (p: PodcastDone) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastDone) => cb(p)
+    ipcRenderer.on('podcast:done', handler)
+    return () => ipcRenderer.off('podcast:done', handler)
+  },
+  onPodcastError: (cb: (p: PodcastError) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastError) => cb(p)
+    ipcRenderer.on('podcast:error', handler)
+    return () => ipcRenderer.off('podcast:error', handler)
   },
 }
 

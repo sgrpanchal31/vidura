@@ -4,6 +4,9 @@ import { mkdir, writeFile } from 'fs/promises'
 import os from 'os'
 import { parsePodcastScript } from './podcast-script'
 import { encodeWavPcm16, concatFloat32 } from './wav'
+import type { MessageAudio } from './state'
+
+export type { MessageAudio }
 
 // Voice assignment. af_heart is Kokoro's highest-quality voice (grade A);
 // am_fenrir is the most energetic male. Swap to am_michael if fenrir sounds off.
@@ -13,12 +16,6 @@ const VOICE_SOLO = 'af_heart'
 
 // Number of stderr lines to keep as a rolling tail for crash diagnostics
 const STDERR_TAIL = 20
-
-export type MessageAudio = {
-  file: string // relative to notebook folder, e.g. .openbook/audio/<session>-<message>.wav
-  durationSec: number
-  chapters: Array<{ title: string; startSec: number }>
-}
 
 export type TtsProgress =
   | { stage: 'model_download'; loaded: number; total: number }

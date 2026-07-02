@@ -23,6 +23,9 @@ import { routeQuery } from './services/router'
 import { getLangfuse } from './services/telemetry'
 import { rerankerGgufService } from './services/reranker-gguf'
 import { folderWatcher } from './services/watcher'
+import { ttsService, CancelledError, type MessageAudio } from './services/tts'
+import { readFile } from 'fs/promises'
+import { resolve as resolvePath } from 'path'
 
 let isBackgroundIndexing = false
 
@@ -239,7 +242,8 @@ ipcMain.handle(
     folderPath: string,
     modelId: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
-    selectedFiles?: string[] // relative paths; undefined = all files
+    selectedFiles?: string[], // relative paths; undefined = all files
+    sessionId?: string // needed for podcast audio file naming; optional for older callers
   ) => {
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
     const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
@@ -271,6 +275,19 @@ ipcMain.handle(
 
     // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
     const flushTrace = () => lf?.flushAsync().catch(() => {})
+
+    // Podcast tasks continue into TTS after the script is done; the renderer needs
+    // the message id main will use so it can attach the audio when podcast:done fires
+    const finishAnswer = (answer: string, citations: unknown[]) => {
+      if (decision.task === 'podcast' && sessionId) {
+        const messageId = `${Date.now()}-a`
+        mainWindow?.webContents.send('chat:done', { answer, citations, podcast: { sessionId, messageId } })
+        startPodcastAudio(folderPath, sessionId, messageId, answer)
+      } else {
+        mainWindow?.webContents.send('chat:done', { answer, citations })
+      }
+      flushTrace()
+    }
 
     if (decision.scope === 'file' && decision.task === 'chat') {
       if (decision.targetFiles.length === 1) {
@@ -328,10 +345,7 @@ ipcMain.handle(
         trace,
         question
       )
-        .then((answer) => {
-          mainWindow?.webContents.send('chat:done', { answer, citations: [] })
-          flushTrace()
-        })
+        .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
           mainWindow?.webContents.send('chat:error', String(err))
           flushTrace()
@@ -350,10 +364,7 @@ ipcMain.handle(
         trace,
         question
       )
-        .then((answer) => {
-          mainWindow?.webContents.send('chat:done', { answer, citations: [] })
-          flushTrace()
-        })
+        .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
           mainWindow?.webContents.send('chat:error', String(err))
           flushTrace()
@@ -371,10 +382,7 @@ ipcMain.handle(
         decision.task === 'chat' ? undefined : decision.task,
         trace
       )
-        .then((result) => {
-          mainWindow?.webContents.send('chat:done', result)
-          flushTrace()
-        })
+        .then((result) => finishAnswer(result.answer, result.citations))
         .catch((err) => {
           mainWindow?.webContents.send('chat:error', String(err))
           flushTrace()
@@ -382,6 +390,43 @@ ipcMain.handle(
     }
   }
 )
+
+// Fire-and-forget: renders the finished podcast script to a WAV in the notebook's
+// .openbook/audio dir. Always emits a terminal event (done or error) so the
+// renderer can clear its generating state.
+function startPodcastAudio(folderPath: string, sessionId: string, messageId: string, script: string): void {
+  ttsService
+    .synthesizePodcast({
+      script,
+      folderPath,
+      sessionId,
+      messageId,
+      onProgress: (p) => mainWindow?.webContents.send('podcast:progress', { sessionId, messageId, ...p }),
+    })
+    .then((audio: MessageAudio) => {
+      mainWindow?.webContents.send('podcast:done', { sessionId, messageId, audio })
+    })
+    .catch((err) => {
+      const cancelled = err instanceof CancelledError
+      mainWindow?.webContents.send('podcast:error', {
+        sessionId,
+        messageId,
+        cancelled,
+        error: cancelled ? '' : String(err),
+      })
+    })
+}
+
+ipcMain.handle('podcast:cancel', (_event, sessionId: string) => {
+  ttsService.cancel(sessionId)
+})
+
+ipcMain.handle('audio:read', async (_event, folderPath: string, relFile: string) => {
+  const audioDir = join(folderPath, '.openbook', 'audio')
+  const abs = resolvePath(folderPath, relFile)
+  if (!abs.startsWith(audioDir + '/')) throw new Error('Invalid audio path')
+  return readFile(abs)
+})
 
 ipcMain.handle('chat:cancel', () => {
   llamaService.cancel()
@@ -463,5 +508,6 @@ app.on('before-quit', () => {
   folderWatcher.stop()
   embedService.stop()
   rerankerGgufService.stop()
+  ttsService.stop()
   llamaService.dispose()
 })

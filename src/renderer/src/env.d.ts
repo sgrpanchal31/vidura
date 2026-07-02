@@ -16,6 +16,9 @@ import type {
   GenerateProgress,
   ChatProgress,
   ChatSession,
+  PodcastProgress,
+  PodcastDone,
+  PodcastError,
 } from '../../preload/index'
 
 declare global {
@@ -58,7 +61,8 @@ declare global {
         folderPath: string,
         modelId: string,
         history?: Array<{ role: 'user' | 'assistant'; content: string }>,
-        selectedFiles?: string[]
+        selectedFiles?: string[],
+        sessionId?: string
       ) => Promise<void>
       chatCancel: () => Promise<void>
       onChatToken: (cb: (token: string) => void) => () => void
@@ -87,6 +91,12 @@ declare global {
       onGenerateToken: (cb: (token: string) => void) => () => void
       onGenerateDone: (cb: (result: string) => void) => () => void
       onGenerateError: (cb: (message: string) => void) => () => void
+
+      podcastCancel: (sessionId: string) => Promise<void>
+      audioRead: (folderPath: string, relFile: string) => Promise<Uint8Array>
+      onPodcastProgress: (cb: (p: PodcastProgress) => void) => () => void
+      onPodcastDone: (cb: (p: PodcastDone) => void) => () => void
+      onPodcastError: (cb: (p: PodcastError) => void) => () => void
     }
   }
 }
