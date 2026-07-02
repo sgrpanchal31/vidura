@@ -7,6 +7,7 @@ import { parseText } from './ingest/text'
 import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
 import { getLangfuse } from './telemetry'
+import { PODCAST_SCRIPT_RULES } from './podcast-script'
 
 // Structural type — LangfuseTraceClient and LangfuseSpanClient both satisfy this
 export type LangfuseParent = {
@@ -58,7 +59,8 @@ function reducePrompt(task: GenerateTask, format: GenerateFormat, intermediates:
 
   const taskHint: Record<GenerateTask, string> = {
     overview: 'Synthesize the following document summaries into a single cohesive overview.',
-    podcast: 'Combine the following talking points into a natural podcast script with a host narrating key ideas.',
+    podcast:
+      'Combine the following talking points into a single organized list of the best talking points for a podcast.',
     facts: 'Combine and deduplicate the following facts into a final list.',
   }
 
@@ -205,9 +207,13 @@ export async function generateFromCorpus(
     reduceRound++
   }
 
-  // Final reduce — stream tokens to the caller
+  // Final reduce — stream tokens to the caller. Podcast gets the script-format
+  // rules here (not in intermediate reduces, which merge material only).
   onProgress?.({ stage: 'final', type: task })
-  const basePrompt = reducePrompt(task, format, current[0])
+  const basePrompt =
+    task === 'podcast'
+      ? `Turn the following talking points into an engaging podcast conversation.\n${PODCAST_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+      : reducePrompt(task, format, current[0])
   const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
   const finalGen = trace?.generation({
     name: 'final',

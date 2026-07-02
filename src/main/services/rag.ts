@@ -6,6 +6,7 @@ import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
 import { rerankerGgufService } from './reranker-gguf'
 import type { LangfuseParent } from './generate'
+import { PODCAST_SCRIPT_RULES } from './podcast-script'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 30
@@ -71,8 +72,8 @@ function buildPodcastPrompt(parents: SearchResult[]): string {
     })
     .join('\n\n')
   return `You are creating a podcast script from retrieved document passages.
-Combine the key ideas into a natural, engaging narrative as if a host is speaking to an audience.
-Do not use citation numbers or mention source filenames. Write in flowing spoken prose.
+Turn the key ideas into an engaging podcast conversation.
+${PODCAST_SCRIPT_RULES}
 
 Passages:
 ${passages}`
