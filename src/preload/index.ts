@@ -97,6 +97,7 @@ export type ChatSession = {
   updatedAt: number
   title: string
   type?: 'chat' | 'podcast'
+  selectedFiles?: string[]
   messages: Array<{
     id: string
     role: 'user' | 'assistant'
@@ -173,8 +174,9 @@ const api = {
     question: string,
     folderPath: string,
     modelId: string,
-    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history),
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    selectedFiles?: string[]
+  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history, selectedFiles),
   chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
   onChatProgress: (cb: (p: ChatProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ChatProgress) => cb(p)
@@ -211,8 +213,13 @@ const api = {
 
   // ── Generation (map-reduce over full corpus) ─────────────────────────────
   // generateRun resolves immediately; tokens arrive via onGenerateToken, completion via onGenerateDone
-  generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat): Promise<void> =>
-    ipcRenderer.invoke('generate:run', folderPath, modelId, task, format),
+  generateRun: (
+    folderPath: string,
+    modelId: string,
+    task: GenerateTask,
+    format: GenerateFormat,
+    selectedFiles?: string[]
+  ): Promise<void> => ipcRenderer.invoke('generate:run', folderPath, modelId, task, format, selectedFiles),
   generateCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'), // reuses the same LlamaService cancel
   onGenerateProgress: (cb: (p: GenerateProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: GenerateProgress) => cb(p)

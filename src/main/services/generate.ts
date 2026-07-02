@@ -8,6 +8,12 @@ import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
 import { getLangfuse } from './telemetry'
 
+// Structural type — LangfuseTraceClient and LangfuseSpanClient both satisfy this
+export type LangfuseParent = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  span(opts: { name: string; input?: unknown }): any
+}
+
 export type GenerateTask = 'overview' | 'podcast' | 'facts'
 export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
 export type GenerateProgress = { stage: 'map' } | { stage: 'reduce' } | { stage: 'final'; type: GenerateTask }
@@ -98,13 +104,17 @@ export async function generateFromCorpus(
   task: GenerateTask,
   format: GenerateFormat,
   onToken: (token: string) => void,
-  onProgress?: (p: GenerateProgress) => void
+  onProgress?: (p: GenerateProgress) => void,
+  allowedFiles?: string[], // relative paths; undefined = all files
+  externalTrace?: LangfuseParent | null,
+  question?: string // original user question, prepended to the final synthesis prompt
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
-  const { files } = await scanFolder(folderPath)
+  const { files: allFiles } = await scanFolder(folderPath)
+  const files = allowedFiles ? allFiles.filter((f) => allowedFiles.includes(relative(folderPath, f.path))) : allFiles
   if (files.length === 0) {
     const msg = 'No documents found in this notebook.'
     onToken(msg)
@@ -112,7 +122,18 @@ export async function generateFromCorpus(
   }
 
   const lf = getLangfuse()
-  const trace = lf?.trace({ name: 'generate-corpus', input: { task, format, fileCount: files.length } })
+  // If a parent trace is provided (chat-ask flow), attach as a child span.
+  // Otherwise create a standalone trace (direct generate:run calls from Podcast tile).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'generate-corpus', input: { task, format, fileCount: files.length } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'generate-corpus', input: { task, format, fileCount: files.length } }) ?? null
+  }
 
   // Map phase: summarize each document sequentially
   const intermediates: string[] = []
@@ -129,7 +150,14 @@ export async function generateFromCorpus(
 
     onProgress?.({ stage: 'map' })
     const prompt = mapPrompt(task, format, `[${relPath}]\n${docText}`)
-    const mapGen = trace?.generation({ name: `map:${relPath}`, model: modelId, input: relPath })
+    const mapGen = trace?.generation({
+      name: `map:${relPath}`,
+      model: modelId,
+      input: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+    })
     // Silent map calls — tokens only stream during the final reduce
     const summary = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
     mapGen?.update({ output: summary.slice(0, 200) })
@@ -163,7 +191,10 @@ export async function generateFromCorpus(
       const reduceGen = trace?.generation({
         name: `reduce:r${reduceRound}:b${Math.floor(i / REDUCE_BATCH_SIZE)}`,
         model: modelId,
-        input: `${batch.length} summaries`,
+        input: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
       })
       const merged = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
       reduceGen?.update({ output: merged.slice(0, 200) })
@@ -176,12 +207,21 @@ export async function generateFromCorpus(
 
   // Final reduce — stream tokens to the caller
   onProgress?.({ stage: 'final', type: task })
-  const finalPrompt = reducePrompt(task, format, current[0])
-  const finalGen = trace?.generation({ name: 'final', model: modelId, input: 'final synthesis' })
+  const basePrompt = reducePrompt(task, format, current[0])
+  const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
+  const finalGen = trace?.generation({
+    name: 'final',
+    model: modelId,
+    input: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: finalPrompt },
+    ],
+  })
   const result = await llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
   finalGen?.update({ output: result.slice(0, 200) })
   finalGen?.end()
   trace?.update({ output: 'completed' })
-  lf?.flushAsync().catch(() => {})
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
   return result
 }

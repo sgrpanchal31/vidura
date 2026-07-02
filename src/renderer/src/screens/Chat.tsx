@@ -37,6 +37,7 @@ type GeneratingSnapshot = {
   createdAt: number
   type: 'chat' | 'podcast'
   messages: Message[]
+  selectedFiles: string[] | undefined
 }
 
 type ChatProps = {
@@ -109,6 +110,15 @@ function collectDirPaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<s
   return out
 }
 
+function collectLeafPaths(nodes: TreeNode[]): string[] {
+  const paths: string[] = []
+  for (const n of nodes) {
+    if (n.type === 'file') paths.push(n.item.relativePath)
+    else paths.push(...collectLeafPaths(n.children))
+  }
+  return paths
+}
+
 function buildTree(sources: SourceItem[]): TreeNode[] {
   const root: TreeNode[] = []
   for (const source of sources) {
@@ -146,10 +156,14 @@ function renderTree(
   nodes: TreeNode[],
   level: number,
   collapsed: Set<string>,
-  onToggle: (path: string) => void
+  onToggleFolderExpand: (path: string) => void,
+  isSelected: (path: string) => boolean,
+  onToggleFile: (path: string) => void,
+  onToggleFolderSelection: (children: TreeNode[]) => void
 ): React.ReactNode {
   return nodes.map((node) => {
     if (node.type === 'file') {
+      const checked = isSelected(node.item.relativePath)
       return (
         <div
           key={node.item.relativePath}
@@ -157,21 +171,53 @@ function renderTree(
           style={{ paddingLeft: `${16 + level * 14}px` }}
           title={node.item.relativePath}
         >
+          <input
+            type="checkbox"
+            className="source-check"
+            checked={checked}
+            onChange={() => onToggleFile(node.item.relativePath)}
+          />
           <span className="source-icon">{node.item.ext}</span>
           <span className="source-name">{node.item.filename}</span>
         </div>
       )
     }
     const isCollapsed = collapsed.has(node.path)
+    const leaves = collectLeafPaths(node.children)
+    const selectedCount = leaves.filter((p) => isSelected(p)).length
+    const dirState = selectedCount === 0 ? 'none' : selectedCount === leaves.length ? 'all' : 'some'
     return (
       <div key={node.path}>
-        <div className="source-dir" style={{ paddingLeft: `${16 + level * 14}px` }} onClick={() => onToggle(node.path)}>
+        <div
+          className="source-dir"
+          style={{ paddingLeft: `${16 + level * 14}px` }}
+          onClick={() => onToggleFolderExpand(node.path)}
+        >
+          <input
+            type="checkbox"
+            className="source-check"
+            checked={dirState !== 'none'}
+            ref={(el) => {
+              if (el) el.indeterminate = dirState === 'some'
+            }}
+            onChange={() => onToggleFolderSelection(node.children)}
+            onClick={(e) => e.stopPropagation()}
+          />
           <span className="source-dir-chevron" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
             ▶
           </span>
           <span className="source-dir-name">{node.name}</span>
         </div>
-        {!isCollapsed && renderTree(node.children, level + 1, collapsed, onToggle)}
+        {!isCollapsed &&
+          renderTree(
+            node.children,
+            level + 1,
+            collapsed,
+            onToggleFolderExpand,
+            isSelected,
+            onToggleFile,
+            onToggleFolderSelection
+          )}
       </div>
     )
   })
@@ -330,6 +376,9 @@ export default function Chat({
   const [currentSessionType, setCurrentSessionType] = useState<'chat' | 'podcast'>('chat')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [generatingSessionId, setGeneratingSessionId] = useState<string | null>(null)
+  // null = all files selected; Set = explicit subset of relative paths
+  const [selectedFiles, setSelectedFiles] = useState<Set<string> | null>(null)
+  const [showNoFilesToast, setShowNoFilesToast] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -344,6 +393,9 @@ export default function Chat({
   const waitToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const newChatDraftRef = useRef<string>('')
   const newPodcastDraftRef = useRef<string>('')
+  const noFilesToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // tracks previous source paths to detect newly added files
+  const prevSourcePathsRef = useRef<Set<string>>(new Set())
 
   const folderName = folder.split('/').pop() ?? folder
   const modelLabel = MODEL_LABELS[modelId] ?? modelId
@@ -398,6 +450,23 @@ export default function Chat({
     return unsub
   }, [folder])
 
+  // When sources update and we have an explicit selection, auto-add any new files.
+  useEffect(() => {
+    const currentPaths = new Set(sources.map((s) => s.relativePath))
+    if (selectedFiles !== null) {
+      const newPaths = sources.map((s) => s.relativePath).filter((p) => !prevSourcePathsRef.current.has(p))
+      if (newPaths.length > 0) {
+        setSelectedFiles((prev) => {
+          if (prev === null) return null
+          const next = new Set(prev)
+          newPaths.forEach((p) => next.add(p))
+          return next.size === sources.length ? null : next
+        })
+      }
+    }
+    prevSourcePathsRef.current = currentPaths
+  }, [sources])
+
   // Load sessions list and restore the last active session (or fall back to newest) on mount
   useEffect(() => {
     loadSessionsList()
@@ -410,6 +479,7 @@ export default function Chat({
               setSessionId(session.id)
               setSessionCreatedAt(session.createdAt)
               setCurrentSessionType(session.type ?? 'chat')
+              setSelectedFiles(session.selectedFiles ? new Set(session.selectedFiles) : null)
               setSessionLoaded(true)
             } else if (list[0] && list[0].id !== targetId) {
               // initialSessionId had no messages — fall back to newest
@@ -419,6 +489,7 @@ export default function Chat({
                   setSessionId(s.id)
                   setSessionCreatedAt(s.createdAt)
                   setCurrentSessionType(s.type ?? 'chat')
+                  setSelectedFiles(s.selectedFiles ? new Set(s.selectedFiles) : null)
                 } else {
                   setSessionId(newSessionId())
                 }
@@ -467,9 +538,10 @@ export default function Chat({
       updatedAt: Date.now(),
       title,
       type: currentSessionType,
+      selectedFiles: selectedFiles === null ? undefined : Array.from(selectedFiles),
       messages,
     })
-  }, [messages, sessionLoaded, sessionId, currentSessionType])
+  }, [messages, selectedFiles, sessionLoaded, sessionId, currentSessionType])
 
   useEffect(() => {
     const el = messagesListRef.current
@@ -485,6 +557,36 @@ export default function Chat({
       else next.add(path)
       return next
     })
+  }
+
+  function toggleFile(relativePath: string) {
+    setSelectedFiles((prev) => {
+      const current = prev !== null ? prev : new Set(sources.map((s) => s.relativePath))
+      const next = new Set(current)
+      if (next.has(relativePath)) next.delete(relativePath)
+      else next.add(relativePath)
+      return next.size === sources.length ? null : next
+    })
+  }
+
+  function toggleFolderSelection(children: TreeNode[]) {
+    const leaves = collectLeafPaths(children)
+    setSelectedFiles((prev) => {
+      const current = prev !== null ? prev : new Set(sources.map((s) => s.relativePath))
+      const allInFolder = leaves.every((p) => current.has(p))
+      const next = new Set(current)
+      if (allInFolder) leaves.forEach((p) => next.delete(p))
+      else leaves.forEach((p) => next.add(p))
+      return next.size === sources.length ? null : next
+    })
+  }
+
+  function toggleAll() {
+    if (selectedFiles === null || selectedFiles.size === sources.length) {
+      setSelectedFiles(new Set())
+    } else {
+      setSelectedFiles(null)
+    }
   }
 
   function resetViewToBlank() {
@@ -533,6 +635,7 @@ export default function Chat({
     setSessionId(newSid)
     setSessionCreatedAt(Date.now())
     setCurrentSessionType('chat')
+    setSelectedFiles(null)
     if (isGenerating) {
       resetViewToBlank()
       setInput(newChatDraftRef.current)
@@ -571,6 +674,7 @@ export default function Chat({
     setSessionId(newSid)
     setSessionCreatedAt(Date.now())
     setCurrentSessionType('podcast')
+    setSelectedFiles(null)
     const podcastInput = newPodcastDraftRef.current || '/podcast Create a podcast script from my documents'
     if (isGenerating) {
       resetViewToBlank()
@@ -605,6 +709,7 @@ export default function Chat({
     setSessionId(session.id)
     setSessionCreatedAt(session.createdAt)
     setCurrentSessionType(session.type ?? 'chat')
+    setSelectedFiles(session.selectedFiles ? new Set(session.selectedFiles) : null)
     setStreamBuffer('')
     setGenerateStatus('')
     setActiveCitation(null)
@@ -633,6 +738,12 @@ export default function Chat({
 
   async function handleSend(text: string) {
     if (!text.trim()) return
+    if (selectedFiles !== null && selectedFiles.size === 0) {
+      if (noFilesToastTimerRef.current) clearTimeout(noFilesToastTimerRef.current)
+      setShowNoFilesToast(true)
+      noFilesToastTimerRef.current = setTimeout(() => setShowNoFilesToast(false), 2500)
+      return
+    }
     if (isGenerating) {
       if (generatingSessionId !== sessionId) {
         if (waitToastTimerRef.current) clearTimeout(waitToastTimerRef.current)
@@ -683,6 +794,7 @@ export default function Chat({
       createdAt: sessionCreatedAt,
       type: currentSessionType,
       messages: messagesWithUser,
+      selectedFiles: selectedFiles === null ? undefined : Array.from(selectedFiles),
     }
     setStreamBuffer('')
     setGenerateStatus('')
@@ -732,6 +844,7 @@ export default function Chat({
           updatedAt: Date.now(),
           title,
           type: snapshot.type,
+          selectedFiles: snapshot.selectedFiles,
           messages: [...snapshot.messages, assistantMsg],
         })
       }
@@ -770,6 +883,7 @@ export default function Chat({
           updatedAt: Date.now(),
           title,
           type: snapshot.type,
+          selectedFiles: snapshot.selectedFiles,
           messages: [...snapshot.messages, errorMsg],
         })
       }
@@ -794,7 +908,8 @@ export default function Chat({
     unsubsRef.current = [unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
-    await window.api.chatAsk(text.trim(), folder, modelId, history)
+    const fileFilter = selectedFiles === null ? undefined : Array.from(selectedFiles)
+    await window.api.chatAsk(text.trim(), folder, modelId, history, fileFilter)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -986,6 +1101,7 @@ export default function Chat({
             {showWaitToast && (
               <div className="wait-toast">Another chat is generating. You can send once it finishes.</div>
             )}
+            {showNoFilesToast && <div className="wait-toast">Select at least one file to continue.</div>}
             <div className="composer-inner">
               <textarea
                 ref={textareaRef}
@@ -1009,10 +1125,41 @@ export default function Chat({
 
         {/* Sources panel — now on the right */}
         <div className="sources-panel">
-          <div className="sources-header">Sources{sources.length > 0 ? ` · ${sources.length}` : ''}</div>
+          <div className="sources-header">
+            {sources.length > 0 && (
+              <input
+                type="checkbox"
+                className="source-check"
+                checked={selectedFiles === null || selectedFiles.size === sources.length}
+                ref={(el) => {
+                  if (el) {
+                    const allSelected = selectedFiles === null || selectedFiles.size === sources.length
+                    const noneSelected = selectedFiles !== null && selectedFiles.size === 0
+                    el.indeterminate = !allSelected && !noneSelected
+                    el.checked = allSelected
+                  }
+                }}
+                onChange={toggleAll}
+              />
+            )}
+            <span>Sources</span>
+            {sources.length > 0 && (
+              <span className="sources-count">
+                {selectedFiles === null ? sources.length : `${selectedFiles.size} / ${sources.length}`}
+              </span>
+            )}
+          </div>
           {isReindexing && <div className="sources-progress" />}
           <div className={isReindexing ? 'sources-list reindexing' : 'sources-list'}>
-            {renderTree(tree, 0, collapsedDirs, toggleDir)}
+            {renderTree(
+              tree,
+              0,
+              collapsedDirs,
+              toggleDir,
+              (path) => selectedFiles === null || selectedFiles.has(path),
+              toggleFile,
+              toggleFolderSelection
+            )}
           </div>
         </div>
       </div>
