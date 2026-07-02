@@ -1,0 +1,97 @@
+.audio-player {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--cream-d);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-width: 480px;
+}
+
+.audio-player--error {
+  font-size: 13px;
+  color: var(--slate);
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.audio-play-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--ox);
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.audio-play-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.audio-time {
+  flex-shrink: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--slate);
+  min-width: 76px;
+}
+
+.audio-scrubber {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--ox);
+  cursor: pointer;
+}
+
+.audio-speed-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--line-m);
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  padding: 3px 7px;
+  cursor: pointer;
+  min-width: 42px;
+}
+
+.audio-speed-btn:hover {
+  background: var(--cream-dd);
+}
+
+.audio-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.audio-chapter {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: none;
+  color: var(--slate);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.audio-chapter:hover {
+  border-color: var(--line-m);
+  color: var(--ink);
+}
+
+.audio-chapter--active {
+  border-color: var(--ox);
+  color: var(--ox);
+}

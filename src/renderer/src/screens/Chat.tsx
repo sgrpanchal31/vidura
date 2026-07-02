@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './Chat.css'
-import type { CitationEntry, NotebookState } from '../../../preload'
+import type { CitationEntry, NotebookState, MessageAudio } from '../../../preload'
+import AudioPlayer from '../components/AudioPlayer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ type Message = {
   role: 'user' | 'assistant'
   content: string
   citations: CitationEntry[]
+  audio?: MessageAudio
 }
 
 type SourceItem = {
@@ -50,6 +52,8 @@ type ChatProps = {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const PODCAST_PREFILL = '/podcast Create a podcast where two hosts discuss my documents.\nLength: about 5 minutes.'
 
 const MODEL_LABELS: Record<string, string> = {
   'gemma4-e2b': 'Gemma 4 E2B',
@@ -379,6 +383,11 @@ export default function Chat({
   // null = all files selected; Set = explicit subset of relative paths
   const [selectedFiles, setSelectedFiles] = useState<Set<string> | null>(null)
   const [showNoFilesToast, setShowNoFilesToast] = useState(false)
+  // Set while podcast audio is rendering (after the script is done); at most one
+  // job exists at a time because generation is serialized end to end
+  const [audioPhase, setAudioPhase] = useState<{ sessionId: string; messageId: string } | null>(null)
+  // Message id to show a transient "audio failed" note under (not persisted)
+  const [audioErrorMsgId, setAudioErrorMsgId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -448,6 +457,53 @@ export default function Chat({
       if (!active) refreshSources()
     })
     return unsub
+  }, [folder])
+
+  // Podcast audio events arrive minutes after chat:done, so they are subscribed
+  // for the component's lifetime rather than per-send (unsubsRef dies at chat:done)
+  useEffect(() => {
+    const clearGenerating = () => {
+      setAudioPhase(null)
+      generatingSessionIdRef.current = null
+      generatingSnapshotRef.current = null
+      setGeneratingSessionId(null)
+      setIsGenerating(false)
+      setGenerateStatus('')
+    }
+    const unsubProgress = window.api.onPodcastProgress((p) => {
+      setAudioPhase({ sessionId: p.sessionId, messageId: p.messageId })
+      if (p.stage === 'model_download')
+        setGenerateStatus(`Downloading voice model... ${Math.round((p.loaded / p.total) * 100)}%`)
+      else if (p.stage === 'loading') setGenerateStatus('Loading voice model...')
+      else if (p.stage === 'synthesizing') setGenerateStatus(`Creating audio... ${p.done}/${p.total}`)
+      else setGenerateStatus('Saving audio...')
+    })
+    const unsubDone = window.api.onPodcastDone(({ sessionId: sid, messageId, audio }) => {
+      if (currentSessionIdRef.current === sid) {
+        // Viewing the session — the save effect persists the patched message
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, audio } : m)))
+      } else if (!deletedSessionIdsRef.current.has(sid)) {
+        // Navigated away — patch the session on disk directly
+        window.api
+          .chatSessionLoad(folder, sid)
+          .then((session) => {
+            if (!session) return
+            const patched = session.messages.map((m) => (m.id === messageId ? { ...m, audio } : m))
+            return window.api.chatSessionSave(folder, { ...session, updatedAt: Date.now(), messages: patched })
+          })
+          .catch(() => {})
+      }
+      clearGenerating()
+    })
+    const unsubError = window.api.onPodcastError((p) => {
+      if (!p.cancelled && currentSessionIdRef.current === p.sessionId) setAudioErrorMsgId(p.messageId)
+      clearGenerating()
+    })
+    return () => {
+      unsubProgress()
+      unsubDone()
+      unsubError()
+    }
   }, [folder])
 
   // When sources update and we have an explicit selection, auto-add any new files.
@@ -654,7 +710,7 @@ export default function Chat({
     // Switching type on a blank session: swap drafts, don't create new session ID
     if (messages.length === 0 && currentSessionType === 'chat') {
       newChatDraftRef.current = input
-      const restored = newPodcastDraftRef.current || '/podcast Create a podcast script from my documents'
+      const restored = newPodcastDraftRef.current || PODCAST_PREFILL
       setCurrentSessionType('podcast')
       setInput(restored)
       setTimeout(() => {
@@ -675,7 +731,7 @@ export default function Chat({
     setSessionCreatedAt(Date.now())
     setCurrentSessionType('podcast')
     setSelectedFiles(null)
-    const podcastInput = newPodcastDraftRef.current || '/podcast Create a podcast script from my documents'
+    const podcastInput = newPodcastDraftRef.current || PODCAST_PREFILL
     if (isGenerating) {
       resetViewToBlank()
       setInput(podcastInput)
@@ -713,6 +769,7 @@ export default function Chat({
     setStreamBuffer('')
     setGenerateStatus('')
     setActiveCitation(null)
+    setAudioErrorMsgId(null)
     const restored = draftRef.current.get(sid) ?? ''
     setInput(restored)
     setConfirmDeleteId(null)
@@ -799,6 +856,7 @@ export default function Chat({
     setStreamBuffer('')
     setGenerateStatus('')
     setActiveCitation(null)
+    setAudioErrorMsgId(null)
 
     const unsubChatProgress = window.api.onChatProgress((p) => {
       if (p.stage === 'reading') setGenerateStatus('Reading documents...')
@@ -820,7 +878,8 @@ export default function Chat({
     const unsubDone = window.api.onChatDone((result) => {
       const snapshot = generatingSnapshotRef.current
       const assistantMsg: Message = {
-        id: `${Date.now()}-a`,
+        // Podcast tasks: main minted the id so podcast:done can find this message later
+        id: result.podcast?.messageId ?? `${Date.now()}-a`,
         role: 'assistant',
         content: result.answer,
         citations: result.citations as CitationEntry[],
@@ -849,12 +908,22 @@ export default function Chat({
         })
       }
 
-      generatingSessionIdRef.current = null
-      generatingSnapshotRef.current = null
-      setGeneratingSessionId(null)
-      setStreamBuffer('')
-      setGenerateStatus('')
-      setIsGenerating(false)
+      if (result.podcast) {
+        // Script done but audio still rendering: keep the generation lifecycle
+        // alive (send stays blocked, sidebar dot stays on) until podcast:done/error.
+        // The snapshot is no longer needed — the message is persisted above.
+        generatingSnapshotRef.current = null
+        setAudioPhase({ sessionId: result.podcast.sessionId, messageId: result.podcast.messageId })
+        setStreamBuffer('')
+        setGenerateStatus('Preparing audio...')
+      } else {
+        generatingSessionIdRef.current = null
+        generatingSnapshotRef.current = null
+        setGeneratingSessionId(null)
+        setStreamBuffer('')
+        setGenerateStatus('')
+        setIsGenerating(false)
+      }
       cleanup()
       loadSessionsList().catch(() => {})
     })
@@ -909,7 +978,7 @@ export default function Chat({
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
     const fileFilter = selectedFiles === null ? undefined : Array.from(selectedFiles)
-    await window.api.chatAsk(text.trim(), folder, modelId, history, fileFilter)
+    await window.api.chatAsk(text.trim(), folder, modelId, history, fileFilter, sessionId!)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -1053,6 +1122,10 @@ export default function Chat({
                     {msg.role === 'user'
                       ? msg.content
                       : renderMarkdown(msg.content, msg.citations, handleCitationEnter, handleCitationLeave)}
+                    {msg.audio && <AudioPlayer folder={folder} audio={msg.audio} />}
+                    {audioErrorMsgId === msg.id && (
+                      <div className="audio-error-note">Audio generation failed. Your script is saved.</div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1113,7 +1186,13 @@ export default function Chat({
                 rows={1}
               />
               {isCurrentSessionGenerating ? (
-                <button className="composer-cancel" onClick={() => window.api.chatCancel()}>
+                <button
+                  className="composer-cancel"
+                  onClick={() =>
+                    // During the audio phase Stop cancels TTS; during the script phase it cancels the LLM
+                    audioPhase ? window.api.podcastCancel(audioPhase.sessionId) : window.api.chatCancel()
+                  }
+                >
                   Stop
                 </button>
               ) : (
