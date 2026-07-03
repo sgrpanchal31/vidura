@@ -1,8 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+export type PodcastVoices = { hostA: string; hostB: string; solo: string }
+
 export type Prefs = {
   lastFolder: string | null
   modelId: string | null
+  rerankerEnabled: boolean
+  ttsEngine: string | null
+  podcastVoices: PodcastVoices | null
 }
 
 export type LlmModelInfo = {
@@ -91,24 +96,48 @@ export type CitationEntry = {
   chunk: SearchResult
 }
 
+export type MessageAudio = {
+  file: string // relative to notebook folder
+  durationSec: number
+  chapters: Array<{ title: string; startSec: number }>
+}
+
 export type ChatSession = {
   id: string
   createdAt: number
   updatedAt: number
   title: string
   type?: 'chat' | 'podcast'
+  selectedFiles?: string[]
   messages: Array<{
     id: string
     role: 'user' | 'assistant'
     content: string
     citations: CitationEntry[]
+    audio?: MessageAudio
   }>
 }
 
 export type ChatResult = {
   answer: string
   citations: CitationEntry[]
+  // Present when this was a podcast task: main will follow up with podcast:progress
+  // events and attach audio to the message with this id via podcast:done
+  podcast?: { sessionId: string; messageId: string }
 }
+
+export type PodcastProgress = { sessionId: string; messageId: string } & (
+  | { stage: 'model_download'; loaded: number; total: number }
+  | { stage: 'loading' }
+  | { stage: 'synthesizing'; done: number; total: number }
+  | { stage: 'writing' }
+)
+
+export type PodcastDone = { sessionId: string; messageId: string; audio: MessageAudio }
+export type PodcastError = { sessionId: string; messageId: string; cancelled: boolean; error: string }
+
+// Sent once per chat:ask as soon as the router has classified the query
+export type ChatRouted = { task: 'chat' | 'podcast' | 'overview' }
 
 const api = {
   // ── Folder + prefs ──────────────────────────────────────────────────────────
@@ -173,8 +202,10 @@ const api = {
     question: string,
     folderPath: string,
     modelId: string,
-    history: Array<{ role: 'user' | 'assistant'; content: string }> = []
-  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history),
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    selectedFiles?: string[],
+    sessionId?: string
+  ): Promise<void> => ipcRenderer.invoke('chat:ask', question, folderPath, modelId, history, selectedFiles, sessionId),
   chatCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'),
   onChatProgress: (cb: (p: ChatProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ChatProgress) => cb(p)
@@ -185,6 +216,11 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('chat:token', handler)
     return () => ipcRenderer.off('chat:token', handler)
+  },
+  onChatRouted: (cb: (r: ChatRouted) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, r: ChatRouted) => cb(r)
+    ipcRenderer.on('chat:routed', handler)
+    return () => ipcRenderer.off('chat:routed', handler)
   },
   onChatDone: (cb: (result: ChatResult) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, result: ChatResult) => cb(result)
@@ -211,8 +247,13 @@ const api = {
 
   // ── Generation (map-reduce over full corpus) ─────────────────────────────
   // generateRun resolves immediately; tokens arrive via onGenerateToken, completion via onGenerateDone
-  generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat): Promise<void> =>
-    ipcRenderer.invoke('generate:run', folderPath, modelId, task, format),
+  generateRun: (
+    folderPath: string,
+    modelId: string,
+    task: GenerateTask,
+    format: GenerateFormat,
+    selectedFiles?: string[]
+  ): Promise<void> => ipcRenderer.invoke('generate:run', folderPath, modelId, task, format, selectedFiles),
   generateCancel: (): Promise<void> => ipcRenderer.invoke('chat:cancel'), // reuses the same LlamaService cancel
   onGenerateProgress: (cb: (p: GenerateProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: GenerateProgress) => cb(p)
@@ -233,6 +274,28 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, message: string) => cb(message)
     ipcRenderer.on('generate:error', handler)
     return () => ipcRenderer.off('generate:error', handler)
+  },
+
+  // ── Podcast audio ───────────────────────────────────────────────────────────
+  podcastCancel: (sessionId: string): Promise<void> => ipcRenderer.invoke('podcast:cancel', sessionId),
+  audioRead: (folderPath: string, relFile: string): Promise<Uint8Array> =>
+    ipcRenderer.invoke('audio:read', folderPath, relFile),
+  audioSaveAs: (folderPath: string, relFile: string): Promise<string | null> =>
+    ipcRenderer.invoke('audio:saveAs', folderPath, relFile),
+  onPodcastProgress: (cb: (p: PodcastProgress) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastProgress) => cb(p)
+    ipcRenderer.on('podcast:progress', handler)
+    return () => ipcRenderer.off('podcast:progress', handler)
+  },
+  onPodcastDone: (cb: (p: PodcastDone) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastDone) => cb(p)
+    ipcRenderer.on('podcast:done', handler)
+    return () => ipcRenderer.off('podcast:done', handler)
+  },
+  onPodcastError: (cb: (p: PodcastError) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: PodcastError) => cb(p)
+    ipcRenderer.on('podcast:error', handler)
+    return () => ipcRenderer.off('podcast:error', handler)
   },
 }
 

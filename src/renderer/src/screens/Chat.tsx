@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './Chat.css'
-import type { CitationEntry, NotebookState } from '../../../preload'
+import type { CitationEntry, NotebookState, MessageAudio } from '../../../preload'
+import AudioPlayer from '../components/AudioPlayer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ type Message = {
   role: 'user' | 'assistant'
   content: string
   citations: CitationEntry[]
+  audio?: MessageAudio
 }
 
 type SourceItem = {
@@ -37,6 +39,7 @@ type GeneratingSnapshot = {
   createdAt: number
   type: 'chat' | 'podcast'
   messages: Message[]
+  selectedFiles: string[] | undefined
 }
 
 type ChatProps = {
@@ -49,6 +52,8 @@ type ChatProps = {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const PODCAST_PREFILL = '/podcast Create a podcast where two hosts discuss my documents.\nLength: about 5 minutes.'
 
 const MODEL_LABELS: Record<string, string> = {
   'gemma4-e2b': 'Gemma 4 E2B',
@@ -109,6 +114,15 @@ function collectDirPaths(nodes: TreeNode[], out: Set<string> = new Set()): Set<s
   return out
 }
 
+function collectLeafPaths(nodes: TreeNode[]): string[] {
+  const paths: string[] = []
+  for (const n of nodes) {
+    if (n.type === 'file') paths.push(n.item.relativePath)
+    else paths.push(...collectLeafPaths(n.children))
+  }
+  return paths
+}
+
 function buildTree(sources: SourceItem[]): TreeNode[] {
   const root: TreeNode[] = []
   for (const source of sources) {
@@ -146,10 +160,14 @@ function renderTree(
   nodes: TreeNode[],
   level: number,
   collapsed: Set<string>,
-  onToggle: (path: string) => void
+  onToggleFolderExpand: (path: string) => void,
+  isSelected: (path: string) => boolean,
+  onToggleFile: (path: string) => void,
+  onToggleFolderSelection: (children: TreeNode[]) => void
 ): React.ReactNode {
   return nodes.map((node) => {
     if (node.type === 'file') {
+      const checked = isSelected(node.item.relativePath)
       return (
         <div
           key={node.item.relativePath}
@@ -157,21 +175,53 @@ function renderTree(
           style={{ paddingLeft: `${16 + level * 14}px` }}
           title={node.item.relativePath}
         >
+          <input
+            type="checkbox"
+            className="source-check"
+            checked={checked}
+            onChange={() => onToggleFile(node.item.relativePath)}
+          />
           <span className="source-icon">{node.item.ext}</span>
           <span className="source-name">{node.item.filename}</span>
         </div>
       )
     }
     const isCollapsed = collapsed.has(node.path)
+    const leaves = collectLeafPaths(node.children)
+    const selectedCount = leaves.filter((p) => isSelected(p)).length
+    const dirState = selectedCount === 0 ? 'none' : selectedCount === leaves.length ? 'all' : 'some'
     return (
       <div key={node.path}>
-        <div className="source-dir" style={{ paddingLeft: `${16 + level * 14}px` }} onClick={() => onToggle(node.path)}>
+        <div
+          className="source-dir"
+          style={{ paddingLeft: `${16 + level * 14}px` }}
+          onClick={() => onToggleFolderExpand(node.path)}
+        >
+          <input
+            type="checkbox"
+            className="source-check"
+            checked={dirState !== 'none'}
+            ref={(el) => {
+              if (el) el.indeterminate = dirState === 'some'
+            }}
+            onChange={() => onToggleFolderSelection(node.children)}
+            onClick={(e) => e.stopPropagation()}
+          />
           <span className="source-dir-chevron" style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}>
             ▶
           </span>
           <span className="source-dir-name">{node.name}</span>
         </div>
-        {!isCollapsed && renderTree(node.children, level + 1, collapsed, onToggle)}
+        {!isCollapsed &&
+          renderTree(
+            node.children,
+            level + 1,
+            collapsed,
+            onToggleFolderExpand,
+            isSelected,
+            onToggleFile,
+            onToggleFolderSelection
+          )}
       </div>
     )
   })
@@ -330,6 +380,17 @@ export default function Chat({
   const [currentSessionType, setCurrentSessionType] = useState<'chat' | 'podcast'>('chat')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [generatingSessionId, setGeneratingSessionId] = useState<string | null>(null)
+  // null = all files selected; Set = explicit subset of relative paths
+  const [selectedFiles, setSelectedFiles] = useState<Set<string> | null>(null)
+  const [showNoFilesToast, setShowNoFilesToast] = useState(false)
+  // Set while podcast audio is rendering (after the script is done); at most one
+  // job exists at a time because generation is serialized end to end
+  const [audioPhase, setAudioPhase] = useState<{ sessionId: string; messageId: string } | null>(null)
+  // Message id to show a transient "audio failed" note under (not persisted)
+  const [audioErrorMsgId, setAudioErrorMsgId] = useState<string | null>(null)
+  // Router's task for the in-flight ask; podcasts swap the streaming transcript
+  // for simple phase labels ("Generating script..." / "Generating audio...")
+  const [routedTask, setRoutedTask] = useState<'chat' | 'podcast' | 'overview' | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -344,6 +405,9 @@ export default function Chat({
   const waitToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const newChatDraftRef = useRef<string>('')
   const newPodcastDraftRef = useRef<string>('')
+  const noFilesToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // tracks previous source paths to detect newly added files
+  const prevSourcePathsRef = useRef<Set<string>>(new Set())
 
   const folderName = folder.split('/').pop() ?? folder
   const modelLabel = MODEL_LABELS[modelId] ?? modelId
@@ -398,6 +462,71 @@ export default function Chat({
     return unsub
   }, [folder])
 
+  // Podcast audio events arrive minutes after chat:done, so they are subscribed
+  // for the component's lifetime rather than per-send (unsubsRef dies at chat:done)
+  useEffect(() => {
+    const clearGenerating = () => {
+      setAudioPhase(null)
+      setRoutedTask(null)
+      generatingSessionIdRef.current = null
+      generatingSnapshotRef.current = null
+      setGeneratingSessionId(null)
+      setIsGenerating(false)
+      setGenerateStatus('')
+    }
+    const unsubProgress = window.api.onPodcastProgress((p) => {
+      setAudioPhase({ sessionId: p.sessionId, messageId: p.messageId })
+      // The one-time ~92MB voice model download keeps its percent so it doesn't
+      // look hung; every other stage is just "Generating audio..."
+      if (p.stage === 'model_download')
+        setGenerateStatus(`Downloading voice model... ${Math.round((p.loaded / p.total) * 100)}%`)
+      else setGenerateStatus('Generating audio...')
+    })
+    const unsubDone = window.api.onPodcastDone(({ sessionId: sid, messageId, audio }) => {
+      if (currentSessionIdRef.current === sid) {
+        // Viewing the session — the save effect persists the patched message
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, audio } : m)))
+      } else if (!deletedSessionIdsRef.current.has(sid)) {
+        // Navigated away — patch the session on disk directly
+        window.api
+          .chatSessionLoad(folder, sid)
+          .then((session) => {
+            if (!session) return
+            const patched = session.messages.map((m) => (m.id === messageId ? { ...m, audio } : m))
+            return window.api.chatSessionSave(folder, { ...session, updatedAt: Date.now(), messages: patched })
+          })
+          .catch(() => {})
+      }
+      clearGenerating()
+    })
+    const unsubError = window.api.onPodcastError((p) => {
+      if (!p.cancelled && currentSessionIdRef.current === p.sessionId) setAudioErrorMsgId(p.messageId)
+      clearGenerating()
+    })
+    return () => {
+      unsubProgress()
+      unsubDone()
+      unsubError()
+    }
+  }, [folder])
+
+  // When sources update and we have an explicit selection, auto-add any new files.
+  useEffect(() => {
+    const currentPaths = new Set(sources.map((s) => s.relativePath))
+    if (selectedFiles !== null) {
+      const newPaths = sources.map((s) => s.relativePath).filter((p) => !prevSourcePathsRef.current.has(p))
+      if (newPaths.length > 0) {
+        setSelectedFiles((prev) => {
+          if (prev === null) return null
+          const next = new Set(prev)
+          newPaths.forEach((p) => next.add(p))
+          return next.size === sources.length ? null : next
+        })
+      }
+    }
+    prevSourcePathsRef.current = currentPaths
+  }, [sources])
+
   // Load sessions list and restore the last active session (or fall back to newest) on mount
   useEffect(() => {
     loadSessionsList()
@@ -410,6 +539,7 @@ export default function Chat({
               setSessionId(session.id)
               setSessionCreatedAt(session.createdAt)
               setCurrentSessionType(session.type ?? 'chat')
+              setSelectedFiles(session.selectedFiles ? new Set(session.selectedFiles) : null)
               setSessionLoaded(true)
             } else if (list[0] && list[0].id !== targetId) {
               // initialSessionId had no messages — fall back to newest
@@ -419,6 +549,7 @@ export default function Chat({
                   setSessionId(s.id)
                   setSessionCreatedAt(s.createdAt)
                   setCurrentSessionType(s.type ?? 'chat')
+                  setSelectedFiles(s.selectedFiles ? new Set(s.selectedFiles) : null)
                 } else {
                   setSessionId(newSessionId())
                 }
@@ -467,9 +598,10 @@ export default function Chat({
       updatedAt: Date.now(),
       title,
       type: currentSessionType,
+      selectedFiles: selectedFiles === null ? undefined : Array.from(selectedFiles),
       messages,
     })
-  }, [messages, sessionLoaded, sessionId, currentSessionType])
+  }, [messages, selectedFiles, sessionLoaded, sessionId, currentSessionType])
 
   useEffect(() => {
     const el = messagesListRef.current
@@ -485,6 +617,36 @@ export default function Chat({
       else next.add(path)
       return next
     })
+  }
+
+  function toggleFile(relativePath: string) {
+    setSelectedFiles((prev) => {
+      const current = prev !== null ? prev : new Set(sources.map((s) => s.relativePath))
+      const next = new Set(current)
+      if (next.has(relativePath)) next.delete(relativePath)
+      else next.add(relativePath)
+      return next.size === sources.length ? null : next
+    })
+  }
+
+  function toggleFolderSelection(children: TreeNode[]) {
+    const leaves = collectLeafPaths(children)
+    setSelectedFiles((prev) => {
+      const current = prev !== null ? prev : new Set(sources.map((s) => s.relativePath))
+      const allInFolder = leaves.every((p) => current.has(p))
+      const next = new Set(current)
+      if (allInFolder) leaves.forEach((p) => next.delete(p))
+      else leaves.forEach((p) => next.add(p))
+      return next.size === sources.length ? null : next
+    })
+  }
+
+  function toggleAll() {
+    if (selectedFiles === null || selectedFiles.size === sources.length) {
+      setSelectedFiles(new Set())
+    } else {
+      setSelectedFiles(null)
+    }
   }
 
   function resetViewToBlank() {
@@ -533,6 +695,7 @@ export default function Chat({
     setSessionId(newSid)
     setSessionCreatedAt(Date.now())
     setCurrentSessionType('chat')
+    setSelectedFiles(null)
     if (isGenerating) {
       resetViewToBlank()
       setInput(newChatDraftRef.current)
@@ -551,7 +714,7 @@ export default function Chat({
     // Switching type on a blank session: swap drafts, don't create new session ID
     if (messages.length === 0 && currentSessionType === 'chat') {
       newChatDraftRef.current = input
-      const restored = newPodcastDraftRef.current || '/podcast Create a podcast script from my documents'
+      const restored = newPodcastDraftRef.current || PODCAST_PREFILL
       setCurrentSessionType('podcast')
       setInput(restored)
       setTimeout(() => {
@@ -571,7 +734,8 @@ export default function Chat({
     setSessionId(newSid)
     setSessionCreatedAt(Date.now())
     setCurrentSessionType('podcast')
-    const podcastInput = newPodcastDraftRef.current || '/podcast Create a podcast script from my documents'
+    setSelectedFiles(null)
+    const podcastInput = newPodcastDraftRef.current || PODCAST_PREFILL
     if (isGenerating) {
       resetViewToBlank()
       setInput(podcastInput)
@@ -605,9 +769,11 @@ export default function Chat({
     setSessionId(session.id)
     setSessionCreatedAt(session.createdAt)
     setCurrentSessionType(session.type ?? 'chat')
+    setSelectedFiles(session.selectedFiles ? new Set(session.selectedFiles) : null)
     setStreamBuffer('')
     setGenerateStatus('')
     setActiveCitation(null)
+    setAudioErrorMsgId(null)
     const restored = draftRef.current.get(sid) ?? ''
     setInput(restored)
     setConfirmDeleteId(null)
@@ -632,7 +798,13 @@ export default function Chat({
   }
 
   async function handleSend(text: string) {
-    if (!text.trim()) return
+    if (!text.trim() || sessionLocked) return
+    if (selectedFiles !== null && selectedFiles.size === 0) {
+      if (noFilesToastTimerRef.current) clearTimeout(noFilesToastTimerRef.current)
+      setShowNoFilesToast(true)
+      noFilesToastTimerRef.current = setTimeout(() => setShowNoFilesToast(false), 2500)
+      return
+    }
     if (isGenerating) {
       if (generatingSessionId !== sessionId) {
         if (waitToastTimerRef.current) clearTimeout(waitToastTimerRef.current)
@@ -683,11 +855,15 @@ export default function Chat({
       createdAt: sessionCreatedAt,
       type: currentSessionType,
       messages: messagesWithUser,
+      selectedFiles: selectedFiles === null ? undefined : Array.from(selectedFiles),
     }
     setStreamBuffer('')
     setGenerateStatus('')
     setActiveCitation(null)
+    setAudioErrorMsgId(null)
+    setRoutedTask(null)
 
+    const unsubRouted = window.api.onChatRouted(({ task }) => setRoutedTask(task))
     const unsubChatProgress = window.api.onChatProgress((p) => {
       if (p.stage === 'reading') setGenerateStatus('Reading documents...')
       else if (p.stage === 'reranking') setGenerateStatus('Finding best matches...')
@@ -708,7 +884,8 @@ export default function Chat({
     const unsubDone = window.api.onChatDone((result) => {
       const snapshot = generatingSnapshotRef.current
       const assistantMsg: Message = {
-        id: `${Date.now()}-a`,
+        // Podcast tasks: main minted the id so podcast:done can find this message later
+        id: result.podcast?.messageId ?? `${Date.now()}-a`,
         role: 'assistant',
         content: result.answer,
         citations: result.citations as CitationEntry[],
@@ -732,16 +909,28 @@ export default function Chat({
           updatedAt: Date.now(),
           title,
           type: snapshot.type,
+          selectedFiles: snapshot.selectedFiles,
           messages: [...snapshot.messages, assistantMsg],
         })
       }
 
-      generatingSessionIdRef.current = null
-      generatingSnapshotRef.current = null
-      setGeneratingSessionId(null)
-      setStreamBuffer('')
-      setGenerateStatus('')
-      setIsGenerating(false)
+      if (result.podcast) {
+        // Script done but audio still rendering: keep the generation lifecycle
+        // alive (send stays blocked, sidebar dot stays on) until podcast:done/error.
+        // The snapshot is no longer needed — the message is persisted above.
+        generatingSnapshotRef.current = null
+        setAudioPhase({ sessionId: result.podcast.sessionId, messageId: result.podcast.messageId })
+        setStreamBuffer('')
+        setGenerateStatus('Generating audio...')
+      } else {
+        generatingSessionIdRef.current = null
+        generatingSnapshotRef.current = null
+        setGeneratingSessionId(null)
+        setStreamBuffer('')
+        setGenerateStatus('')
+        setIsGenerating(false)
+        setRoutedTask(null)
+      }
       cleanup()
       loadSessionsList().catch(() => {})
     })
@@ -770,6 +959,7 @@ export default function Chat({
           updatedAt: Date.now(),
           title,
           type: snapshot.type,
+          selectedFiles: snapshot.selectedFiles,
           messages: [...snapshot.messages, errorMsg],
         })
       }
@@ -780,10 +970,12 @@ export default function Chat({
       setStreamBuffer('')
       setGenerateStatus('')
       setIsGenerating(false)
+      setRoutedTask(null)
       cleanup()
     })
 
     function cleanup() {
+      unsubRouted()
       unsubChatProgress()
       unsubProgress()
       unsubToken()
@@ -791,10 +983,11 @@ export default function Chat({
       unsubError()
       unsubsRef.current = []
     }
-    unsubsRef.current = [unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
+    unsubsRef.current = [unsubRouted, unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
-    await window.api.chatAsk(text.trim(), folder, modelId, history)
+    const fileFilter = selectedFiles === null ? undefined : Array.from(selectedFiles)
+    await window.api.chatAsk(text.trim(), folder, modelId, history, fileFilter, sessionId!)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -831,6 +1024,12 @@ export default function Chat({
 
   const tree = buildTree(sources)
   const isCurrentSessionGenerating = isGenerating && generatingSessionId === sessionId
+  // A session with a generated podcast is read-only for now: chatting after the
+  // episode is not a real usage pattern (a future podcast-edit feature may reopen it)
+  const sessionLocked =
+    !isCurrentSessionGenerating &&
+    (messages.some((m) => m.audio) ||
+      (currentSessionType === 'podcast' && messages.some((m) => m.role === 'assistant')))
 
   // Compute tooltip position: fixed to viewport, smart top/bottom based on citation location
   const tooltipStyle: React.CSSProperties | null = activeCitation
@@ -932,24 +1131,44 @@ export default function Chat({
         <div className="chat-main">
           {hasMessages ? (
             <div className="messages-list" ref={messagesListRef}>
-              {messages.map((msg) => (
-                <div key={msg.id} className={`message message-${msg.role}`}>
-                  <div className="message-bubble">
-                    {msg.role === 'user'
-                      ? msg.content
-                      : renderMarkdown(msg.content, msg.citations, handleCitationEnter, handleCitationLeave)}
+              {messages.map((msg) => {
+                // Script message whose audio is still rendering: show nothing here,
+                // the status spinner below carries the "Generating audio..." state
+                if (msg.role === 'assistant' && audioPhase?.messageId === msg.id) return null
+                return (
+                  <div key={msg.id} className={`message message-${msg.role}`}>
+                    <div className="message-bubble">
+                      {msg.role === 'user' ? (
+                        msg.content
+                      ) : msg.audio ? (
+                        // Finished podcast: the player IS the message; the raw
+                        // script (HOST tags, [SECTION] markers) stays hidden
+                        <AudioPlayer folder={folder} audio={msg.audio} />
+                      ) : (
+                        // Normal answer, or a podcast script whose audio failed
+                        // (shown as fallback so the content is not lost)
+                        renderMarkdown(msg.content, msg.citations, handleCitationEnter, handleCitationLeave)
+                      )}
+                      {audioErrorMsgId === msg.id && (
+                        <div className="audio-error-note">Audio generation failed. Your script is saved.</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {isCurrentSessionGenerating && !streamBuffer && (
+                )
+              })}
+              {isCurrentSessionGenerating && (!streamBuffer || routedTask === 'podcast') && (
                 <div className="message message-assistant">
                   <div className="message-bubble thinking-loader">
                     <span className="thinking-spinner" />
-                    <span className="thinking-label">{generateStatus || 'Thinking...'}</span>
+                    <span className="thinking-label">
+                      {routedTask === 'podcast' && !audioPhase
+                        ? 'Generating script...'
+                        : generateStatus || 'Thinking...'}
+                    </span>
                   </div>
                 </div>
               )}
-              {isCurrentSessionGenerating && streamBuffer && (
+              {isCurrentSessionGenerating && streamBuffer && routedTask !== 'podcast' && (
                 <div className="message message-assistant">
                   <div className="message-bubble message-streaming">
                     {streamBuffer}
@@ -986,6 +1205,7 @@ export default function Chat({
             {showWaitToast && (
               <div className="wait-toast">Another chat is generating. You can send once it finishes.</div>
             )}
+            {showNoFilesToast && <div className="wait-toast">Select at least one file to continue.</div>}
             <div className="composer-inner">
               <textarea
                 ref={textareaRef}
@@ -993,14 +1213,25 @@ export default function Chat({
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask your notebook…"
+                placeholder={
+                  sessionLocked
+                    ? 'This podcast is complete. Start a new chat or podcast to continue.'
+                    : 'Ask your notebook…'
+                }
+                disabled={sessionLocked}
                 rows={1}
               />
               {isCurrentSessionGenerating ? (
-                <button className="composer-cancel" onClick={() => window.api.chatCancel()}>
+                <button
+                  className="composer-cancel"
+                  onClick={() =>
+                    // During the audio phase Stop cancels TTS; during the script phase it cancels the LLM
+                    audioPhase ? window.api.podcastCancel(audioPhase.sessionId) : window.api.chatCancel()
+                  }
+                >
                   Stop
                 </button>
-              ) : (
+              ) : sessionLocked ? null : (
                 <span className="composer-hint">⌘ Return</span>
               )}
             </div>
@@ -1009,10 +1240,41 @@ export default function Chat({
 
         {/* Sources panel — now on the right */}
         <div className="sources-panel">
-          <div className="sources-header">Sources{sources.length > 0 ? ` · ${sources.length}` : ''}</div>
+          <div className="sources-header">
+            {sources.length > 0 && (
+              <input
+                type="checkbox"
+                className="source-check"
+                checked={selectedFiles === null || selectedFiles.size === sources.length}
+                ref={(el) => {
+                  if (el) {
+                    const allSelected = selectedFiles === null || selectedFiles.size === sources.length
+                    const noneSelected = selectedFiles !== null && selectedFiles.size === 0
+                    el.indeterminate = !allSelected && !noneSelected
+                    el.checked = allSelected
+                  }
+                }}
+                onChange={toggleAll}
+              />
+            )}
+            <span>Sources</span>
+            {sources.length > 0 && (
+              <span className="sources-count">
+                {selectedFiles === null ? sources.length : `${selectedFiles.size} / ${sources.length}`}
+              </span>
+            )}
+          </div>
           {isReindexing && <div className="sources-progress" />}
           <div className={isReindexing ? 'sources-list reindexing' : 'sources-list'}>
-            {renderTree(tree, 0, collapsedDirs, toggleDir)}
+            {renderTree(
+              tree,
+              0,
+              collapsedDirs,
+              toggleDir,
+              (path) => selectedFiles === null || selectedFiles.has(path),
+              toggleFile,
+              toggleFolderSelection
+            )}
           </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import { llamaService } from './inference'
 import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
 import { rerankerGgufService } from './reranker-gguf'
+import type { LangfuseParent } from './generate'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES, podcastLengthLine } from './podcast-script'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 30
@@ -62,6 +64,38 @@ function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
+function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo', lengthLine: string): string {
+  const passages = parents
+    .map((c) => {
+      const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
+      return `${filename}:\n${c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)}`
+    })
+    .join('\n\n')
+  const lead =
+    podcastMode === 'solo'
+      ? `Turn the key ideas into an engaging single-narrator podcast.\n${SOLO_SCRIPT_RULES}`
+      : `Turn the key ideas into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}`
+  return `You are creating a podcast script from retrieved document passages.
+${lead}
+${lengthLine ? `${lengthLine}\n` : ''}
+Passages:
+${passages}`
+}
+
+function buildOverviewPrompt(parents: SearchResult[]): string {
+  const passages = parents
+    .map((c) => {
+      const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
+      return `${filename}:\n${c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)}`
+    })
+    .join('\n\n')
+  return `Write a clear, cohesive overview synthesizing the key ideas from these retrieved passages.
+Write in flowing prose. Do not use citation numbers or mention source filenames.
+
+Passages:
+${passages}`
+}
+
 function buildSystemPrompt(parents: SearchResult[], history: HistoryMessage[]): string {
   const sources = parents
     .map((c, i) => {
@@ -113,6 +147,7 @@ function extractCitations(answer: string, parents: SearchResult[]): CitationEntr
 
 export type RetrievalConfig = {
   topK: number
+  sourceFileFilter?: string[]
 }
 
 export async function retrieve(question: string, folderPath: string, cfg: RetrievalConfig): Promise<SearchResult[]> {
@@ -122,7 +157,7 @@ export async function retrieve(question: string, folderPath: string, cfg: Retrie
   await embedService.start(undefined, { modelId: embedModel })
   const [queryVector] = await embedService.embedBatched([formatQueryForEmbed(question)])
   // Use raw question for BM25 (keywords), instruction-prefixed vector for dense search
-  return vectorStore.searchHybrid(queryVector, question, cfg.topK)
+  return vectorStore.searchHybrid(queryVector, question, cfg.topK, cfg.sourceFileFilter)
 }
 
 // Ask the LLM to rewrite the user's question into 2-3 short search queries.
@@ -159,12 +194,25 @@ export async function ragQuery(
   modelId: string,
   history: HistoryMessage[],
   onToken: (token: string) => void,
-  onProgress?: (p: ChatProgress) => void
+  onProgress?: (p: ChatProgress) => void,
+  sourceFileFilter?: string[],
+  task?: 'podcast' | 'overview',
+  externalTrace?: LangfuseParent | null,
+  podcastMode: 'solo' | 'duo' = 'duo' // router's narrator-count decision, only used when task is 'podcast'
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
   const lf = getLangfuse()
-  const trace = lf?.trace({ name: 'rag-query', input: question })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'rag-query', input: { question } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'rag-query', input: question }) ?? null
+  }
 
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -182,7 +230,7 @@ export async function ragQuery(
   const retrieveSpan = trace?.span({ name: 'retrieve', input: queries })
   const allChunks: SearchResult[] = []
   for (const q of queries) {
-    const chunks = await retrieve(q, folderPath, { topK: RETRIEVE_TOP_K })
+    const chunks = await retrieve(q, folderPath, { topK: RETRIEVE_TOP_K, sourceFileFilter })
     for (const chunk of chunks) {
       if (!allChunks.some((c) => c.parentId === chunk.parentId)) {
         allChunks.push(chunk)
@@ -226,6 +274,31 @@ export async function ragQuery(
     })),
   })
   rerankSpan?.end()
+
+  // Format path: podcast/overview synthesis from retrieved chunks, no citations
+  if (task) {
+    const sysPrompt =
+      task === 'podcast'
+        ? buildPodcastPrompt(parents, podcastMode, podcastLengthLine(question))
+        : buildOverviewPrompt(parents)
+    onProgress?.({ stage: 'generating' })
+    const gen = trace?.generation({
+      name: 'llm',
+      model: modelId,
+      input: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: question },
+      ],
+    })
+    const answer = await llamaService.generateStream(sysPrompt, question, onToken)
+    gen?.update({ output: answer })
+    gen?.end()
+    trace?.update({ output: answer })
+    pipelineSpan?.end()
+    if (!externalTrace) lf?.flushAsync().catch(() => {})
+    return { answer, citations: [] }
+  }
+
   const systemPrompt = buildSystemPrompt(parents, history)
 
   onProgress?.({ stage: 'generating' })
@@ -262,7 +335,8 @@ export async function ragQuery(
     .sort((a, b) => a.sourceNum - b.sourceNum)
 
   trace?.update({ output: answer })
-  lf?.flushAsync().catch(() => {})
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
 
   return { answer, citations }
 }
@@ -276,12 +350,22 @@ export async function ragSummarizeFile(
   modelId: string,
   history: HistoryMessage[],
   onToken: (token: string) => void,
-  onProgress?: (p: ChatProgress) => void
+  onProgress?: (p: ChatProgress) => void,
+  externalTrace?: LangfuseParent | null
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
   const lf = getLangfuse()
-  const trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'rag-summarize-file', input: { question, sourceFile } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'rag-summarize-file', input: { question, sourceFile } }) ?? null
+  }
 
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -297,7 +381,8 @@ export async function ragSummarizeFile(
 
   if (allChunks.length === 0) {
     trace?.update({ output: 'no_chunks_found' })
-    lf?.flushAsync().catch(() => {})
+    pipelineSpan?.end()
+    if (!externalTrace) lf?.flushAsync().catch(() => {})
     return { answer: "I couldn't find any content for that file.", citations: [] }
   }
 
@@ -338,7 +423,8 @@ export async function ragSummarizeFile(
     .sort((a, b) => a.sourceNum - b.sourceNum)
 
   trace?.update({ output: answer })
-  lf?.flushAsync().catch(() => {})
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
 
   return { answer, citations }
 }

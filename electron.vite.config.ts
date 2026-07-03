@@ -11,6 +11,7 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts'),
           'workers/embed.worker': resolve('src/main/workers/embed.worker.ts'),
+          'workers/tts.worker': resolve('src/main/workers/tts.worker.ts'),
         },
       },
     },

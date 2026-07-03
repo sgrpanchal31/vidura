@@ -39,6 +39,7 @@ src/renderer/src/
 - **Fonts**: IBM Plex Sans (UI), Source Serif 4 (editorial), IBM Plex Mono (code)
 - **sourceFile** in chunks = relative path from notebook root, not absolute
 - Build uses esbuild — TypeScript errors don't block `npm run build`
+- **Native ML runtimes must not share the Electron main process** — kokoro-js and the embed worker bundle different onnxruntime versions, and two copies in one address space segfault the app. TTS runs in a `utilityProcess`; keep any future native-heavy engine in its own process too.
 
 ## Models (GGUF QAT Q4_0 / Q4_K_M, downloaded to userData/models/)
 

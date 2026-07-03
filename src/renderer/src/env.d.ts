@@ -16,6 +16,10 @@ import type {
   GenerateProgress,
   ChatProgress,
   ChatSession,
+  PodcastProgress,
+  PodcastDone,
+  PodcastError,
+  ChatRouted,
 } from '../../preload/index'
 
 declare global {
@@ -57,10 +61,13 @@ declare global {
         question: string,
         folderPath: string,
         modelId: string,
-        history?: Array<{ role: 'user' | 'assistant'; content: string }>
+        history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+        selectedFiles?: string[],
+        sessionId?: string
       ) => Promise<void>
       chatCancel: () => Promise<void>
       onChatToken: (cb: (token: string) => void) => () => void
+      onChatRouted: (cb: (r: ChatRouted) => void) => () => void
       onChatDone: (cb: (result: ChatResult) => void) => () => void
       onChatError: (cb: (message: string) => void) => () => void
       chatSessionList: (
@@ -74,12 +81,25 @@ declare global {
 
       setWindowSize: (width: number, height: number) => Promise<void>
 
-      generateRun: (folderPath: string, modelId: string, task: GenerateTask, format: GenerateFormat) => Promise<void>
+      generateRun: (
+        folderPath: string,
+        modelId: string,
+        task: GenerateTask,
+        format: GenerateFormat,
+        selectedFiles?: string[]
+      ) => Promise<void>
       generateCancel: () => Promise<void>
       onGenerateProgress: (cb: (p: GenerateProgress) => void) => () => void
       onGenerateToken: (cb: (token: string) => void) => () => void
       onGenerateDone: (cb: (result: string) => void) => () => void
       onGenerateError: (cb: (message: string) => void) => () => void
+
+      podcastCancel: (sessionId: string) => Promise<void>
+      audioRead: (folderPath: string, relFile: string) => Promise<Uint8Array>
+      audioSaveAs: (folderPath: string, relFile: string) => Promise<string | null>
+      onPodcastProgress: (cb: (p: PodcastProgress) => void) => () => void
+      onPodcastDone: (cb: (p: PodcastDone) => void) => () => void
+      onPodcastError: (cb: (p: PodcastError) => void) => () => void
     }
   }
 }
