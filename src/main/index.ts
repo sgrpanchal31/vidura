@@ -24,6 +24,7 @@ import { getLangfuse } from './services/telemetry'
 import { rerankerGgufService } from './services/reranker-gguf'
 import { folderWatcher } from './services/watcher'
 import { ttsService, CancelledError, type MessageAudio } from './services/tts'
+import { parsePodcastScript } from './services/podcast-script'
 import { readFile } from 'fs/promises'
 import { resolve as resolvePath } from 'path'
 
@@ -282,7 +283,7 @@ ipcMain.handle(
       if (decision.task === 'podcast' && sessionId) {
         const messageId = `${Date.now()}-a`
         mainWindow?.webContents.send('chat:done', { answer, citations, podcast: { sessionId, messageId } })
-        startPodcastAudio(folderPath, sessionId, messageId, answer)
+        startPodcastAudio(folderPath, sessionId, messageId, answer, trace)
       } else {
         mainWindow?.webContents.send('chat:done', { answer, citations })
       }
@@ -394,7 +395,28 @@ ipcMain.handle(
 // Fire-and-forget: renders the finished podcast script to a WAV in the notebook's
 // .openbook/audio dir. Always emits a terminal event (done or error) so the
 // renderer can clear its generating state.
-function startPodcastAudio(folderPath: string, sessionId: string, messageId: string, script: string): void {
+function startPodcastAudio(
+  folderPath: string,
+  sessionId: string,
+  messageId: string,
+  script: string,
+  trace?: { span(opts: { name: string; input?: unknown }): { end(opts?: { output?: unknown }): void } } | null
+): void {
+  // The chat-ask trace was already flushed when the script finished, but Langfuse
+  // trace objects stay usable — this span attaches the audio phase to the same trace.
+  const parsed = parsePodcastScript(script)
+  const span = trace?.span({
+    name: 'tts',
+    input: {
+      segments: parsed.segments.length,
+      chapters: parsed.chapters.map((c) => c.title),
+      solo: parsed.segments.every((s) => s.speaker === 'solo'),
+    },
+  })
+  const flush = () =>
+    getLangfuse()
+      ?.flushAsync()
+      .catch(() => {})
   ttsService
     .synthesizePodcast({
       script,
@@ -404,10 +426,14 @@ function startPodcastAudio(folderPath: string, sessionId: string, messageId: str
       onProgress: (p) => mainWindow?.webContents.send('podcast:progress', { sessionId, messageId, ...p }),
     })
     .then((audio: MessageAudio) => {
+      span?.end({ output: { durationSec: audio.durationSec, file: audio.file } })
+      flush()
       mainWindow?.webContents.send('podcast:done', { sessionId, messageId, audio })
     })
     .catch((err) => {
       const cancelled = err instanceof CancelledError
+      span?.end({ output: { error: cancelled ? 'cancelled' : String(err) } })
+      flush()
       mainWindow?.webContents.send('podcast:error', {
         sessionId,
         messageId,
@@ -510,4 +536,8 @@ app.on('before-quit', () => {
   rerankerGgufService.stop()
   ttsService.stop()
   llamaService.dispose()
+  // Deliver any queued Langfuse events; fire-and-forget flushes lose them on fast quits
+  getLangfuse()
+    ?.shutdownAsync()
+    .catch(() => {})
 })
