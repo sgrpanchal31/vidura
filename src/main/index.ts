@@ -21,6 +21,7 @@ import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 import { routeQuery } from './services/router'
 import { getLangfuse } from './services/telemetry'
+import { checkForUpdate, downloadAndInstall } from './services/updater'
 import { rerankerGgufService } from './services/reranker-gguf'
 import { folderWatcher } from './services/watcher'
 import { ttsService, CancelledError, type MessageAudio } from './services/tts'
@@ -128,6 +129,18 @@ ipcMain.handle('system:info', () => ({
   totalRamGB: Math.round(os.totalmem() / 1024 ** 3),
   platform: process.platform,
 }))
+
+// ── App version + updates ─────────────────────────────────────────────────────
+
+ipcMain.handle('app:version', () => app.getVersion())
+
+ipcMain.handle('update:check', () => checkForUpdate())
+
+ipcMain.handle('update:install', async (_event, url: string) => {
+  await downloadAndInstall(url, (loaded, total) => {
+    mainWindow?.webContents.send('update:progress', { loaded, total })
+  })
+})
 
 ipcMain.handle('ingest:parserVersion', () => PARSER_VERSION)
 

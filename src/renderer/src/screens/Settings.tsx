@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './Settings.css'
-import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices } from '../../../preload/index'
+import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices, UpdateInfo } from '../../../preload/index'
 
 const LLM_META: Record<string, { name: string; desc: string }> = {
   'gemma4-e2b': {
@@ -49,7 +49,7 @@ const KOKORO_VOICES: { id: string; label: string }[] = [
 // Must match VOICE_A / VOICE_B / VOICE_SOLO in src/main/services/tts.ts
 const DEFAULT_VOICES: PodcastVoices = { hostA: 'af_heart', hostB: 'am_fenrir', solo: 'am_michael' }
 
-type Section = 'llm' | 'embed' | 'retrieval' | 'audio'
+type Section = 'llm' | 'embed' | 'retrieval' | 'audio' | 'about'
 
 type Props = {
   folder: string
@@ -97,6 +97,12 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   // Podcast audio state
   const [podcastVoices, setPodcastVoices] = useState<PodcastVoices>(DEFAULT_VOICES)
 
+  // About / updates state
+  const [appVersion, setAppVersion] = useState('')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
+  const [updateDl, setUpdateDl] = useState<{ loaded: number; total: number } | null>(null)
+
   const unsubRef = useRef<(() => void) | null>(null)
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
@@ -117,6 +123,10 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
       setRerankerDownloaded(reranker.downloaded)
       if (prefs.podcastVoices) setPodcastVoices(prefs.podcastVoices)
     })
+    window.api
+      .getAppVersion()
+      .then(setAppVersion)
+      .catch(() => {})
 
     return () => {
       unsubRef.current?.()
@@ -283,6 +293,31 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     await window.api.setPrefs({ podcastVoices: next })
   }
 
+  async function handleCheckUpdates() {
+    setUpdateStatus('checking')
+    setAvailableUpdate(null)
+    const update = await window.api.updateCheck().catch(() => null)
+    if (update) {
+      setAvailableUpdate(update)
+      setUpdateStatus('idle')
+    } else {
+      setUpdateStatus('latest')
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!availableUpdate || updateDl) return
+    const unsub = window.api.onUpdateProgress((p) => setUpdateDl(p))
+    setUpdateDl({ loaded: 0, total: 0 })
+    try {
+      // Downloads the DMG, then the app quits and relaunches as the new version
+      await window.api.updateInstall(availableUpdate.url)
+    } catch {
+      unsub()
+      setUpdateDl(null)
+    }
+  }
+
   const recommendedLlm = recommendedLlmId(ramGB)
   const busy = !!downloadingId || !!loadingId
 
@@ -291,6 +326,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     { id: 'embed', label: 'Embedding model' },
     { id: 'retrieval', label: 'Retrieval' },
     { id: 'audio', label: 'Podcast audio' },
+    { id: 'about', label: 'About' },
   ]
 
   return (
@@ -572,6 +608,60 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
               </div>
             </div>
           )}
+          {/* ── About ── */}
+          {activeSection === 'about' && (
+            <div className="settings-section">
+              <div className="settings-section-title">About</div>
+              <div className="settings-section-note">
+                Vidura is local-first: your documents and conversations never leave your Mac.
+              </div>
+              <div className="settings-voice-list">
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Version</div>
+                    <div className="settings-model-desc">Vidura {appVersion || '...'}</div>
+                  </div>
+                  {availableUpdate ? (
+                    <button className="settings-use-btn" onClick={handleInstallUpdate} disabled={!!updateDl}>
+                      {updateDl
+                        ? updateDl.total > 0
+                          ? `Downloading... ${Math.round((updateDl.loaded / updateDl.total) * 100)}%`
+                          : 'Downloading...'
+                        : `Update to ${availableUpdate.version}`}
+                    </button>
+                  ) : (
+                    <button
+                      className="settings-use-btn"
+                      onClick={handleCheckUpdates}
+                      disabled={updateStatus === 'checking'}
+                    >
+                      {updateStatus === 'checking'
+                        ? 'Checking...'
+                        : updateStatus === 'latest'
+                          ? 'You are on the latest version'
+                          : 'Check for updates'}
+                    </button>
+                  )}
+                </div>
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Feedback</div>
+                    <div className="settings-model-desc">Found a bug or have an idea? It helps a lot.</div>
+                  </div>
+                  <a
+                    className="settings-use-btn"
+                    style={{ textDecoration: 'none' }}
+                    href="https://github.com/sgrpanchal31/vidura/issues"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Report an issue
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Podcast audio ── */}
           {activeSection === 'audio' && (
             <div className="settings-section">

@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 export type PodcastVoices = { hostA: string; hostB: string; solo: string }
 
+// A newer GitHub release the app can update itself to
+export type UpdateInfo = { version: string; url: string }
+
 export type Prefs = {
   lastFolder: string | null
   modelId: string | null
@@ -145,6 +148,16 @@ const api = {
   getPrefs: (): Promise<Prefs> => ipcRenderer.invoke('prefs:get'),
   setPrefs: (patch: Partial<Prefs>): Promise<void> => ipcRenderer.invoke('prefs:set', patch),
   getSystemInfo: (): Promise<SystemInfo> => ipcRenderer.invoke('system:info'),
+
+  // ── App version + updates ───────────────────────────────────────────────────
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  updateCheck: (): Promise<UpdateInfo | null> => ipcRenderer.invoke('update:check'),
+  updateInstall: (url: string): Promise<void> => ipcRenderer.invoke('update:install', url),
+  onUpdateProgress: (cb: (p: { loaded: number; total: number }) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, p: { loaded: number; total: number }) => cb(p)
+    ipcRenderer.on('update:progress', handler)
+    return () => ipcRenderer.off('update:progress', handler)
+  },
 
   // ── Ingest ──────────────────────────────────────────────────────────────────
   getParserVersion: (): Promise<string> => ipcRenderer.invoke('ingest:parserVersion'),
