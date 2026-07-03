@@ -79,6 +79,12 @@ for wasm in "$GRAMMAR_DIR"/tree-sitter-*.wasm; do
   "$keep" || rm -f "$wasm"
 done
 
+echo "▶ Removing llama.cpp git metadata (~33 MB; its read-only pack files also break xattr -cr on install)"
+rm -rf "$REPO_DIR/node_modules/node-llama-cpp/llama/llama.cpp/.git"
+# Belt and braces: no read-only files anywhere in the bundle, so recursive
+# xattr/chmod operations during install and self-update can never fail.
+chmod -R u+w "$REPO_DIR/node_modules/node-llama-cpp/llama" 2>/dev/null || true
+
 # Clean up broken .bin/ symlinks left by deleted packages (e.g., tsc, tsserver).
 # cp -r dereferences symlinks on macOS, so broken ones produce errors and abort.
 for link in "$REPO_DIR/node_modules/.bin"/*; do

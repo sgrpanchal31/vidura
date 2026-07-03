@@ -119,7 +119,9 @@ hdiutil attach "${dmgPath}" -nobrowse -quiet -mountpoint "$MOUNT"
 # one is completely on disk, and the final mv is a fast rename.
 rm -rf "${INSTALL_PATH}.new"
 ditto "$MOUNT/Vidura.app" "${INSTALL_PATH}.new"
-xattr -cr "${INSTALL_PATH}.new"
+# || true: xattr exits non-zero on read-only nested files; only the bundle-level
+# quarantine flag matters and set -e must not abort the update over it
+xattr -cr "${INSTALL_PATH}.new" || true
 rm -rf "${INSTALL_PATH}"
 mv "${INSTALL_PATH}.new" "${INSTALL_PATH}"
 open -n "${INSTALL_PATH}"
