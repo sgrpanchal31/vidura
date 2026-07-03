@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The stock llama.cpp bundled with node-llama-cpp cannot load the Gemma 4
+      # models: the app needs llama.cpp b8750 with the Gemma 4 E4B patch compiled
+      # in (same step as local `npm run dist:mac`). Takes ~5 minutes.
+      - name: Build patched llama.cpp
+        run: npm run llama:update
+
       - name: Build
         run: npm run build
 
