@@ -12,13 +12,15 @@ export type ParsedPdf = {
 export async function parsePdf(filePath: string): Promise<ParsedPdf> {
   const buffer = await readFile(filePath)
 
-  // Dynamic import required: pdfjs-dist v5 is ESM-only; CJS main process must use import()
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  // Dynamic import required: pdfjs-dist v5 is ESM-only; CJS main process must use import().
+  // Cast: the legacy build's .d.ts lags its .mjs runtime (getDocument is missing from the
+  // types even though it exists at runtime), so the module is typed as any.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjsLib = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as any
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
     useWorkerFetch: false,
-    // @ts-expect-error — pdfjs-dist type defs lag the runtime API; isEvalSupported is valid
     isEvalSupported: false,
     useSystemFonts: true,
   })
