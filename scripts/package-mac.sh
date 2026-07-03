@@ -79,10 +79,11 @@ for wasm in "$GRAMMAR_DIR"/tree-sitter-*.wasm; do
   "$keep" || rm -f "$wasm"
 done
 
-echo "▶ Removing llama.cpp git metadata (~33 MB; its read-only pack files also break xattr -cr on install)"
-rm -rf "$REPO_DIR/node_modules/node-llama-cpp/llama/llama.cpp/.git"
-# Belt and braces: no read-only files anywhere in the bundle, so recursive
-# xattr/chmod operations during install and self-update can never fail.
+echo "▶ Normalizing llama.cpp file permissions"
+# llama.cpp's .git MUST ship: node-llama-cpp refuses to use its locally compiled
+# build without it and silently falls back to the stock binary, which cannot
+# load the Gemma 4 models (this broke the v0.2.2 release). Its read-only pack
+# files are made writable so recursive xattr/copy operations never fail.
 chmod -R u+w "$REPO_DIR/node_modules/node-llama-cpp/llama" 2>/dev/null || true
 
 # Clean up broken .bin/ symlinks left by deleted packages (e.g., tsc, tsserver).
