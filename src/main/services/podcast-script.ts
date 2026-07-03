@@ -43,6 +43,25 @@ function stripLineDecoration(line: string): string {
   return line.replace(/^[\s*_>#-]*\s*/, '').trim()
 }
 
+// The model sometimes doubles the tag ("HOST B: HOST B: Hello"), which would be
+// read aloud. Strip repeated leading tags, but only when they resolve to the SAME
+// speaker, so real text like "HOST A: B - as in the second option" survives.
+function stripRepeatedTag(text: string, speaker: 'A' | 'B'): string {
+  for (;;) {
+    const dup = text.match(SPEAKER_RE)
+    if (dup && dup[1].toUpperCase() === speaker) {
+      text = dup[2]
+      continue
+    }
+    const name = text.match(/^(\w+)\s*[:\-–]\s*(.*)$/)
+    if (name && NAME_ALIASES[name[1].toLowerCase()] === speaker) {
+      text = name[2]
+      continue
+    }
+    return text
+  }
+}
+
 export function parsePodcastScript(script: string): ParsedScript {
   const segments: ScriptSegment[] = []
   const chapters: ScriptChapter[] = []
@@ -66,12 +85,12 @@ export function parsePodcastScript(script: string): ParsedScript {
     const tagMatch = line.match(SPEAKER_RE)
     if (tagMatch) {
       speaker = tagMatch[1].toUpperCase() as 'A' | 'B'
-      spoken = tagMatch[2]
+      spoken = stripRepeatedTag(tagMatch[2], speaker)
     } else {
       const nameMatch = line.match(/^(\w+)\s*[:\-–]\s*(.*)$/)
       if (nameMatch && NAME_ALIASES[nameMatch[1].toLowerCase()]) {
         speaker = NAME_ALIASES[nameMatch[1].toLowerCase()]
-        spoken = nameMatch[2]
+        spoken = stripRepeatedTag(nameMatch[2], speaker)
       }
     }
 

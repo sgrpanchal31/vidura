@@ -34,6 +34,19 @@ describe('parsePodcastScript', () => {
     expect(segments.map((s) => s.speaker)).toEqual(['A', 'B'])
   })
 
+  it('strips duplicated speaker tags so they are not read aloud', () => {
+    const { segments } = parsePodcastScript(
+      'HOST A: Welcome!\nHOST B: HOST B: Hello Maya.\nMaya: Maya: Hi Sam.\nHOST B: Sam: Good to be here.'
+    )
+    expect(segments.map((s) => s.text)).toEqual(['Welcome!', 'Hello Maya.', 'Hi Sam.', 'Good to be here.'])
+    expect(segments.map((s) => s.speaker)).toEqual(['A', 'B', 'A', 'B'])
+  })
+
+  it('keeps a different-speaker prefix that is real text, not a duplicated tag', () => {
+    const { segments } = parsePodcastScript('HOST A: B - as in the second option.\nHOST B: Right.')
+    expect(segments[0].text).toBe('B - as in the second option.')
+  })
+
   it('appends untagged continuation lines to the current speaker', () => {
     const { segments } = parsePodcastScript('HOST A: First part.\nAnd the continuation.\nHOST B: Reply.')
     expect(segments).toHaveLength(2)
