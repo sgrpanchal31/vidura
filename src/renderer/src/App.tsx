@@ -44,11 +44,16 @@ export default function App() {
         setScreen('onboarding')
       }
     })
-    // Fire-and-forget: resolves null on any network error, never blocks launch
-    window.api
-      .updateCheck()
-      .then((u) => u && setUpdateInfo(u))
-      .catch(() => {})
+    // Fire-and-forget: resolves null on any network error, never blocks launch.
+    // One delayed re-check covers transient failures during app boot.
+    const checkUpdate = () =>
+      window.api
+        .updateCheck()
+        .then((u) => u && setUpdateInfo(u))
+        .catch(() => {})
+    checkUpdate()
+    const recheck = setTimeout(checkUpdate, 60_000)
+    return () => clearTimeout(recheck)
   }, [])
 
   async function handleUpdateNow() {
@@ -198,6 +203,65 @@ export default function App() {
 
   // ── Screens ────────────────────────────────────────────────────────────────
 
+  // Rendered on EVERY screen (not just chat): if a release ships broken, the
+  // error screen is exactly where the user needs the update escape hatch.
+  const updatePct =
+    updateProgress && updateProgress.total > 0 ? Math.round((updateProgress.loaded / updateProgress.total) * 100) : null
+  const updateBanner = updateInfo && !updateHidden && (
+    <div
+      style={{
+        position: 'fixed',
+        top: 14,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 200,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        background: 'var(--ink)',
+        color: 'var(--cream)',
+        padding: '8px 14px',
+        borderRadius: 8,
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        fontSize: 12,
+        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.25)',
+      }}
+    >
+      <span>Vidura {updateInfo.version} is available</span>
+      <button
+        onClick={handleUpdateNow}
+        disabled={!!updateProgress}
+        style={{
+          border: 'none',
+          borderRadius: 5,
+          background: 'var(--ox)',
+          color: 'var(--cream)',
+          fontSize: 12,
+          padding: '5px 10px',
+          cursor: updateProgress ? 'default' : 'pointer',
+        }}
+      >
+        {updateProgress ? (updatePct !== null ? `Downloading... ${updatePct}%` : 'Downloading...') : 'Update now'}
+      </button>
+      {!updateProgress && (
+        <button
+          onClick={() => setUpdateHidden(true)}
+          style={{
+            border: 'none',
+            background: 'none',
+            color: 'var(--cream)',
+            opacity: 0.7,
+            fontSize: 12,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          Later
+        </button>
+      )}
+    </div>
+  )
+
   if (screen === 'loading') return null
 
   if (screen === 'onboarding') {
@@ -240,6 +304,7 @@ export default function App() {
 
     return (
       <div className="app-window">
+        {updateBanner}
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -360,6 +425,7 @@ export default function App() {
 
     return (
       <div className="app-window">
+        {updateBanner}
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -441,66 +507,9 @@ export default function App() {
   }
 
   if ((screen === 'ready' || screen === 'settings') && notebookFolder && modelId) {
-    const updatePct =
-      updateProgress && updateProgress.total > 0
-        ? Math.round((updateProgress.loaded / updateProgress.total) * 100)
-        : null
     return (
       <div className="app-window">
-        {updateInfo && !updateHidden && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 14,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 200,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              background: 'var(--ink)',
-              color: 'var(--cream)',
-              padding: '8px 14px',
-              borderRadius: 8,
-              fontFamily: "'IBM Plex Sans', sans-serif",
-              fontSize: 12,
-              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.25)',
-            }}
-          >
-            <span>Vidura {updateInfo.version} is available</span>
-            <button
-              onClick={handleUpdateNow}
-              disabled={!!updateProgress}
-              style={{
-                border: 'none',
-                borderRadius: 5,
-                background: 'var(--ox)',
-                color: 'var(--cream)',
-                fontSize: 12,
-                padding: '5px 10px',
-                cursor: updateProgress ? 'default' : 'pointer',
-              }}
-            >
-              {updateProgress ? (updatePct !== null ? `Downloading... ${updatePct}%` : 'Downloading...') : 'Update now'}
-            </button>
-            {!updateProgress && (
-              <button
-                onClick={() => setUpdateHidden(true)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: 'var(--cream)',
-                  opacity: 0.7,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                Later
-              </button>
-            )}
-          </div>
-        )}
+        {updateBanner}
         {/* Chat stays mounted even when Settings is open so generation keeps running */}
         <div className="screen-content" style={{ display: screen === 'settings' ? 'none' : undefined }}>
           <Chat
