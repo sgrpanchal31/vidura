@@ -281,6 +281,10 @@ ipcMain.handle(
       decision.scope = 'rag'
     }
 
+    // Let the renderer adapt its progress UI to the task (podcasts hide the
+    // streaming transcript and show phase labels instead)
+    mainWindow?.webContents.send('chat:routed', { task: decision.task })
+
     // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
     const flushTrace = () => lf?.flushAsync().catch(() => {})
 

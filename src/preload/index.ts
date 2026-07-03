@@ -131,6 +131,9 @@ export type PodcastProgress = { sessionId: string; messageId: string } & (
 export type PodcastDone = { sessionId: string; messageId: string; audio: MessageAudio }
 export type PodcastError = { sessionId: string; messageId: string; cancelled: boolean; error: string }
 
+// Sent once per chat:ask as soon as the router has classified the query
+export type ChatRouted = { task: 'chat' | 'podcast' | 'overview' }
+
 const api = {
   // ── Folder + prefs ──────────────────────────────────────────────────────────
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:pickFolder'),
@@ -208,6 +211,11 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token)
     ipcRenderer.on('chat:token', handler)
     return () => ipcRenderer.off('chat:token', handler)
+  },
+  onChatRouted: (cb: (r: ChatRouted) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, r: ChatRouted) => cb(r)
+    ipcRenderer.on('chat:routed', handler)
+    return () => ipcRenderer.off('chat:routed', handler)
   },
   onChatDone: (cb: (result: ChatResult) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, result: ChatResult) => cb(result)

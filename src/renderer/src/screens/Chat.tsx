@@ -388,6 +388,9 @@ export default function Chat({
   const [audioPhase, setAudioPhase] = useState<{ sessionId: string; messageId: string } | null>(null)
   // Message id to show a transient "audio failed" note under (not persisted)
   const [audioErrorMsgId, setAudioErrorMsgId] = useState<string | null>(null)
+  // Router's task for the in-flight ask; podcasts swap the streaming transcript
+  // for simple phase labels ("Generating script..." / "Generating audio...")
+  const [routedTask, setRoutedTask] = useState<'chat' | 'podcast' | 'overview' | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -464,6 +467,7 @@ export default function Chat({
   useEffect(() => {
     const clearGenerating = () => {
       setAudioPhase(null)
+      setRoutedTask(null)
       generatingSessionIdRef.current = null
       generatingSnapshotRef.current = null
       setGeneratingSessionId(null)
@@ -472,11 +476,11 @@ export default function Chat({
     }
     const unsubProgress = window.api.onPodcastProgress((p) => {
       setAudioPhase({ sessionId: p.sessionId, messageId: p.messageId })
+      // The one-time ~92MB voice model download keeps its percent so it doesn't
+      // look hung; every other stage is just "Generating audio..."
       if (p.stage === 'model_download')
         setGenerateStatus(`Downloading voice model... ${Math.round((p.loaded / p.total) * 100)}%`)
-      else if (p.stage === 'loading') setGenerateStatus('Loading voice model...')
-      else if (p.stage === 'synthesizing') setGenerateStatus(`Creating audio... ${p.done}/${p.total}`)
-      else setGenerateStatus('Saving audio...')
+      else setGenerateStatus('Generating audio...')
     })
     const unsubDone = window.api.onPodcastDone(({ sessionId: sid, messageId, audio }) => {
       if (currentSessionIdRef.current === sid) {
@@ -857,7 +861,9 @@ export default function Chat({
     setGenerateStatus('')
     setActiveCitation(null)
     setAudioErrorMsgId(null)
+    setRoutedTask(null)
 
+    const unsubRouted = window.api.onChatRouted(({ task }) => setRoutedTask(task))
     const unsubChatProgress = window.api.onChatProgress((p) => {
       if (p.stage === 'reading') setGenerateStatus('Reading documents...')
       else if (p.stage === 'reranking') setGenerateStatus('Finding best matches...')
@@ -915,7 +921,7 @@ export default function Chat({
         generatingSnapshotRef.current = null
         setAudioPhase({ sessionId: result.podcast.sessionId, messageId: result.podcast.messageId })
         setStreamBuffer('')
-        setGenerateStatus('Preparing audio...')
+        setGenerateStatus('Generating audio...')
       } else {
         generatingSessionIdRef.current = null
         generatingSnapshotRef.current = null
@@ -923,6 +929,7 @@ export default function Chat({
         setStreamBuffer('')
         setGenerateStatus('')
         setIsGenerating(false)
+        setRoutedTask(null)
       }
       cleanup()
       loadSessionsList().catch(() => {})
@@ -963,10 +970,12 @@ export default function Chat({
       setStreamBuffer('')
       setGenerateStatus('')
       setIsGenerating(false)
+      setRoutedTask(null)
       cleanup()
     })
 
     function cleanup() {
+      unsubRouted()
       unsubChatProgress()
       unsubProgress()
       unsubToken()
@@ -974,7 +983,7 @@ export default function Chat({
       unsubError()
       unsubsRef.current = []
     }
-    unsubsRef.current = [unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
+    unsubsRef.current = [unsubRouted, unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
     const fileFilter = selectedFiles === null ? undefined : Array.from(selectedFiles)
@@ -1116,28 +1125,44 @@ export default function Chat({
         <div className="chat-main">
           {hasMessages ? (
             <div className="messages-list" ref={messagesListRef}>
-              {messages.map((msg) => (
-                <div key={msg.id} className={`message message-${msg.role}`}>
-                  <div className="message-bubble">
-                    {msg.role === 'user'
-                      ? msg.content
-                      : renderMarkdown(msg.content, msg.citations, handleCitationEnter, handleCitationLeave)}
-                    {msg.audio && <AudioPlayer folder={folder} audio={msg.audio} />}
-                    {audioErrorMsgId === msg.id && (
-                      <div className="audio-error-note">Audio generation failed. Your script is saved.</div>
-                    )}
+              {messages.map((msg) => {
+                // Script message whose audio is still rendering: show nothing here,
+                // the status spinner below carries the "Generating audio..." state
+                if (msg.role === 'assistant' && audioPhase?.messageId === msg.id) return null
+                return (
+                  <div key={msg.id} className={`message message-${msg.role}`}>
+                    <div className="message-bubble">
+                      {msg.role === 'user' ? (
+                        msg.content
+                      ) : msg.audio ? (
+                        // Finished podcast: the player IS the message; the raw
+                        // script (HOST tags, [SECTION] markers) stays hidden
+                        <AudioPlayer folder={folder} audio={msg.audio} />
+                      ) : (
+                        // Normal answer, or a podcast script whose audio failed
+                        // (shown as fallback so the content is not lost)
+                        renderMarkdown(msg.content, msg.citations, handleCitationEnter, handleCitationLeave)
+                      )}
+                      {audioErrorMsgId === msg.id && (
+                        <div className="audio-error-note">Audio generation failed. Your script is saved.</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {isCurrentSessionGenerating && !streamBuffer && (
+                )
+              })}
+              {isCurrentSessionGenerating && (!streamBuffer || routedTask === 'podcast') && (
                 <div className="message message-assistant">
                   <div className="message-bubble thinking-loader">
                     <span className="thinking-spinner" />
-                    <span className="thinking-label">{generateStatus || 'Thinking...'}</span>
+                    <span className="thinking-label">
+                      {routedTask === 'podcast' && !audioPhase
+                        ? 'Generating script...'
+                        : generateStatus || 'Thinking...'}
+                    </span>
                   </div>
                 </div>
               )}
-              {isCurrentSessionGenerating && streamBuffer && (
+              {isCurrentSessionGenerating && streamBuffer && routedTask !== 'podcast' && (
                 <div className="message message-assistant">
                   <div className="message-bubble message-streaming">
                     {streamBuffer}
