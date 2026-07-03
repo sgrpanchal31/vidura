@@ -98,19 +98,30 @@ export async function downloadAndInstall(
   const script = `#!/bin/bash
 # Vidura self-update: runs detached after the app quits
 set -e
-# Wait (up to 30s) for the app process to exit
+MOUNT="${workDir}/mount"
+# Whatever happens, unmount the DMG and clean up temp files + a stale staging copy
+cleanup() {
+  hdiutil detach "$MOUNT" -quiet 2>/dev/null || true
+  rm -rf "${workDir}" "${INSTALL_PATH}.new"
+}
+trap cleanup EXIT
+# Wait (up to 30s) for the app process to exit; never swap under a running app
+app_exited=false
 for i in $(seq 1 60); do
-  kill -0 ${process.pid} 2>/dev/null || break
+  if ! kill -0 ${process.pid} 2>/dev/null; then app_exited=true; break; fi
   sleep 0.5
 done
-MOUNT="${workDir}/mount"
+[ "$app_exited" = true ] || exit 1
 mkdir -p "$MOUNT"
 hdiutil attach "${dmgPath}" -nobrowse -quiet -mountpoint "$MOUNT"
+# Stage the full copy first so a mid-copy failure (e.g. disk full) can never
+# leave the user without an app; the old bundle is only removed once the new
+# one is completely on disk, and the final mv is a fast rename.
+rm -rf "${INSTALL_PATH}.new"
+ditto "$MOUNT/Vidura.app" "${INSTALL_PATH}.new"
+xattr -cr "${INSTALL_PATH}.new"
 rm -rf "${INSTALL_PATH}"
-ditto "$MOUNT/Vidura.app" "${INSTALL_PATH}"
-xattr -cr "${INSTALL_PATH}"
-hdiutil detach "$MOUNT" -quiet || true
-rm -rf "${workDir}"
+mv "${INSTALL_PATH}.new" "${INSTALL_PATH}"
 open -n "${INSTALL_PATH}"
 `
   const scriptPath = join(workDir, 'update.sh')
