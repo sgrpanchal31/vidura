@@ -1,7 +1,6 @@
-import { Worker } from 'worker_threads'
+import { app, utilityProcess, type UtilityProcess } from 'electron'
 import { join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
-import os from 'os'
 import { parsePodcastScript } from './podcast-script'
 import { encodeWavPcm16, concatFloat32 } from './wav'
 import type { MessageAudio } from './state'
@@ -44,9 +43,12 @@ type PendingRequest = {
   reject: (err: Error) => void
 }
 
-// Kokoro-82M running in a worker thread (same lifecycle as EmbedService)
+// Kokoro-82M running in a utilityProcess — a separate OS process, not a worker
+// thread. kokoro-js bundles its own onnxruntime native library whose version
+// differs from the embedding engine's; loading both into one process segfaults
+// the whole app. A separate process also can't take the app down if TTS crashes.
 class KokoroEngine implements TtsEngine {
-  private worker: Worker | null = null
+  private worker: UtilityProcess | null = null
   private readyPromise: Promise<void> | null = null
   private pending = new Map<number, PendingRequest>()
   private nextId = 0
@@ -62,22 +64,18 @@ class KokoroEngine implements TtsEngine {
       rejectReady = rej
     })
 
-    let cacheDir: string
-    if (process.versions.electron) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      cacheDir = join(require('electron').app.getPath('userData'), 'models')
-    } else {
-      cacheDir = process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), '.openbook', 'models')
-    }
+    const cacheDir = join(app.getPath('userData'), 'models')
 
     const workerPath = join(__dirname, 'workers', 'tts.worker.js')
-    const worker = new Worker(workerPath, { workerData: { cacheDir }, stderr: true })
+    // stdio: stdin ignored, stdout inherited (so it can't back up the pipe),
+    // stderr piped for the rolling crash-diagnostic tail below
+    const worker = utilityProcess.fork(workerPath, [], { stdio: ['ignore', 'inherit', 'pipe'], serviceName: 'tts' })
     this.worker = worker
 
     // Rolling stderr tail — piped to process.stderr so it shows in the dev console too
     const stderrLines: string[] = []
     let stderrBuf = ''
-    worker.stderr.on('data', (chunk: Buffer) => {
+    worker.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       process.stderr.write(text)
       stderrBuf += text
@@ -113,7 +111,7 @@ class KokoroEngine implements TtsEngine {
       } else if (msg.type === 'ready') {
         resolveReady()
       } else if (msg.type === 'init_error') {
-        worker.terminate()
+        worker.kill()
         failAll(new Error(msg.error))
       } else if (msg.type === 'audio') {
         const req = this.pending.get(msg.reqId)
@@ -130,17 +128,14 @@ class KokoroEngine implements TtsEngine {
       }
     })
 
-    worker.on('error', (err) => {
-      if (this.worker !== worker) return
-      failAll(makeError(err.message))
-    })
-
+    // UtilityProcess has no 'error' event: crashes (including native segfaults)
+    // surface as a nonzero exit code, with the cause in the stderr tail.
     worker.on('exit', (code) => {
       if (this.worker !== worker) return
-      if (code !== 0) failAll(makeError(`TTS worker exited unexpectedly (code ${code})`))
+      if (code !== 0) failAll(makeError(`TTS process exited unexpectedly (code ${code})`))
     })
 
-    worker.postMessage({ type: 'init', dtype: 'q8' })
+    worker.postMessage({ type: 'init', dtype: 'q8', cacheDir })
     await this.readyPromise
   }
 
@@ -156,11 +151,11 @@ class KokoroEngine implements TtsEngine {
 
   stop(): void {
     const worker = this.worker
-    // Null this.worker BEFORE terminate() so the exit handler's guard ignores the event
+    // Null this.worker BEFORE kill() so the exit handler's guard ignores the event
     this.worker = null
     this.readyPromise = null
     this.pending.clear()
-    worker?.terminate()
+    worker?.kill()
   }
 }
 
