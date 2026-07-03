@@ -6,7 +6,7 @@ import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
 import { rerankerGgufService } from './reranker-gguf'
 import type { LangfuseParent } from './generate'
-import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES } from './podcast-script'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES, podcastLengthLine } from './podcast-script'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 30
@@ -64,7 +64,7 @@ function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
-function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo'): string {
+function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo', lengthLine: string): string {
   const passages = parents
     .map((c) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
@@ -77,7 +77,7 @@ function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo'
       : `Turn the key ideas into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}`
   return `You are creating a podcast script from retrieved document passages.
 ${lead}
-
+${lengthLine ? `${lengthLine}\n` : ''}
 Passages:
 ${passages}`
 }
@@ -277,7 +277,10 @@ export async function ragQuery(
 
   // Format path: podcast/overview synthesis from retrieved chunks, no citations
   if (task) {
-    const sysPrompt = task === 'podcast' ? buildPodcastPrompt(parents, podcastMode) : buildOverviewPrompt(parents)
+    const sysPrompt =
+      task === 'podcast'
+        ? buildPodcastPrompt(parents, podcastMode, podcastLengthLine(question))
+        : buildOverviewPrompt(parents)
     onProgress?.({ stage: 'generating' })
     const gen = trace?.generation({
       name: 'llm',

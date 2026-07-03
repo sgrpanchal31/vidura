@@ -7,7 +7,7 @@ import { parseText } from './ingest/text'
 import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
 import { getLangfuse } from './telemetry'
-import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES } from './podcast-script'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES, podcastLengthLine } from './podcast-script'
 
 // Structural type — LangfuseTraceClient and LangfuseSpanClient both satisfy this
 export type LangfuseParent = {
@@ -71,14 +71,14 @@ Summaries:
 ${intermediates}`
 }
 
-// Extract up to MAP_CHARS_PER_DOC of representative text from a file
-async function extractDocText(absPath: string, ext: string): Promise<string> {
+// Extract up to maxChars of representative text from a file
+async function extractDocText(absPath: string, ext: string, maxChars: number): Promise<string> {
   if (ext === '.pdf') {
     const parsed = await parsePdf(absPath)
     return parsed.pages
       .map((p) => p.text)
       .join('\n\n')
-      .slice(0, MAP_CHARS_PER_DOC)
+      .slice(0, maxChars)
   }
   const content = await readFile(absPath, 'utf-8')
   if (ext === '.md') {
@@ -86,7 +86,7 @@ async function extractDocText(absPath: string, ext: string): Promise<string> {
     return sections
       .map((s) => s.text)
       .join('\n\n')
-      .slice(0, MAP_CHARS_PER_DOC)
+      .slice(0, maxChars)
   }
   if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
     const symbols = await parseCode(absPath, content)
@@ -94,10 +94,10 @@ async function extractDocText(absPath: string, ext: string): Promise<string> {
       return symbols
         .map((s) => s.parentText)
         .join('\n\n')
-        .slice(0, MAP_CHARS_PER_DOC)
+        .slice(0, maxChars)
     }
   }
-  return parseText(content).text.slice(0, MAP_CHARS_PER_DOC)
+  return parseText(content).text.slice(0, maxChars)
 }
 
 export async function generateFromCorpus(
@@ -138,6 +138,10 @@ export async function generateFromCorpus(
     trace = lf?.trace({ name: 'generate-corpus', input: { task, format, fileCount: files.length } }) ?? null
   }
 
+  // Podcasts need more raw material than summaries: a script written from one
+  // page of source runs out of things to say long before the requested length.
+  const mapChars = task === 'podcast' ? (files.length <= 2 ? 16000 : 8000) : MAP_CHARS_PER_DOC
+
   // Map phase: summarize each document sequentially
   const intermediates: string[] = []
   for (const file of files) {
@@ -145,7 +149,7 @@ export async function generateFromCorpus(
     const relPath = relative(folderPath, file.path)
     let docText: string
     try {
-      docText = await extractDocText(file.path, ext)
+      docText = await extractDocText(file.path, ext, mapChars)
     } catch {
       continue
     }
@@ -217,7 +221,10 @@ export async function generateFromCorpus(
         ? `Turn the following talking points into an engaging single-narrator podcast.\n${SOLO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
         : `Turn the following talking points into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
       : reducePrompt(task, format, current[0])
-  const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
+  const lengthLine = task === 'podcast' && question ? podcastLengthLine(question) : ''
+  const finalPrompt = [question ? `User request: "${question}"` : '', basePrompt, lengthLine]
+    .filter(Boolean)
+    .join('\n\n')
   const finalGen = trace?.generation({
     name: 'final',
     model: modelId,
