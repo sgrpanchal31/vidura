@@ -11,20 +11,20 @@ DMG_URL="https://github.com/sgrpanchal31/vidura/releases/latest/download/vidura-
 APP_NAME="Vidura.app"
 INSTALL_DIR="/Applications"
 
-# ── Preflight checks ──────────────────────────────────────────────────────────
+# -- Preflight checks ---------------------------------------------------------
 
 if [ "$(uname)" != "Darwin" ]; then
-  echo "✗ This installer only works on macOS." >&2
+  echo "Error: This installer only works on macOS." >&2
   exit 1
 fi
 
 if [ "$(uname -m)" != "arm64" ]; then
-  echo "✗ This release is built for Apple Silicon (arm64) only." >&2
-  echo "  Intel Mac support isn't available yet." >&2
+  echo "Error: This release is built for Apple Silicon (arm64) only." >&2
+  echo "  Intel Mac support is not available yet." >&2
   exit 1
 fi
 
-# ── Download ──────────────────────────────────────────────────────────────────
+# -- Download -----------------------------------------------------------------
 
 TMP="$(mktemp -d)"
 MNT="$TMP/mnt"
@@ -37,35 +37,35 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "▶ Downloading Vidura…"
+echo "Downloading Vidura..."
 curl -fL --progress-bar -o "$DMG" "$DMG_URL"
 
-# ── Mount ────────────────────────────────────────────────────────────────────
+# -- Mount --------------------------------------------------------------------
 
-echo "▶ Mounting DMG…"
+echo "Mounting DMG..."
 mkdir -p "$MNT"
 hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" -quiet
 
-# ── Install ───────────────────────────────────────────────────────────────────
+# -- Install ------------------------------------------------------------------
 
-echo "▶ Copying to $INSTALL_DIR…"
+echo "Copying to ${INSTALL_DIR}..."
 # Remove any previous install so reruns work as an upgrade
 # (including installs from before the app was renamed to Vidura).
-rm -rf "$INSTALL_DIR/$APP_NAME"
-rm -rf "$INSTALL_DIR/openbook-lm.app"
+rm -rf "${INSTALL_DIR}/${APP_NAME}"
+rm -rf "${INSTALL_DIR}/openbook-lm.app"
 # ditto preserves code signatures; plain cp -r can strip them.
-ditto "$MNT/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
+ditto "$MNT/$APP_NAME" "${INSTALL_DIR}/${APP_NAME}"
 
-# ── Remove quarantine flag ────────────────────────────────────────────────────
+# -- Remove quarantine flag ---------------------------------------------------
 # macOS tags every downloaded file with com.apple.quarantine, which causes
 # Gatekeeper to reject ad-hoc-signed apps as "damaged". Removing the flag
-# skips Gatekeeper evaluation entirely — the app runs without any warning.
-echo "▶ Removing quarantine flag…"
-xattr -cr "$INSTALL_DIR/$APP_NAME"
+# skips Gatekeeper evaluation entirely -- the app runs without any warning.
+echo "Removing quarantine flag..."
+xattr -cr "${INSTALL_DIR}/${APP_NAME}"
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# -- Done ---------------------------------------------------------------------
 
 echo ""
-echo "✔ Vidura installed to $INSTALL_DIR/$APP_NAME"
-echo "  Launching…"
-open "$INSTALL_DIR/$APP_NAME"
+echo "Done: Vidura installed to ${INSTALL_DIR}/${APP_NAME}"
+echo "Launching..."
+open "${INSTALL_DIR}/${APP_NAME}"
