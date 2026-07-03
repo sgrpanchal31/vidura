@@ -26,7 +26,7 @@ Rules:
 - task "overview": user wants a summary or overview
 - task "chat": standard question and answer
 
-- podcastMode "solo": the user wants a single narrator or one voice (e.g. "I narrate", "single narrator", "one host", "in my voice")
+- podcastMode "solo": the user wants a single narrator or one voice (e.g. "I narrate", "single narrator", "one host", "in my voice", "an expert explains this paper", "walk me through this document")
 - podcastMode "duo": two hosts discussing; the default whenever the user did not ask for a single voice
 
 Examples:

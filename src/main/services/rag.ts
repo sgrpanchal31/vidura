@@ -73,7 +73,7 @@ function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo'
     .join('\n\n')
   const lead =
     podcastMode === 'solo'
-      ? `Turn the key ideas into an engaging first-person podcast narration.\n${SOLO_SCRIPT_RULES}`
+      ? `Turn the key ideas into an engaging single-narrator podcast.\n${SOLO_SCRIPT_RULES}`
       : `Turn the key ideas into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}`
   return `You are creating a podcast script from retrieved document passages.
 ${lead}

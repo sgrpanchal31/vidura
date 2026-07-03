@@ -15,10 +15,10 @@ export const DUO_SCRIPT_RULES = `Write the script following these EXACT formatti
 - Match the requested length. About 150 spoken words equal one minute of audio.`
 
 export const SOLO_SCRIPT_RULES = `Write the script following these EXACT formatting rules:
-- A single narrator speaking in the first person, as the author of the documents reflecting on their own experiences and thoughts. Never invent hosts, interviewers, or a second voice.
+- A single narrator. Choose the narrator's perspective from the user request: if the user asks to narrate their own journal, notes, or experiences, speak in the first person as the author; if they ask for an overview, explanation, or expert take on documents, speak as a knowledgeable host presenting the material. Never invent hosts, interviewers, or a second voice.
 - Write flowing spoken paragraphs with NO speaker tags or names.
 - Split the narration into 2 to 4 sections. Before each section, put a line containing only [SECTION] followed by a short section title.
-- Open with a brief welcome and close with a short sign-off, still in the first person.
+- Open with a brief welcome and close with a short sign-off, keeping the same perspective throughout.
 - Plain spoken language only: no markdown, no asterisks, no bullet points, no stage directions, no citation numbers, no filenames.
 - Match the requested length. About 150 spoken words equal one minute of audio.`
 

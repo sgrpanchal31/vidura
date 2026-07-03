@@ -214,7 +214,7 @@ export async function generateFromCorpus(
   const basePrompt =
     task === 'podcast'
       ? podcastMode === 'solo'
-        ? `Turn the following talking points into an engaging first-person podcast narration.\n${SOLO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+        ? `Turn the following talking points into an engaging single-narrator podcast.\n${SOLO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
         : `Turn the following talking points into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
       : reducePrompt(task, format, current[0])
   const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
