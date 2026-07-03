@@ -61,7 +61,9 @@ ditto "$MNT/$APP_NAME" "${INSTALL_DIR}/${APP_NAME}"
 # Gatekeeper to reject ad-hoc-signed apps as "damaged". Removing the flag
 # skips Gatekeeper evaluation entirely -- the app runs without any warning.
 echo "Removing quarantine flag..."
-xattr -cr "${INSTALL_DIR}/${APP_NAME}"
+# || true: xattr exits non-zero if any nested file is read-only; the flag that
+# matters for Gatekeeper is on the bundle itself, so partial failures are fine.
+xattr -cr "${INSTALL_DIR}/${APP_NAME}" || true
 
 # -- Done ---------------------------------------------------------------------
 
