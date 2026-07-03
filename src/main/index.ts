@@ -48,10 +48,14 @@ async function runBackgroundIndex(folderPath: string, embeddingModel?: string): 
 
 const PREFS_PATH = join(app.getPath('userData'), 'prefs.json')
 
+type PodcastVoices = { hostA: string; hostB: string; solo: string }
+
 type Prefs = {
   lastFolder: string | null
   modelId: string | null
   rerankerEnabled: boolean
+  ttsEngine: string | null
+  podcastVoices: PodcastVoices | null
 }
 
 function readPrefs(): Prefs {
@@ -62,7 +66,7 @@ function readPrefs(): Prefs {
   } catch {
     // corrupted prefs — start fresh
   }
-  return { lastFolder: null, modelId: null, rerankerEnabled: false }
+  return { lastFolder: null, modelId: null, rerankerEnabled: false, ttsEngine: null, podcastVoices: null }
 }
 
 function writePrefs(prefs: Prefs): void {
@@ -419,12 +423,14 @@ function startPodcastAudio(
   // The chat-ask trace was already flushed when the script finished, but Langfuse
   // trace objects stay usable — this span attaches the audio phase to the same trace.
   const parsed = parsePodcastScript(script)
+  const voices = readPrefs().podcastVoices ?? undefined
   const span = trace?.span({
     name: 'tts',
     input: {
       segments: parsed.segments.length,
       chapters: parsed.chapters.map((c) => c.title),
       solo: parsed.segments.every((s) => s.speaker === 'solo'),
+      voices: voices ?? 'defaults',
     },
   })
   const flush = () =>
@@ -437,6 +443,7 @@ function startPodcastAudio(
       folderPath,
       sessionId,
       messageId,
+      voices,
       onProgress: (p) => mainWindow?.webContents.send('podcast:progress', { sessionId, messageId, ...p }),
     })
     .then((audio: MessageAudio) => {

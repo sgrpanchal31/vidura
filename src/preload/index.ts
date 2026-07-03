@@ -1,8 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+export type PodcastVoices = { hostA: string; hostB: string; solo: string }
+
 export type Prefs = {
   lastFolder: string | null
   modelId: string | null
+  rerankerEnabled: boolean
+  ttsEngine: string | null
+  podcastVoices: PodcastVoices | null
 }
 
 export type LlmModelInfo = {

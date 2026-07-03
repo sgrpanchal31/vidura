@@ -586,3 +586,37 @@
   opacity: 0.7;
   font-style: italic;
 }
+
+/* ---- Podcast voices ---- */
+
+.settings-voice-list {
+  margin-top: 14px;
+  border: 1px solid var(--line-m);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.settings-voice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-voice-row:last-child {
+  border-bottom: none;
+}
+
+.settings-voice-select {
+  flex-shrink: 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--cream-d);
+  border: 1px solid var(--line-m);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+}

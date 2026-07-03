@@ -166,9 +166,13 @@ type SynthesizeOpts = {
   sessionId: string
   messageId: string
   onProgress: (p: TtsProgress) => void
+  // User-chosen voices from Settings; falls back to the defaults above
+  voices?: { hostA: string; hostB: string; solo: string }
 }
 
 export class TtsService {
+  // Only Kokoro exists today; the Settings engine pref ('ttsEngine') becomes
+  // meaningful once a second TtsEngine implementation (Chatterbox) lands
   private engine: TtsEngine = new KokoroEngine()
   private queue: Promise<void> = Promise.resolve()
   private activeJobs = new Map<string, { cancelled: boolean }>() // sessionId -> flag
@@ -216,7 +220,12 @@ export class TtsService {
         if (ch.segmentIndex === i) chapterTimes.push({ title: ch.title, startSec: cumulativeSamples / sampleRate })
       }
       const seg = segments[i]
-      const voice = seg.speaker === 'A' ? VOICE_A : seg.speaker === 'B' ? VOICE_B : VOICE_SOLO
+      const voice =
+        seg.speaker === 'A'
+          ? (opts.voices?.hostA ?? VOICE_A)
+          : seg.speaker === 'B'
+            ? (opts.voices?.hostB ?? VOICE_B)
+            : (opts.voices?.solo ?? VOICE_SOLO)
       const result = await this.engine.synthesize(seg.text, voice)
       sampleRate = result.sampleRate
       audioChunks.push(result.samples)

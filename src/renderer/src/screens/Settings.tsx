@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './Settings.css'
-import type { LlmModelInfo, EmbedModelInfo, ModelProgress } from '../../../preload/index'
+import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices } from '../../../preload/index'
 
 const LLM_META: Record<string, { name: string; desc: string }> = {
   'gemma4-e2b': {
@@ -31,7 +31,25 @@ function recommendedLlmId(ramGB: number): string {
   return 'gemma4-e4b'
 }
 
-type Section = 'llm' | 'embed' | 'retrieval'
+// Curated Kokoro voices (all bundled with the app, no extra download).
+// Grades come from the Kokoro voice table; af_heart is the standout.
+const KOKORO_VOICES: { id: string; label: string }[] = [
+  { id: 'af_heart', label: 'Heart — female, best quality' },
+  { id: 'af_bella', label: 'Bella — female, great' },
+  { id: 'af_nicole', label: 'Nicole — female, good' },
+  { id: 'af_sarah', label: 'Sarah — female, decent' },
+  { id: 'bf_emma', label: 'Emma — female, British' },
+  { id: 'am_fenrir', label: 'Fenrir — male, decent' },
+  { id: 'am_michael', label: 'Michael — male, decent' },
+  { id: 'am_puck', label: 'Puck — male, decent' },
+  { id: 'bm_george', label: 'George — male, British' },
+  { id: 'bm_fable', label: 'Fable — male, British' },
+]
+
+// Must match VOICE_A / VOICE_B / VOICE_SOLO in src/main/services/tts.ts
+const DEFAULT_VOICES: PodcastVoices = { hostA: 'af_heart', hostB: 'am_fenrir', solo: 'am_michael' }
+
+type Section = 'llm' | 'embed' | 'retrieval' | 'audio'
 
 type Props = {
   folder: string
@@ -76,6 +94,9 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   const [rerankerError, setRerankerError] = useState<string | null>(null)
   const rerankerDownloadUnsubRef = useRef<(() => void) | null>(null)
 
+  // Podcast audio state
+  const [podcastVoices, setPodcastVoices] = useState<PodcastVoices>(DEFAULT_VOICES)
+
   const unsubRef = useRef<(() => void) | null>(null)
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
@@ -85,7 +106,8 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
       window.api.listEmbedModels(),
       window.api.getSystemInfo(),
       window.api.rerankerGetStatus(),
-    ]).then(([llms, embeds, sysInfo, reranker]) => {
+      window.api.getPrefs(),
+    ]).then(([llms, embeds, sysInfo, reranker, prefs]) => {
       setLlmModels(llms)
       setEmbedModel(embeds[0] ?? null)
       setRamGB(sysInfo.totalRamGB)
@@ -93,6 +115,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
       setRerankerEnabled(reranker.enabled)
       setRerankerStatus(reranker.status)
       setRerankerDownloaded(reranker.downloaded)
+      if (prefs.podcastVoices) setPodcastVoices(prefs.podcastVoices)
     })
 
     return () => {
@@ -254,6 +277,12 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     }
   }
 
+  async function handleVoiceChange(role: keyof PodcastVoices, voiceId: string) {
+    const next = { ...podcastVoices, [role]: voiceId }
+    setPodcastVoices(next)
+    await window.api.setPrefs({ podcastVoices: next })
+  }
+
   const recommendedLlm = recommendedLlmId(ramGB)
   const busy = !!downloadingId || !!loadingId
 
@@ -261,6 +290,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     { id: 'llm', label: 'Language model' },
     { id: 'embed', label: 'Embedding model' },
     { id: 'retrieval', label: 'Retrieval' },
+    { id: 'audio', label: 'Podcast audio' },
   ]
 
   return (
@@ -539,6 +569,63 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {/* ── Podcast audio ── */}
+          {activeSection === 'audio' && (
+            <div className="settings-section">
+              <div className="settings-section-title">Podcast audio</div>
+              <div className="settings-section-note">
+                Controls the speech engine and voices used when generating podcast episodes. Changes apply to the next
+                episode you create.
+              </div>
+
+              <div className="settings-model-list">
+                <div className="settings-model-row sel">
+                  <div className="settings-radio" />
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Kokoro 82M</div>
+                    <div className="settings-model-desc">
+                      Lightweight neural text to speech that runs entirely on your Mac. More engines will appear here as
+                      they become available.
+                    </div>
+                  </div>
+                  <div className="settings-model-meta">
+                    <div className="settings-model-size">~92 MB</div>
+                    <div className="settings-model-actions">
+                      <span className="settings-badge active">Selected</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-voice-list">
+                {(
+                  [
+                    { role: 'hostA', name: 'Host A (Maya)', desc: 'Warm, curious host who opens the show' },
+                    { role: 'hostB', name: 'Host B (Sam)', desc: 'Calm, knowledgeable co-host' },
+                    { role: 'solo', name: 'Narrator', desc: 'Used for single-voice podcasts' },
+                  ] as { role: keyof PodcastVoices; name: string; desc: string }[]
+                ).map(({ role, name, desc }) => (
+                  <div key={role} className="settings-voice-row">
+                    <div className="settings-model-info">
+                      <div className="settings-model-name">{name}</div>
+                      <div className="settings-model-desc">{desc}</div>
+                    </div>
+                    <select
+                      className="settings-voice-select"
+                      value={podcastVoices[role]}
+                      onChange={(e) => handleVoiceChange(role, e.target.value)}
+                    >
+                      {KOKORO_VOICES.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
               </div>
             </div>
           )}
