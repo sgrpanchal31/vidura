@@ -275,6 +275,8 @@ const api = {
   podcastCancel: (sessionId: string): Promise<void> => ipcRenderer.invoke('podcast:cancel', sessionId),
   audioRead: (folderPath: string, relFile: string): Promise<Uint8Array> =>
     ipcRenderer.invoke('audio:read', folderPath, relFile),
+  audioSaveAs: (folderPath: string, relFile: string): Promise<string | null> =>
+    ipcRenderer.invoke('audio:saveAs', folderPath, relFile),
   onPodcastProgress: (cb: (p: PodcastProgress) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: PodcastProgress) => cb(p)
     ipcRenderer.on('podcast:progress', handler)

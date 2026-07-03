@@ -25,7 +25,7 @@ import { rerankerGgufService } from './services/reranker-gguf'
 import { folderWatcher } from './services/watcher'
 import { ttsService, CancelledError, type MessageAudio } from './services/tts'
 import { parsePodcastScript } from './services/podcast-script'
-import { readFile } from 'fs/promises'
+import { readFile, copyFile } from 'fs/promises'
 import { resolve as resolvePath } from 'path'
 
 let isBackgroundIndexing = false
@@ -466,6 +466,22 @@ ipcMain.handle('audio:read', async (_event, folderPath: string, relFile: string)
   const abs = resolvePath(folderPath, relFile)
   if (!abs.startsWith(audioDir + '/')) throw new Error('Invalid audio path')
   return readFile(abs)
+})
+
+// Copy a generated episode to a user-chosen location. Returns the saved path,
+// or null if the user cancelled the dialog.
+ipcMain.handle('audio:saveAs', async (_event, folderPath: string, relFile: string) => {
+  const audioDir = join(folderPath, '.openbook', 'audio')
+  const abs = resolvePath(folderPath, relFile)
+  if (!abs.startsWith(audioDir + '/')) throw new Error('Invalid audio path')
+  const date = new Date().toISOString().slice(0, 10)
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    defaultPath: `podcast-${date}.wav`,
+    filters: [{ name: 'WAV audio', extensions: ['wav'] }],
+  })
+  if (result.canceled || !result.filePath) return null
+  await copyFile(abs, result.filePath)
+  return result.filePath
 })
 
 ipcMain.handle('chat:cancel', () => {

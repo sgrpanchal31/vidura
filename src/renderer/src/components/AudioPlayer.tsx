@@ -28,6 +28,16 @@ function IconPause({ size = 14 }: { size?: number }) {
   )
 }
 
+function IconDownload({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <line x1="7" y1="2" x2="7" y2="9" />
+      <path d="M4 6.5L7 9.5l3-3" />
+      <path d="M2.5 12h9" />
+    </svg>
+  )
+}
+
 type AudioPlayerProps = {
   folder: string
   audio: MessageAudio
@@ -121,6 +131,13 @@ export default function AudioPlayer({ folder, audio }: AudioPlayerProps) {
         />
         <button className="audio-speed-btn" onClick={cycleSpeed} title="Playback speed">
           {SPEEDS[speedIdx]}x
+        </button>
+        <button
+          className="audio-download-btn"
+          onClick={() => window.api.audioSaveAs(folder, audio.file).catch(() => {})}
+          title="Download episode"
+        >
+          <IconDownload />
         </button>
       </div>
       {audio.chapters.length > 0 && (

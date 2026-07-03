@@ -96,6 +96,7 @@ declare global {
 
       podcastCancel: (sessionId: string) => Promise<void>
       audioRead: (folderPath: string, relFile: string) => Promise<Uint8Array>
+      audioSaveAs: (folderPath: string, relFile: string) => Promise<string | null>
       onPodcastProgress: (cb: (p: PodcastProgress) => void) => () => void
       onPodcastDone: (cb: (p: PodcastDone) => void) => () => void
       onPodcastError: (cb: (p: PodcastError) => void) => () => void

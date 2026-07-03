@@ -69,6 +69,23 @@
   background: var(--cream-dd);
 }
 
+.audio-download-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-m);
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  padding: 4px 7px;
+  cursor: pointer;
+}
+
+.audio-download-btn:hover {
+  background: var(--cream-dd);
+}
+
 .audio-chapters {
   display: flex;
   flex-wrap: wrap;
