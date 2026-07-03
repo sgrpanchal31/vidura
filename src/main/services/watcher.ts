@@ -2,10 +2,21 @@ import chokidar from 'chokidar'
 import { extname } from 'path'
 
 const SUPPORTED_EXTS = new Set([
-  '.pdf', '.md', '.txt',
-  '.ts', '.tsx', '.js', '.jsx',
-  '.py', '.go', '.rs', '.java',
-  '.c', '.cpp', '.h', '.rb',
+  '.pdf',
+  '.md',
+  '.txt',
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.py',
+  '.go',
+  '.rs',
+  '.java',
+  '.c',
+  '.cpp',
+  '.h',
+  '.rb',
 ])
 
 class FolderWatcher {
@@ -33,8 +44,14 @@ class FolderWatcher {
   }
 
   stop(): void {
-    if (this.timer) { clearTimeout(this.timer); this.timer = null }
-    if (this.watcher) { this.watcher.close(); this.watcher = null }
+    if (this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+    if (this.watcher) {
+      this.watcher.close()
+      this.watcher = null
+    }
   }
 }
 
