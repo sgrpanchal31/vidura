@@ -1,0 +1,24 @@
+Constitutional AI: Harmlessness from AI Feedback (CAI)
+Bai, Jones, Ndousse, Askell, Chen, DasSarma, Drain, Fort, Ganguli, Henighan, Johnston, Kadavath, Kernion, Conerly, El-Showk, Elhage, Hatfield-Dodds, Hernandez, Hume, Kaplan, Khatri, Lasenby, Lightman, Lin, Mather, Matz, McCandlish, McKinnon, McMillan, Mirhoseini, Misra, Mitchell, Murati, Nanda, Olsson, Amodei, Mann, Perez, Pierson, Ryder, Shan, Sohl-Dickstein, Stiennon, Telleen-Lawton, Tenenbaum, Thacker, Tibshiram, Thomas, Torrance, Train, West, Ziegler, Zou, Kaplan (2022)
+
+Constitutional AI (CAI) is a method for training AI systems to be harmless using a set of principles (a "constitution") rather than human-provided harmful/harmless labels.
+
+The two-phase training procedure:
+
+Phase 1 — Supervised Learning from AI Feedback (SL-CAI):
+1. Generate responses to potentially harmful prompts using an initial model
+2. Ask the model to critique its own response according to constitutional principles
+3. Ask the model to revise its response to be more harmless
+4. Fine-tune on the revised responses
+
+Phase 2 — Reinforcement Learning from AI Feedback (RLAIF):
+1. Generate pairs of responses to harmful prompts
+2. Ask the model to choose which response is more harmless given a constitutional principle
+3. Use these AI-generated preference labels to train a preference model (Harmless Reward Model)
+4. Use PPO to fine-tune the policy against this reward model
+
+The constitution contains 16 principles derived from sources including the UN Declaration of Human Rights, asking the model to consider harms, deception, rights violations, and potential misuse.
+
+Key finding: CAI allows scaling harmlessness training without human labels for harm. RLAIF produces a harmlessness reward model that performs comparably to one trained on human-generated harm labels. The resulting model (Claude v1 prototype) is both more helpful than a purely RLHF-trained model and less harmful.
+
+CAI established AI feedback as a viable alternative to human feedback for safety training, enabling more scalable alignment approaches.

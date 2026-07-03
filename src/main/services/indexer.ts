@@ -182,6 +182,8 @@ export async function indexFolder(
 
       embeddedSoFar += chunks.length
     }
+
+    await vectorStore.ensureFtsIndex()
   } else if (toIndex.length === 0) {
     // Nothing new to index — still need the store open for search
     await vectorStore.open(folderPath, { dim })

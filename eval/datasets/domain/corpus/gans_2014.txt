@@ -1,0 +1,20 @@
+Generative Adversarial Networks
+Goodfellow, Pouget-Abadie, Mirza, Xu, Warde-Farley, Ozair, Courville, Bengio (2014)
+
+We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models: a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample came from the training data rather than G.
+
+The training procedure is a minimax two-player game. G tries to fool D by generating realistic samples; D tries to distinguish real data from generated data. At the global optimum, G reproduces the training data distribution and D outputs 1/2 everywhere (cannot distinguish real from fake).
+
+The loss function is:
+min_G max_D E[log D(x)] + E[log(1 - D(G(z)))]
+
+where x is real data and z is noise input to the generator.
+
+Key properties:
+- No Markov chains required; training uses only backpropagation
+- No inference required during training
+- The framework is general and applies to any differentiable generative model
+
+Experimental results on MNIST, CIFAR-10, and Toronto Face Database demonstrate that GANs generate visually plausible samples. Qualitative comparisons with restricted Boltzmann machines and deep Boltzmann machines show competitive or superior sample quality.
+
+GANs established a new paradigm for generative modeling that led to a decade of research on image synthesis, style transfer, data augmentation, and eventually diffusion models.

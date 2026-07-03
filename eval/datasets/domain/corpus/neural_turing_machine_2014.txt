@@ -1,0 +1,22 @@
+Neural Turing Machines
+Graves, Wayne, Danihelka (2014)
+
+We extend the capabilities of neural networks by coupling them to external memory resources which they can interact with by attentional processes. The resulting model, which we call a Neural Turing Machine (NTM), can be trained end-to-end by gradient descent to manipulate memory like a digital computer.
+
+A Neural Turing Machine consists of:
+1. Controller network: An LSTM that receives inputs and emits outputs and interface vectors
+2. Memory matrix: An N×M matrix of real-valued memory cells (N locations, each M-dimensional)
+3. Read/write heads: Mechanisms for selectively reading from and writing to memory using attention
+
+The attention mechanism uses a combination of:
+- Content-based addressing: Soft attention over memory based on similarity to a query vector
+- Location-based addressing: Shifts attention by an integer offset (for sequential access)
+- Interpolation: Blends the current attention with the previous attention to control how much to shift
+
+NTMs are trained to perform algorithmic tasks:
+- Copying: Copy a sequence of random vectors. NTM achieves perfect accuracy and generalizes to sequences 10× longer than those seen in training.
+- Repeated copying: Repeat a sequence N times. NTM generalizes correctly.
+- Associative recall: Given a sequence of (key, value) pairs and a query key, return the correct value. NTM achieves 97.7% accuracy.
+- Priority sort: Sort a sequence by associated priority values. NTM outperforms LSTM.
+
+NTMs were the first demonstration that a neural network could learn to use external memory structures to perform algorithmic tasks that exceed the capacity of recurrent connections alone. They prefigured later work on memory-augmented networks and, at a high level, the key-value memory used in transformer attention.

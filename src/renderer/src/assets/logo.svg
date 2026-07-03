@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Cream rounded-square background, corner radius matches macOS icon squircle -->
+  <rect width="1024" height="1024" rx="229" ry="229" fill="#F4EFE4"/>
+  <!-- Source Serif 4 italic V in oxblood; font is loaded by the app's index.html -->
+  <text
+    x="512"
+    y="730"
+    font-family="'Source Serif 4', Georgia, serif"
+    font-style="italic"
+    font-weight="300"
+    font-size="680"
+    fill="#6B2424"
+    text-anchor="middle"
+    style="font-variation-settings: 'opsz' 60"
+  >V</text>
+</svg>

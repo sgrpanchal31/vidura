@@ -1,0 +1,20 @@
+Finetuned Language Models Are Zero-Shot Learners (FLAN)
+Wei, Bosma, Zhao, Guu, Yu, Lester, Du, Dai, Le (2021)
+
+This paper explores a simple method for improving the zero-shot learning abilities of large language models. We show that instruction tuning — fine-tuning language models on a collection of datasets described via natural language instructions — substantially improves zero-shot performance on unseen tasks.
+
+We fine-tune a 137B parameter language model (LaMDA-PT) on over 60 NLP datasets verbalized via natural language instruction templates. The resulting model, FLAN (Fine-tuned LAnguage Net), is evaluated on tasks not seen during instruction tuning.
+
+Key design: Each task in training is formulated as natural language instructions. For example, sentiment classification is phrased as "For the following review, would you say it has a positive or negative sentiment? {review}" rather than just providing input-output pairs without context.
+
+Tasks are grouped into clusters; for evaluation, all tasks from one cluster are held out (zero-shot evaluation).
+
+Results (FLAN vs GPT-3, zero-shot):
+- Natural language inference (NLI): FLAN 90.0% vs GPT-3 50.3% on RTE
+- Commonsense reasoning: FLAN 68.7% vs GPT-3 65.5% on HellaSwag
+- Sentiment: FLAN 98.5% vs GPT-3 91.2% on SST-2
+- Translation: FLAN 23.6 vs GPT-3 21.6 BLEU (French→English)
+
+FLAN matches or exceeds GPT-3 (175B, 7× larger) on 19 of 25 datasets evaluated zero-shot. Instruction tuning is most effective above 100B parameters — smaller models show no benefit.
+
+FLAN established instruction tuning as a standard technique for enabling zero-shot generalization.

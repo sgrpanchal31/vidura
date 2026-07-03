@@ -1,0 +1,19 @@
+PaLM: Scaling Language Modeling with Pathways
+Chowdhery, Narang, Devlin, Bosma, Mishra, Roberts, Barham, Chung, Sutton, Gehrmann, Schuh, Shi, Tsvyashchenko, Maynez, Rao, Barnes, Tay, Shazeer, Prabhakaran, Reif, Du, Hutchinson, Pope, Bradbury, Austin, Isard, Gur-Ari, Yin, Duke, Levskaya, Ghemawat, Dev, Michalewski, Garcia, Misra, Robinson, Fedus, Zhou, Ippolito, Lester, Longpre, Fiedel, Narayanan, Wei, Bosma, Hu, Soricut, Stern, Zoph, Chi, Dean (2022)
+
+We introduce PaLM (Pathways Language Model), a 540 billion parameter autoregressive language model, trained using a new ML system called Pathways. Pathways enables highly efficient training across 6144 TPU v4 chips using two types of parallelism simultaneously.
+
+PaLM uses the standard decoder-only Transformer architecture with modifications: SwiGLU activation, parallel formulation of attention and feed-forward layers, multi-query attention, RoPE embeddings, and vocabulary of 256K tokens using SentencePiece.
+
+Training data: 780 billion tokens from social media conversations, filtered webpages, books, GitHub, multilingual Wikipedia, and news articles.
+
+Results on 150 NLP benchmarks:
+- Few-shot performance: PaLM 540B outperforms state-of-the-art fine-tuned models on 28 of 29 natural language understanding tasks
+- BIG-Bench (hard reasoning tasks): PaLM 540B outperforms average human performance on 58% of tasks
+- Chain-of-thought reasoning (GSM8K): 56.5% with 8-shot chain-of-thought prompting
+
+Discontinuous improvements (abilities that emerge at PaLM 540B but not smaller PaLM sizes):
+- Multi-step arithmetic (jump from 17% at 62B to 58% at 540B)
+- Code translation between programming languages
+
+PaLM achieves state-of-the-art on multilingual NLP and code benchmarks, demonstrating continued scaling benefits at the 500B+ parameter range.

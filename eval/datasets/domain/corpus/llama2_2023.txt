@@ -1,0 +1,27 @@
+Llama 2: Open Foundation and Fine-Tuned Chat Models
+Touvron, Martin, Stone, Albert, Almahairi, Babaei, Bashlykov, Batra, Bhargava, Bhosale, Bikel, Blecher, Ferrer, Chen, Cucurull, Esiobu, Fernandes, Fu, Fu, Fuller, Gao, Goswami, Goyal, Hartshorn, Hosseini, Hou, Inan, Kardas, Kerkez, Khabsa, Kloumann, Korenev, Koura, La Couture, Lavril, Lee, Liskovich, Lu, Mao, Martinet, Mihaylov, Mishra, Molybog, Nie, Poulton, Reizenstein, Rungta, Salameh, Schelten, Silva, Smith, Subramanian, Tan, Tang, Taylor, Williams, Kuan, Xu, Yan, Zarov, Zhang, Fan, Kambadur, Narang, Rodriguez, Stojnic, Edunov, Touvron (2023)
+
+We develop and release Llama 2, a collection of pretrained and fine-tuned large language models (LLMs) ranging in scale from 7 billion to 70 billion parameters. Our fine-tuned LLMs, called Llama 2-Chat, are optimized for dialogue use cases.
+
+Model sizes: 7B, 13B, 34B, 70B parameters.
+
+Architecture changes from Llama 1:
+- Context window increased from 2048 to 4096 tokens
+- Grouped Query Attention (GQA) for 34B and 70B models
+- Trained on 40% more data (2 trillion tokens vs 1.4T for LLaMA-13B)
+
+Llama 2-Chat uses:
+- Supervised Fine-Tuning (SFT) on high-quality human demonstrations
+- Rejection Sampling: generate multiple responses, rank them with a reward model, train on the best
+- Proximal Policy Optimization (PPO) for RLHF
+
+Human evaluation results:
+- Llama 2-Chat 70B is rated better than ChatGPT on helpfulness in 36% of comparisons, tied in 31.5%, worse in 32.5%
+- Significantly safer than open-source alternatives; comparable to ChatGPT on safety benchmarks
+
+MMLU (5-shot):
+- Llama 2 7B: 45.3
+- Llama 2 13B: 54.8
+- Llama 2 70B: 68.9 (vs GPT-3.5: 70.0)
+
+Released under a custom commercial license permitting use for most commercial applications for companies with fewer than 700M monthly active users.

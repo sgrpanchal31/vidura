@@ -1,0 +1,56 @@
+Language Models are Few-Shot Learners (GPT-3)
+Brown, Mann, Ryder, Subbiah, Kaplan, Dhariwal, Neelakantan, Shyam, Sastry, Askell, et al. (2020)
+
+ABSTRACT
+
+Recent work has demonstrated substantial gains on many NLP tasks and benchmarks by pre-training on a large corpus of text followed by fine-tuning on a specific task. While typically task-agnostic in architecture, this method still requires task-specific fine-tuning datasets of thousands or tens of thousands of examples. By contrast, humans can generally perform a new language task from only a few examples or from simple instructions. Here we show that scaling up language models greatly improves task-agnostic, few-shot performance, sometimes even reaching competitiveness with prior state-of-the-art fine-tuning approaches.
+
+Specifically, we train GPT-3, an autoregressive language model with 175 billion parameters, 10x more than any previous non-sparse language model, and test its performance in the few-shot setting.
+
+MODEL SIZE AND ARCHITECTURE
+
+GPT-3 has 175 billion parameters total. It uses the same model and architecture as GPT-2 with some modifications: alternating dense and locally banded sparse attention patterns in the layers of the transformer. Specifically, GPT-3 uses 96 transformer layers, a context window of 2048 tokens, and an embedding dimension of 12288.
+
+Eight model sizes were trained ranging from 125 million to 175 billion parameters:
+- GPT-3 Small: 125M parameters, 12 layers, 768 dimensions
+- GPT-3 Medium: 350M parameters, 24 layers, 1024 dimensions
+- GPT-3 Large: 760M parameters, 24 layers, 1536 dimensions
+- GPT-3 XL: 1.3B parameters, 24 layers, 2048 dimensions
+- GPT-3 2.7B: 2.7B parameters, 32 layers, 2560 dimensions
+- GPT-3 6.7B: 6.7B parameters, 32 layers, 4096 dimensions
+- GPT-3 13B: 13B parameters, 40 layers, 5140 dimensions
+- GPT-3 175B: 175B parameters, 96 layers, 12288 dimensions
+
+IN-CONTEXT LEARNING
+
+A key concept introduced in this paper is in-context learning: the model uses the text of the prompt, including any examples of the task, to condition its predictions — without any gradient updates or fine-tuning. Three settings are explored:
+
+Zero-shot: Only a task description is given, no examples.
+One-shot: The task description plus one example are given.
+Few-shot: The task description plus a small number of examples (typically 10-100) are given.
+
+TRAINING DATA
+
+GPT-3 was trained on a filtered version of Common Crawl (410 billion tokens), WebText2 (19 billion tokens), Books1 (12 billion tokens), Books2 (55 billion tokens), and Wikipedia (3 billion tokens). The total training dataset contains approximately 300 billion tokens.
+
+KEY RESULTS
+
+SuperGLUE: GPT-3 (175B) achieves 71.8 in the few-shot setting, close to fine-tuned BERT-Large.
+
+TriviaQA: GPT-3 achieves 71.2% accuracy in the zero-shot setting and 68.0% in the one-shot setting, surpassing fine-tuned T5.
+
+WebQuestions: 41.5% zero-shot, 43.0% few-shot.
+
+Natural Questions: 29.9% zero-shot, 37.4% few-shot.
+
+Arithmetic: GPT-3 achieves 50% accuracy on 2-digit addition/subtraction and 100% on 1-digit addition/subtraction in the zero-shot setting. Performance degrades on larger digit counts.
+
+Translation: GPT-3 achieves 40.6 BLEU translating from French to English in the few-shot setting.
+
+LIMITATIONS
+
+GPT-3 still struggles with tasks requiring complex multi-step reasoning. It exhibits some social biases reflected in its training data. The model is computationally expensive to run at inference time.
+
+CONCLUSION
+
+Scaling language models greatly improves few-shot performance without any fine-tuning. GPT-3 demonstrates that a single large language model can perform well across many tasks using in-context learning, suggesting a path toward more general language models.

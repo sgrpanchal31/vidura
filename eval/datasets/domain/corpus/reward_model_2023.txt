@@ -1,0 +1,21 @@
+Reward Model Ensembles Help Mitigate Overoptimization
+Coste, Anwar, Kirk, Krueger (2023)
+
+Reinforcement learning from human feedback (RLHF) relies on a reward model (RM) trained on human preference data to guide policy optimization. A key challenge is reward overoptimization — as the policy is optimized against the reward model, it learns to exploit the RM's errors rather than genuinely improving. This is also called reward hacking or Goodhart's Law applied to reward models.
+
+We investigate whether using an ensemble of reward models can mitigate overoptimization. An ensemble provides uncertainty estimates: when all ensemble members agree on a reward, the policy can be more confident; when they disagree, the policy should be more conservative.
+
+Ensemble methods evaluated:
+1. Mean ensemble: Use the mean reward across all ensemble members as the optimization target
+2. Worst-case ensemble: Optimize against the minimum reward across ensemble members (pessimistic)
+3. Bonus-based exploration: Use ensemble disagreement to add an exploration bonus
+
+Experimental setup: Train multiple reward models from different random seeds on Anthropic's HH-RLHF dataset. Optimize policies using PPO against different ensemble aggregation strategies.
+
+Key findings:
+- Single RM overoptimization occurs at around 40-50 KL divergence from the reference policy
+- Mean ensemble delays the onset of overoptimization significantly (60-80 KL)
+- Worst-case ensemble is the most robust to overoptimization but converges to lower reward
+- Ensemble size of 3-5 models provides most of the benefit; larger ensembles offer diminishing returns
+
+Implications for RLHF: Using reward model ensembles is a practical and effective method to improve the robustness of RLHF training without fundamentally changing the training procedure.

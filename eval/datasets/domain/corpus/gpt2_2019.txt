@@ -1,0 +1,17 @@
+Language Models are Unsupervised Multitask Learners (GPT-2)
+Radford, Wu, Child, Luan, Amodei, Sutskever (2019)
+
+Natural language processing tasks, such as question answering, machine translation, reading comprehension, and summarization, are typically approached with supervised learning on task-specific datasets. We demonstrate that language models begin to learn these tasks without any explicit supervision when trained on a new dataset of millions of webpages called WebText.
+
+GPT-2 is a 1.5B parameter Transformer trained on WebText — 40 GB of text scraped from links shared on Reddit with at least 3 karma. The model uses the same architecture as GPT (decoder-only Transformer) with modifications: Layer normalization moved to the input of each sub-block, an additional layer normalization after the final self-attention block, vocabulary expanded to 50,257 tokens, context window increased to 1024 tokens.
+
+Four model sizes: 117M, 345M, 762M, 1542M parameters.
+
+Zero-shot task performance (no fine-tuning):
+- PTB language modeling: 35.76 perplexity (state-of-the-art at the time)
+- Children's Book Test (common nouns): 93.3% accuracy
+- LAMBADA (predict final word): 63.24% accuracy
+- Winograd Schema (coreference): 70.70% accuracy
+- Reading Comprehension (CoQA): 55 F1
+
+GPT-2 demonstrated that a large language model trained purely on next-word prediction develops surprising zero-shot generalization. The 1.5B model was withheld at release due to concerns about misuse, making it notable as one of the first AI systems where staged release was used.

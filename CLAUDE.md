@@ -1,4 +1,4 @@
-# openbook-lm
+# Vidura
 
 Local-first desktop app: chat with documents using an on-device LLM. Electron + React + TypeScript, built with electron-vite.
 
@@ -39,15 +39,17 @@ src/renderer/src/
 - **Fonts**: IBM Plex Sans (UI), Source Serif 4 (editorial), IBM Plex Mono (code)
 - **sourceFile** in chunks = relative path from notebook root, not absolute
 - Build uses esbuild — TypeScript errors don't block `npm run build`
+- **Native ML runtimes must not share the Electron main process** — kokoro-js and the embed worker bundle different onnxruntime versions, and two copies in one address space segfault the app. TTS runs in a `utilityProcess`; keep any future native-heavy engine in its own process too.
 
-## Models (GGUF Q4_K_M, downloaded to userData/models/)
+## Models (GGUF QAT Q4_0 / Q4_K_M, downloaded to userData/models/)
 
-| modelId       | Model         | Size    |
-| ------------- | ------------- | ------- |
-| `gemma2-2b`   | Qwen 2.5 1.5B | ~1 GB   |
-| `llama3.2-3b` | Llama 3.2 3B  | ~2 GB   |
-| `qwen2.5-7b`  | Qwen 2.5 7B   | ~4.7 GB |
-| `phi3-mini`   | Phi-3 Mini    | ~2.2 GB |
+| modelId       | Model        | Size     |
+| ------------- | ------------ | -------- |
+| `gemma4-e2b`  | Gemma 4 E2B  | ~3.4 GB  |
+| `llama3.2-3b` | Llama 3.2 3B | ~2 GB    |
+| `gemma4-e4b`  | Gemma 4 E4B  | ~5.2 GB  |
+| `gemma4-12b`  | Gemma 4 12B  | ~7 GB    |
+| `gpt-oss-20b` | GPT-OSS 20B  | ~11.6 GB |
 
 Embedding model (downloaded on first launch via HuggingFace Transformers, cached in userData/models/):
 
@@ -57,10 +59,28 @@ Embedding model (downloaded on first launch via HuggingFace Transformers, cached
 ## Commands
 
 ```bash
-npm install   # also runs electron-rebuild for @lancedb/lancedb
+npm install          # also runs electron-rebuild for @lancedb/lancedb
+npm run llama:update # download llama.cpp b8750, apply Gemma 4 E4B patch, compile (takes ~5 min)
 npm run dev
 npm run build
 ```
+
+## UX design principles
+
+Every UI feature should be designed with the mental model of how users behave in mature apps. Before implementing, ask: what does the user expect based on every other app they use?
+
+Key patterns to always consider:
+
+- **Don't destroy typed text.** If the user typed something and clicked a navigation item, that text must survive. Use draft refs keyed by session or context. Examples: clicking "New Chat" when already on a blank chat should focus, not reset; switching between Chat and Podcast tiles should swap drafts, not wipe them.
+- **Background work keeps running.** If a long operation (generation, download) is in progress and the user navigates away, it should continue. Don't unmount the component doing the work — hide it with `display: none` instead. When the user returns, they see the result.
+- **Only one generation at a time, but free navigation.** Block the send action during generation, not the ability to browse or type. Users expect to be able to read other sessions while waiting.
+- **Indicate state where the work is happening, not just where the user is.** If session A is generating and the user is viewing session B, the sidebar must show which session is generating (spinner dot). Don't just disable global UI — point to the specific item.
+- **Disabled visual state should not inadvertently reveal hidden elements.** CSS `:disabled` can override `opacity: 0` rules and make previously invisible elements appear. Always check `:disabled` overrides when adding disabled states to elements that are hidden by default.
+- **Navigation guards should be minimal.** Only block navigation if it would cause data loss or two parallel conflicting operations. "User is generating" is not a reason to block switching sessions — it's a reason to block starting another generation.
+
+## Writing style
+
+- No em-dashes in any user-facing text (README, release notes, UI copy). Use commas or colons instead. Em-dashes are fine in code comments and internal docs like this file.
 
 ## Workflow
 

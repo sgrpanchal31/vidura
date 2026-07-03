@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# One-step installer for openbook-lm on macOS (Apple Silicon).
+# One-step installer for Vidura on macOS (Apple Silicon).
 # Downloads the latest release DMG, installs to /Applications, and removes
 # the quarantine flag that causes the "damaged" error on unsigned apps.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/openbook-lm/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/vidura/main/scripts/install.sh | bash
 set -euo pipefail
 
-DMG_URL="https://github.com/sgrpanchal31/openbook-lm/releases/latest/download/openbook-lm-arm64.dmg"
-APP_NAME="openbook-lm.app"
+DMG_URL="https://github.com/sgrpanchal31/vidura/releases/latest/download/vidura-arm64.dmg"
+APP_NAME="Vidura.app"
 INSTALL_DIR="/Applications"
 
 # -- Preflight checks ---------------------------------------------------------
@@ -28,7 +28,7 @@ fi
 
 TMP="$(mktemp -d)"
 MNT="$TMP/mnt"
-DMG="$TMP/openbook-lm.dmg"
+DMG="$TMP/vidura.dmg"
 
 # Clean up temp dir and unmount on exit (success or failure).
 cleanup() {
@@ -37,7 +37,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Downloading openbook-lm..."
+echo "Downloading Vidura..."
 curl -fL --progress-bar -o "$DMG" "$DMG_URL"
 
 # -- Mount --------------------------------------------------------------------
@@ -49,8 +49,10 @@ hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" -quiet
 # -- Install ------------------------------------------------------------------
 
 echo "Copying to ${INSTALL_DIR}..."
-# Remove any previous install so reruns work as an upgrade.
+# Remove any previous install so reruns work as an upgrade
+# (including installs from before the app was renamed to Vidura).
 rm -rf "${INSTALL_DIR}/${APP_NAME}"
+rm -rf "${INSTALL_DIR}/openbook-lm.app"
 # ditto preserves code signatures; plain cp -r can strip them.
 ditto "$MNT/$APP_NAME" "${INSTALL_DIR}/${APP_NAME}"
 
@@ -64,6 +66,6 @@ xattr -cr "${INSTALL_DIR}/${APP_NAME}"
 # -- Done ---------------------------------------------------------------------
 
 echo ""
-echo "Done: openbook-lm installed to ${INSTALL_DIR}/${APP_NAME}"
+echo "Done: Vidura installed to ${INSTALL_DIR}/${APP_NAME}"
 echo "Launching..."
 open "${INSTALL_DIR}/${APP_NAME}"

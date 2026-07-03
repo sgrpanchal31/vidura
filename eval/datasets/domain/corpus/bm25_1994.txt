@@ -1,0 +1,26 @@
+Okapi BM25: A Non-Binary Model of Document Retrieval
+Robertson, Walker, Jones, Hancock-Beaulieu, Gatford (1994)
+
+BM25 (Best Match 25) is a bag-of-words retrieval function that ranks documents based on query terms appearing in each document. It is the standard baseline for sparse information retrieval and remains widely competitive with neural retrieval methods.
+
+The BM25 scoring function for a document D given query Q with terms q1...qn:
+
+BM25(D, Q) = Σ IDF(qi) × f(qi, D) × (k1 + 1) / (f(qi, D) + k1 × (1 - b + b × |D|/avgdl))
+
+where:
+- f(qi, D) = term frequency of qi in D
+- |D| = document length (in words)
+- avgdl = average document length in the corpus
+- IDF(qi) = log((N - n(qi) + 0.5) / (n(qi) + 0.5)) = inverse document frequency
+- k1, b = tuning parameters (typically k1=1.5, b=0.75)
+
+Key properties:
+- k1 controls term frequency saturation (higher = more weight on frequency)
+- b controls document length normalization (b=1 = full length normalization, b=0 = none)
+- IDF upweights rare terms and downweights common terms
+
+BM25 improvements over TF-IDF:
+- Saturating term frequency: the marginal value of additional term occurrences decreases
+- Better document length normalization than raw TF-IDF
+
+On TREC evaluation benchmarks, BM25 with standard parameters achieves competitive performance with more complex retrieval models. Despite being over 25 years old, BM25 remains the standard sparse retrieval baseline. Modern hybrid retrieval systems typically combine BM25 (for exact keyword matching) with dense neural retrieval (for semantic similarity).

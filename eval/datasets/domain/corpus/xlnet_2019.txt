@@ -1,0 +1,18 @@
+XLNet: Generalized Autoregressive Pretraining for Language Understanding
+Yang, Dai, Yang, Carbonell, Salakhutdinov, Le (2019)
+
+With the capability of modeling bidirectional contexts, denoising autoencoding based pretraining like BERT achieves better performance than pretraining approaches based on autoregressive language modeling. However, relying on corrupting the input with masks, BERT neglects dependency between the masked positions and suffers from a pretrain-finetune discrepancy. In light of these pros and cons, we propose XLNet.
+
+XLNet is a generalized autoregressive pretraining method that enables learning bidirectional contexts by maximizing the expected likelihood over all permutations of the factorization order. XLNet does not rely on data corruption and avoids BERT's pretrain-finetune discrepancy.
+
+XLNet integrates ideas from:
+1. Transformer-XL: A recurrence mechanism and relative positional encoding that extends the effective context length beyond a fixed window. The segment recurrence mechanism caches hidden states from the previous segment and reuses them for the current segment.
+2. Permutation language modeling: Predict tokens in a random order, conditioning on all other tokens regardless of position. This captures bidirectional context without masking.
+
+Results (compared to BERT-Large):
+- GLUE average: 88.4 vs 82.1 for BERT-Large
+- SQuAD 2.0 F1: 86.3 vs 83.1
+- SQuAD 1.1 F1: 95.1 vs 93.2
+- RACE accuracy: 81.7 vs 72.0
+
+XLNet outperforms BERT on all 20 tasks evaluated, establishing that autoregressive pretraining with permutation modeling can surpass masked language modeling while avoiding its fundamental limitations.

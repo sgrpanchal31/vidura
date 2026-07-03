@@ -28,22 +28,25 @@
   white-space: nowrap;
 }
 
-.chat-clear-btn {
+/* ── Sidebar toggle button in titlebar ── */
+.chat-sidebar-toggle {
   position: absolute;
-  right: 16px;
-  font-size: 11px;
-  color: var(--slate);
+  left: 84px;
+  top: 50%;
+  transform: translateY(-50%);
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0;
-  font-family: 'IBM Plex Sans', sans-serif;
-  opacity: 0.65;
+  color: var(--slate);
+  padding: 4px;
+  display: flex;
+  align-items: center;
   -webkit-app-region: no-drag;
+  opacity: 0.55;
 }
-.chat-clear-btn:hover {
+.chat-sidebar-toggle:hover {
   opacity: 1;
-  color: var(--ox);
+  color: var(--ink);
 }
 
 .chat-change-folder-btn {
@@ -99,11 +102,11 @@
   overflow: hidden;
 }
 
-/* ── Sources panel ── */
+/* ── Sources panel — now on the right ── */
 .sources-panel {
   width: 236px;
   flex-shrink: 0;
-  border-right: 1px solid var(--line-m);
+  border-left: 1px solid var(--line-m);
   background: rgba(237, 232, 220, 0.75);
   display: flex;
   flex-direction: column;
@@ -119,12 +122,53 @@
   color: var(--slate);
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sources-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--slate);
+  opacity: 0.7;
+}
+
+.sources-progress {
+  height: 2px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.sources-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: var(--ox);
+  animation: sources-sweep 1.4s ease-in-out infinite;
+}
+@keyframes sources-sweep {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .sources-list {
   flex: 1;
+  transition: opacity 0.25s;
   overflow-y: auto;
   padding: 6px 0;
+}
+.sources-list.reindexing {
+  opacity: 0.4;
 }
 
 /* ── Folder tree ── */
@@ -170,6 +214,64 @@
   user-select: none;
 }
 
+/* Shared checkbox style used in source rows and the sources header */
+.source-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--slate);
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
+  position: relative;
+  opacity: 0.55;
+  transition:
+    opacity 0.1s,
+    background 0.1s;
+  background: transparent;
+}
+.source-check:hover {
+  opacity: 1;
+}
+.source-check:checked {
+  background: var(--ox);
+  border-color: var(--ox);
+  opacity: 1;
+}
+.source-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0px;
+  width: 5px;
+  height: 8px;
+  border: 1.5px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+.source-check:indeterminate {
+  background: var(--ox);
+  border-color: var(--ox);
+  opacity: 0.75;
+}
+.source-check:indeterminate::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 7px;
+  height: 1.5px;
+  background: #fff;
+}
+
+/* dir rows use gap:5px; remove the checkbox margin so spacing isn't doubled */
+.source-dir .source-check {
+  margin-right: 0;
+}
+
 .source-icon {
   font-size: 10px;
   font-weight: 600;
@@ -207,6 +309,7 @@
   display: flex;
   flex-direction: column;
   gap: 28px;
+  align-items: center;
 }
 
 .message {
@@ -215,7 +318,6 @@
 }
 
 .message-user {
-  align-self: flex-end;
   text-align: right;
 }
 
@@ -224,10 +326,13 @@
   font-size: 14px;
   color: var(--slate);
   line-height: 1.55;
+  background: var(--cream-dd);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: left;
 }
 
 .message-assistant {
-  align-self: flex-start;
 }
 
 .message-assistant .message-bubble {
@@ -290,6 +395,55 @@
 .stream-cursor {
   opacity: 0.35;
   font-size: 12px;
+}
+
+.thinking-loader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.thinking-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-m);
+  border-top-color: var(--ox);
+  animation: spin 0.85s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.thinking-label {
+  font-size: 13px;
+  background: linear-gradient(
+    90deg,
+    var(--slate) 0%,
+    var(--slate) 25%,
+    var(--ox) 50%,
+    var(--slate) 75%,
+    var(--slate) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 /* ── Empty state ── */
@@ -357,9 +511,44 @@
 
 /* ── Composer ── */
 .composer {
+  position: relative;
   border-top: 1px solid var(--line-m);
   padding: 16px 48px 20px;
   flex-shrink: 0;
+}
+
+.audio-error-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--slate);
+  font-style: italic;
+}
+
+.wait-toast {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--cream-dd);
+  border: 1px solid var(--line-m);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--slate);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: toast-in 0.15s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .composer-inner {
@@ -370,6 +559,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  max-width: 680px;
+  margin: 0 auto;
 }
 
 .composer-textarea {
@@ -422,134 +613,262 @@
   background: rgba(26, 22, 18, 0.05);
 }
 
-/* ── Status bar ── */
-.statusbar {
-  padding: 6px 48px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ── Sidebar ── */
+.sidebar {
+  width: 200px;
   flex-shrink: 0;
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #5c8a4a;
-  flex-shrink: 0;
-  transition: background 0.3s;
-}
-
-.statusbar.generating .status-dot {
-  background: var(--ox);
-  animation: status-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes status-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.status-text {
-  font-size: 11px;
-  color: var(--slate);
-}
-
-/* ── Preview panel ── */
-.preview-panel {
-  width: 340px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--line-m);
-  background: var(--cream-dd);
+  border-right: 1px solid var(--line-m);
+  background: rgba(237, 232, 220, 0.75);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.16s ease;
 }
 
-.preview-header {
-  padding: 14px 18px 10px;
-  border-bottom: 1px solid var(--line-m);
+.sidebar--collapsed {
+  width: 0;
+  border-right: none;
+}
+
+.sidebar-create {
+  display: flex;
+  gap: 6px;
+  padding: 10px 8px 8px;
   flex-shrink: 0;
 }
 
-.preview-cite-tag {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ox);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
+.create-tile {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: var(--cream-dd);
+  border: 1px solid var(--line-m);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  min-width: 0;
 }
 
-.preview-filename {
+.create-tile:hover {
+  background: rgba(26, 22, 18, 0.06);
+  border-color: var(--slate);
+}
+
+.create-tile:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.sidebar-sessions {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px 5px 10px;
+  min-width: 0;
+}
+
+.session-item:hover {
+  background: rgba(26, 22, 18, 0.04);
+}
+
+.session-item--active {
+  background: var(--cream-dd);
+}
+
+.session-item:hover .session-delete-btn {
+  opacity: 1;
+}
+
+.session-icon {
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+}
+
+.session-title {
+  flex: 1;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 12px;
-  font-weight: 500;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.preview-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px;
-}
-
-.preview-text {
-  font-family: 'Source Serif 4', Georgia, serif;
-  font-size: 13px;
-  color: var(--ink);
-  line-height: 1.75;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.preview-footer {
-  font-size: 11px;
-  color: var(--slate);
-  border-top: 1px solid var(--line);
-  padding: 10px 18px;
-  flex-shrink: 0;
-}
-
-.preview-dismiss {
-  color: var(--ox);
   cursor: pointer;
-  margin-left: 6px;
+  min-width: 0;
 }
 
-.preview-dismiss:hover {
-  text-decoration: underline;
+.session-delete-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--slate);
+  padding: 2px;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  transition: opacity 0.1s;
 }
 
-/* ── Sidebar settings footer ── */
+.session-delete-btn:hover {
+  color: var(--ox);
+}
 
-.sources-settings-btn {
+.session-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0;
+}
+
+.session-generating-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ox);
+  opacity: 0.7;
+  animation: session-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes session-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+}
+
+.session-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.session-delete-confirm button {
+  background: transparent;
+  border: 1px solid var(--line-m);
+  border-radius: 2px;
+  padding: 1px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.session-delete-confirm button:first-of-type {
+  color: var(--ox);
+  border-color: var(--ox);
+}
+
+.session-delete-confirm button:first-of-type:hover {
+  background: rgba(107, 36, 36, 0.06);
+}
+
+.sidebar-settings-btn {
   flex-shrink: 0;
   border: none;
   border-top: 1px solid var(--line-m);
   background: transparent;
   width: 100%;
-  padding: 10px 16px;
+  padding: 10px 12px;
   text-align: left;
   font-family: 'IBM Plex Sans', sans-serif;
   font-size: 12px;
   color: var(--slate);
   cursor: pointer;
-  transition:
-    background 0.08s,
-    color 0.08s;
-  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-.sources-settings-btn:hover {
+.sidebar-settings-btn:hover {
   background: var(--cream-dd);
   color: var(--ink);
+}
+
+/* ── Citation tooltip ── */
+.citation-tooltip {
+  max-height: 200px;
+  background: var(--cream-d);
+  border: 1px solid var(--line-m);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(26, 22, 18, 0.14);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.citation-tooltip-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.citation-tooltip-tag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ox);
+  flex-shrink: 0;
+}
+
+.citation-tooltip-file {
+  font-size: 12px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.citation-tooltip-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.citation-tooltip-footer {
+  font-size: 11px;
+  color: var(--slate);
+  border-top: 1px solid var(--line);
+  padding: 5px 12px;
+  flex-shrink: 0;
 }

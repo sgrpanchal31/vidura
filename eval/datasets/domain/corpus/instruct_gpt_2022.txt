@@ -1,0 +1,53 @@
+Training Language Models to Follow Instructions with Human Feedback (InstructGPT)
+Ouyang, Wu, Jiang, Almeida, Wainwright, Mishkin, Zhang, Agarwal, Slama, Ray, Schulman, Hilton, Kelton, Miller, Simens, Askell, Welinder, Christiano, Leike, Lowe (2022)
+
+ABSTRACT
+
+Making language models bigger does not inherently make them better at following a user's intent. For example, large language models can generate outputs that are untruthful, toxic, or simply not helpful to the user. In other words, these models are not aligned with their users. In this paper, we show an avenue for aligning language models with user intent on a wide range of tasks by fine-tuning with human feedback. Starting from GPT-3, we collect a dataset of human demonstrations and use this to fine-tune GPT-3 using supervised learning. We then collect a dataset of human rankings of model outputs, which we use to further fine-tune this supervised model using reinforcement learning from human feedback (RLHF). We call the resulting models InstructGPT.
+
+METHOD: REINFORCEMENT LEARNING FROM HUMAN FEEDBACK (RLHF)
+
+The training procedure has three steps:
+
+Step 1 — Supervised Fine-Tuning (SFT): Collect demonstration data showing how the model should respond. Human labelers write ideal responses to a set of prompts. Fine-tune GPT-3 on this data.
+
+Step 2 — Reward Model Training: Collect comparison data. For a given prompt, the SFT model generates multiple outputs. Human labelers rank these outputs from best to worst. Train a reward model to predict human preferences from these rankings.
+
+Step 3 — Reinforcement Learning with PPO: Use the reward model as a reward signal and optimize the SFT model using Proximal Policy Optimization (PPO), a reinforcement learning algorithm. A KL penalty is added to prevent the model from deviating too far from the original GPT-3 behavior.
+
+MODEL SIZES
+
+InstructGPT models were trained at three sizes:
+- 1.3B parameters
+- 6B parameters
+- 175B parameters
+
+HUMAN EVALUATION RESULTS
+
+Key finding: A 1.3B parameter InstructGPT model is preferred over the 175B parameter GPT-3 model by human labelers, despite being 100x smaller. Labelers preferred InstructGPT 1.3B outputs over GPT-3 175B outputs 85% of the time in head-to-head comparisons.
+
+Specifically:
+- InstructGPT outputs are rated as more helpful than GPT-3 on 85% of prompts
+- InstructGPT outputs are rated as less harmful than GPT-3 on 71% of prompts
+- InstructGPT is rated as more truthful than GPT-3 on TruthfulQA (21% vs 41% truthful)
+
+AUTOMATIC EVALUATION
+
+On the FLAN and T0 held-out benchmarks:
+- InstructGPT shows minimal regression compared to GPT-3
+- The KL penalty successfully prevents the model from forgetting knowledge
+
+On RealToxicityPrompts:
+- InstructGPT generates 25% fewer toxic outputs than GPT-3
+
+LABELER DETAILS
+
+The reward model was trained using about 50,000 ranking comparisons from 40 human labelers. The labeler pool consisted of contractors who were selected for their ability to identify sensitive content and follow detailed instructions.
+
+LIMITATIONS
+
+InstructGPT can still produce harmful outputs, make mistakes on factual questions, and exhibit biases from training data. The model is aligned to the preferences of labelers, which may not represent all users. RLHF is expensive to run and requires significant human annotation effort.
+
+SIGNIFICANCE
+
+InstructGPT demonstrated that alignment through RLHF can dramatically improve user-perceived quality without increasing model size. This work directly influenced the development of ChatGPT and established RLHF as a standard technique for aligning large language models. The key insight — that a smaller, better-aligned model beats a larger, poorly-aligned one — shifted the field's focus toward instruction following and human preference modeling.

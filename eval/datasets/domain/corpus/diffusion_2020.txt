@@ -1,0 +1,25 @@
+Denoising Diffusion Probabilistic Models (DDPM)
+Ho, Jain, Abbeel (2020)
+
+We present high quality image synthesis results using diffusion probabilistic models, a class of latent variable models inspired by nonequilibrium thermodynamics. Our best results are obtained by training on a weighted variational bound designed according to a novel connection between diffusion probabilistic models and denoising score matching with Langevin dynamics.
+
+The forward process gradually adds Gaussian noise to an image over T timesteps until it becomes pure noise. The model learns the reverse process — given a noisy image at timestep t, predict the noise that was added.
+
+Forward process (adding noise):
+q(x_t | x_{t-1}) = N(x_t; √(1-β_t) x_{t-1}, β_t I)
+
+where β_t is a noise schedule (linear from 10^{-4} to 0.02 in the original paper) and T=1000 timesteps.
+
+Reverse process (denoising):
+p_θ(x_{t-1} | x_t) = N(x_{t-1}; μ_θ(x_t, t), Σ_θ(x_t, t))
+
+The model (a U-Net with attention) predicts the noise ε rather than the denoised image directly. The training objective simplifies to: E[||ε - ε_θ(x_t, t)||²]
+
+Results on image generation:
+- CIFAR-10: FID score of 3.17 (competitive with GANs)
+- LSUN bedroom 256×256: FID of 4.90 (outperforms GAN baselines)
+- CelebA-HQ 256×256: FID of 4.88
+
+Unlike GANs, diffusion models do not suffer from mode collapse or training instability. They produce diverse, high-quality samples but require many denoising steps at inference (1000 steps), making generation slower than GANs.
+
+DDPM established diffusion models as a practical alternative to GANs and directly led to Stable Diffusion, DALL-E 2, and Imagen.

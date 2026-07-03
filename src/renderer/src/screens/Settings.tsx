@@ -1,33 +1,60 @@
 import { useState, useEffect, useRef } from 'react'
 import './Settings.css'
-import type { LlmModelInfo, EmbedModelInfo, ModelProgress } from '../../../preload/index'
+import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices, UpdateInfo } from '../../../preload/index'
 
-const LLM_META: Record<string, { name: string; desc: string }> = {
-  'gemma2-2b': {
-    name: 'Qwen 2.5 1.5B',
-    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
+const LLM_META: Record<string, { name: string; desc: string; minRamGB: number }> = {
+  'gemma4-e2b': {
+    name: 'Gemma 4 E2B',
+    desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
+    minRamGB: 0,
   },
   'llama3.2-3b': {
     name: 'Llama 3.2 3B',
     desc: 'Slightly larger. Better on dense academic text and long-form sources.',
+    minRamGB: 8,
   },
-  'qwen2.5-7b': {
-    name: 'Qwen 2.5 7B',
-    desc: 'Highest quality. Requires 32 GB RAM or more.',
+  'gemma4-e4b': {
+    name: 'Gemma 4 E4B',
+    desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
+    minRamGB: 8,
   },
-  'phi3-mini': {
-    name: 'Phi-3 Mini',
-    desc: "Microsoft's compact model. Good on structured notes and lists.",
+  'gemma4-12b': {
+    name: 'Gemma 4 12B',
+    desc: 'High quality. Requires 24 GB RAM or more.',
+    minRamGB: 24,
+  },
+  'gpt-oss-20b': {
+    name: 'GPT-OSS 20B',
+    desc: "OpenAI's open-weight model. Top-tier reasoning and comprehension. Needs 32 GB RAM.",
+    minRamGB: 32,
   },
 }
 
 function recommendedLlmId(ramGB: number): string {
-  if (ramGB >= 32) return 'qwen2.5-7b'
-  if (ramGB >= 16) return 'llama3.2-3b'
-  return 'gemma2-2b'
+  if (ramGB >= 32) return 'gpt-oss-20b'
+  if (ramGB >= 24) return 'gemma4-12b'
+  return 'gemma4-e4b'
 }
 
-type Section = 'llm' | 'embed'
+// Curated Kokoro voices (all bundled with the app, no extra download).
+// Grades come from the Kokoro voice table; af_heart is the standout.
+const KOKORO_VOICES: { id: string; label: string }[] = [
+  { id: 'af_heart', label: 'Heart: female, best quality' },
+  { id: 'af_bella', label: 'Bella: female, great' },
+  { id: 'af_nicole', label: 'Nicole: female, good' },
+  { id: 'af_sarah', label: 'Sarah: female, decent' },
+  { id: 'bf_emma', label: 'Emma: female, British' },
+  { id: 'am_fenrir', label: 'Fenrir: male, decent' },
+  { id: 'am_michael', label: 'Michael: male, decent' },
+  { id: 'am_puck', label: 'Puck: male, decent' },
+  { id: 'bm_george', label: 'George: male, British' },
+  { id: 'bm_fable', label: 'Fable: male, British' },
+]
+
+// Must match VOICE_A / VOICE_B / VOICE_SOLO in src/main/services/tts.ts
+const DEFAULT_VOICES: PodcastVoices = { hostA: 'af_heart', hostB: 'am_fenrir', solo: 'am_michael' }
+
+type Section = 'llm' | 'embed' | 'retrieval' | 'audio' | 'about'
 
 type Props = {
   folder: string
@@ -61,22 +88,55 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   const [embedDownloadProgress, setEmbedDownloadProgress] = useState<{ loaded: number; total: number } | null>(null)
   const [embedError, setEmbedError] = useState<string | null>(null)
 
+  // Reranker state
+  const [rerankerEnabled, setRerankerEnabled] = useState(false)
+  const [rerankerStatus, setRerankerStatus] = useState<string>('idle')
+  const [rerankerDownloaded, setRerankerDownloaded] = useState(false)
+  const [downloadingReranker, setDownloadingReranker] = useState(false)
+  const [rerankerDownloadProgress, setRerankerDownloadProgress] = useState<{ loaded: number; total: number } | null>(
+    null
+  )
+  const [rerankerError, setRerankerError] = useState<string | null>(null)
+  const rerankerDownloadUnsubRef = useRef<(() => void) | null>(null)
+
+  // Podcast audio state
+  const [podcastVoices, setPodcastVoices] = useState<PodcastVoices>(DEFAULT_VOICES)
+
+  // About / updates state
+  const [appVersion, setAppVersion] = useState('')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
+  const [updateDl, setUpdateDl] = useState<{ loaded: number; total: number } | null>(null)
+
   const unsubRef = useRef<(() => void) | null>(null)
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    Promise.all([window.api.listModels(), window.api.listEmbedModels(), window.api.getSystemInfo()]).then(
-      ([llms, embeds, sysInfo]) => {
-        setLlmModels(llms)
-        setEmbedModel(embeds[0] ?? null)
-        setRamGB(sysInfo.totalRamGB)
-        setIsMac(sysInfo.platform === 'darwin')
-      }
-    )
+    Promise.all([
+      window.api.listModels(),
+      window.api.listEmbedModels(),
+      window.api.getSystemInfo(),
+      window.api.rerankerGetStatus(),
+      window.api.getPrefs(),
+    ]).then(([llms, embeds, sysInfo, reranker, prefs]) => {
+      setLlmModels(llms)
+      setEmbedModel(embeds[0] ?? null)
+      setRamGB(sysInfo.totalRamGB)
+      setIsMac(sysInfo.platform === 'darwin')
+      setRerankerEnabled(reranker.enabled)
+      setRerankerStatus(reranker.status)
+      setRerankerDownloaded(reranker.downloaded)
+      if (prefs.podcastVoices) setPodcastVoices(prefs.podcastVoices)
+    })
+    window.api
+      .getAppVersion()
+      .then(setAppVersion)
+      .catch(() => {})
 
     return () => {
       unsubRef.current?.()
       embedUnsubRef.current?.()
+      rerankerDownloadUnsubRef.current?.()
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
     }
   }, [folder])
@@ -187,12 +247,91 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     }
   }
 
+  async function handleDownloadReranker() {
+    if (downloadingReranker) return
+    setRerankerError(null)
+    setDownloadingReranker(true)
+    setRerankerDownloadProgress(null)
+    const unsub = window.api.onModelProgress((p) => {
+      if (p.modelId === 'bge-reranker-v2-m3') {
+        setRerankerDownloadProgress({ loaded: p.downloaded, total: p.total })
+      }
+    })
+    rerankerDownloadUnsubRef.current = unsub
+    try {
+      await window.api.modelDownload('bge-reranker-v2-m3')
+      const status = await window.api.rerankerGetStatus()
+      setRerankerDownloaded(status.downloaded)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg !== 'DOWNLOAD_CANCELLED') setRerankerError(msg)
+    } finally {
+      unsub()
+      rerankerDownloadUnsubRef.current = null
+      setDownloadingReranker(false)
+      setRerankerDownloadProgress(null)
+    }
+  }
+
+  async function handleRerankerToggle(enabled: boolean) {
+    setRerankerError(null)
+    if (enabled) {
+      setRerankerStatus('starting')
+      try {
+        await window.api.rerankerSetEnabled(true)
+        setRerankerEnabled(true)
+        setRerankerStatus('ready')
+      } catch (err) {
+        setRerankerStatus('error')
+        setRerankerError(err instanceof Error ? err.message : String(err))
+      }
+    } else {
+      await window.api.rerankerSetEnabled(false)
+      setRerankerEnabled(false)
+      setRerankerStatus('idle')
+    }
+  }
+
+  async function handleVoiceChange(role: keyof PodcastVoices, voiceId: string) {
+    const next = { ...podcastVoices, [role]: voiceId }
+    setPodcastVoices(next)
+    await window.api.setPrefs({ podcastVoices: next })
+  }
+
+  async function handleCheckUpdates() {
+    setUpdateStatus('checking')
+    setAvailableUpdate(null)
+    const update = await window.api.updateCheck().catch(() => null)
+    if (update) {
+      setAvailableUpdate(update)
+      setUpdateStatus('idle')
+    } else {
+      setUpdateStatus('latest')
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!availableUpdate || updateDl) return
+    const unsub = window.api.onUpdateProgress((p) => setUpdateDl(p))
+    setUpdateDl({ loaded: 0, total: 0 })
+    try {
+      // Downloads the DMG, then the app quits and relaunches as the new version
+      await window.api.updateInstall(availableUpdate.url)
+    } catch {
+      unsub()
+      setUpdateDl(null)
+    }
+  }
+
   const recommendedLlm = recommendedLlmId(ramGB)
   const busy = !!downloadingId || !!loadingId
 
   const NAV_ITEMS: { id: Section; label: string }[] = [
     { id: 'llm', label: 'Language model' },
     { id: 'embed', label: 'Embedding model' },
+    { id: 'retrieval', label: 'Retrieval' },
+    { id: 'audio', label: 'Podcast audio' },
+    { id: 'about', label: 'About' },
   ]
 
   return (
@@ -281,17 +420,21 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                     )
                   }
 
+                  // Models above the machine's RAM would hang or crash on load,
+                  // so their actions are disabled with an explanatory tag
+                  const tooBig = (meta?.minRamGB ?? 0) > ramGB
                   return (
                     <div
                       key={m.id}
-                      className={`settings-model-row${isActive ? ' sel' : ''}${busy && !isActive ? ' disabled' : ''}${!m.downloaded ? ' clickable' : ''}`}
-                      onClick={!m.downloaded ? () => showHint(m.id) : undefined}
+                      className={`settings-model-row${isActive ? ' sel' : ''}${(busy && !isActive) || tooBig ? ' disabled' : ''}${!m.downloaded && !tooBig ? ' clickable' : ''}`}
+                      onClick={!m.downloaded && !tooBig ? () => showHint(m.id) : undefined}
                     >
                       <div className="settings-radio" />
                       <div className="settings-model-info">
                         <div className="settings-model-name">
                           {meta?.name ?? m.id}
                           {m.id === recommendedLlm && <span className="tag-rec">Recommended</span>}
+                          {tooBig && <span className="tag-info">Needs {meta?.minRamGB} GB RAM</span>}
                         </div>
                         <div className="settings-model-desc">{meta?.desc ?? ''}</div>
                       </div>
@@ -301,7 +444,11 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                           {isActive && <span className="settings-badge active">Selected</span>}
                           {!isActive && m.downloaded && (
                             <>
-                              <button className="settings-use-btn" onClick={(e) => handleUse(m.id, e)} disabled={busy}>
+                              <button
+                                className="settings-use-btn"
+                                onClick={(e) => handleUse(m.id, e)}
+                                disabled={busy || tooBig}
+                              >
                                 {isLoading ? 'Loading…' : 'Use'}
                               </button>
                               <button
@@ -313,7 +460,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                               </button>
                             </>
                           )}
-                          {!m.downloaded && (
+                          {!m.downloaded && !tooBig && (
                             <div className="settings-download-group">
                               {hintId === m.id && <span className="settings-download-hint">Download first</span>}
                               <button
@@ -332,6 +479,79 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                 })}
               </div>
               <div className="settings-coming-soon">Coming soon: switch models per chat</div>
+            </div>
+          )}
+
+          {/* ── Retrieval ── */}
+          {activeSection === 'retrieval' && (
+            <div className="settings-section">
+              <div className="settings-section-title">Retrieval</div>
+              <div className="settings-section-note">
+                Controls how passages are scored and ranked before being sent to the language model.
+              </div>
+              {rerankerError && <div className="settings-error">{rerankerError}</div>}
+              <div className="settings-model-list">
+                {downloadingReranker ? (
+                  <div className="settings-row-progress">
+                    <div className="settings-progress-header">
+                      <span className="settings-progress-label">
+                        Downloading BGE Reranker V2 M3
+                        {rerankerDownloadProgress && rerankerDownloadProgress.total > 0
+                          ? ` — ${Math.round((rerankerDownloadProgress.loaded / rerankerDownloadProgress.total) * 100)}%`
+                          : '…'}
+                      </span>
+                    </div>
+                    <div className="settings-progress-track">
+                      <div
+                        className="settings-progress-fill"
+                        style={{
+                          width:
+                            rerankerDownloadProgress && rerankerDownloadProgress.total > 0
+                              ? `${Math.round((rerankerDownloadProgress.loaded / rerankerDownloadProgress.total) * 100)}%`
+                              : '0%',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="settings-model-row">
+                    <div className="settings-model-info">
+                      <div className="settings-model-name">BGE Reranker V2 M3</div>
+                      <div className="settings-model-desc">
+                        Re-scores retrieved passages with a cross-encoder for more relevant answers. Runs on-device via
+                        the same engine as the language model.
+                      </div>
+                      {rerankerEnabled && rerankerStatus === 'starting' && (
+                        <div className="settings-progress-label" style={{ marginTop: 6 }}>
+                          Loading model…
+                        </div>
+                      )}
+                    </div>
+                    <div className="settings-model-meta">
+                      <div className="settings-model-size">~600 MB</div>
+                      <div className="settings-model-actions">
+                        {rerankerDownloaded ? (
+                          <>
+                            {rerankerEnabled && rerankerStatus === 'ready' && (
+                              <span className="settings-badge active">Active</span>
+                            )}
+                            <button
+                              className={`reranker-toggle${rerankerEnabled ? ' on' : ''}`}
+                              onClick={() => handleRerankerToggle(!rerankerEnabled)}
+                              disabled={rerankerStatus === 'starting'}
+                              aria-label={rerankerEnabled ? 'Disable reranker' : 'Enable reranker'}
+                            />
+                          </>
+                        ) : (
+                          <button className="settings-download-btn" onClick={handleDownloadReranker}>
+                            Download
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -398,6 +618,117 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {/* ── About ── */}
+          {activeSection === 'about' && (
+            <div className="settings-section">
+              <div className="settings-section-title">About</div>
+              <div className="settings-section-note">
+                Vidura is local-first: your documents and conversations never leave your Mac.
+              </div>
+              <div className="settings-voice-list">
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Version</div>
+                    <div className="settings-model-desc">Vidura {appVersion || '...'}</div>
+                  </div>
+                  {availableUpdate ? (
+                    <button className="settings-use-btn" onClick={handleInstallUpdate} disabled={!!updateDl}>
+                      {updateDl
+                        ? updateDl.total > 0
+                          ? `Downloading... ${Math.round((updateDl.loaded / updateDl.total) * 100)}%`
+                          : 'Downloading...'
+                        : `Update to ${availableUpdate.version}`}
+                    </button>
+                  ) : (
+                    <button
+                      className="settings-use-btn"
+                      onClick={handleCheckUpdates}
+                      disabled={updateStatus === 'checking'}
+                    >
+                      {updateStatus === 'checking'
+                        ? 'Checking...'
+                        : updateStatus === 'latest'
+                          ? 'You are on the latest version'
+                          : 'Check for updates'}
+                    </button>
+                  )}
+                </div>
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Feedback</div>
+                    <div className="settings-model-desc">Found a bug or have an idea? It helps a lot.</div>
+                  </div>
+                  <a
+                    className="settings-use-btn"
+                    style={{ textDecoration: 'none' }}
+                    href="https://github.com/sgrpanchal31/vidura/issues"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Report an issue
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Podcast audio ── */}
+          {activeSection === 'audio' && (
+            <div className="settings-section">
+              <div className="settings-section-title">Podcast audio</div>
+              <div className="settings-section-note">
+                Controls the speech engine and voices used when generating podcast episodes. Changes apply to the next
+                episode you create.
+              </div>
+
+              <div className="settings-model-list">
+                <div className="settings-model-row sel">
+                  <div className="settings-radio" />
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Kokoro 82M</div>
+                    <div className="settings-model-desc">
+                      Lightweight neural text to speech that runs entirely on your Mac. More engines will appear here as
+                      they become available.
+                    </div>
+                  </div>
+                  <div className="settings-model-meta">
+                    <div className="settings-model-size">~92 MB</div>
+                    <div className="settings-model-actions">
+                      <span className="settings-badge active">Selected</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-voice-list">
+                {(
+                  [
+                    { role: 'hostA', name: 'Host A (Maya)', desc: 'Warm, curious host who opens the show' },
+                    { role: 'hostB', name: 'Host B (Sam)', desc: 'Calm, knowledgeable co-host' },
+                    { role: 'solo', name: 'Narrator', desc: 'Used for single-voice podcasts' },
+                  ] as { role: keyof PodcastVoices; name: string; desc: string }[]
+                ).map(({ role, name, desc }) => (
+                  <div key={role} className="settings-voice-row">
+                    <div className="settings-model-info">
+                      <div className="settings-model-name">{name}</div>
+                      <div className="settings-model-desc">{desc}</div>
+                    </div>
+                    <select
+                      className="settings-voice-select"
+                      value={podcastVoices[role]}
+                      onChange={(e) => handleVoiceChange(role, e.target.value)}
+                    >
+                      {KOKORO_VOICES.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -9,7 +9,14 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$REPO_DIR/dist"
-APP="$DIST/openbook-lm.app"
+APP="$DIST/Vidura.app"
+
+# Safety: dev-mode builds inline the local Langfuse keys from .env.local into
+# out/main/index.js. Never ship one — require a fresh production build.
+if grep -qE 'pk-lf|new Langfuse' "$REPO_DIR/out/main/index.js" 2>/dev/null; then
+  echo "✗ out/ contains a dev build (telemetry keys detected) — run 'npm run build' first" >&2
+  exit 1
+fi
 
 echo "▶ Cleaning previous build artifacts"
 rm -rf "$DIST"
@@ -89,10 +96,10 @@ cp -r "$REPO_DIR/node_modules" "$APP_RES/"
 # ── 5. Rename executable and patch Info.plist ──
 echo "▶ Patching Info.plist and renaming executable"
 PLIST="$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName openbook-lm"          "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.openbooklm.app" "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable openbook-lm"    "$PLIST"
-mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/openbook-lm"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName Vidura"          "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.vidura.app" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable vidura"    "$PLIST"
+mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/vidura"
 
 # ── 6. Ad-hoc code-sign (inside-out: native binaries first, then the bundle) ──
 # --deep does not descend into Contents/Resources/app/node_modules, so we sign
@@ -121,15 +128,15 @@ echo "▶ Verifying signature (informational)"
 # codesign --verify always traverses the full bundle and exits non-zero on
 # Electron Framework's "ambiguous" structure — that's a tooling quirk, not a
 # launch failure. We check the main executable's signing status directly instead.
-codesign -dv "$APP/Contents/MacOS/openbook-lm" 2>&1 | grep -E 'Signature|CodeDirectory|Authority' | head -3 || true
+codesign -dv "$APP/Contents/MacOS/vidura" 2>&1 | grep -E 'Signature|CodeDirectory|Authority' | head -3 || true
 
 # ── 7. Create DMG ──
 echo "▶ Creating DMG"
 hdiutil create \
-  -volname "openbook-lm" \
+  -volname "Vidura" \
   -srcfolder "$APP" \
   -ov -format UDZO \
-  "$DIST/openbook-lm-arm64.dmg"
+  "$DIST/vidura-arm64.dmg"
 
 echo ""
-echo "✔ Done: $DIST/openbook-lm-arm64.dmg ($(du -sh "$DIST/openbook-lm-arm64.dmg" | cut -f1))"
+echo "✔ Done: $DIST/vidura-arm64.dmg ($(du -sh "$DIST/vidura-arm64.dmg" | cut -f1))"

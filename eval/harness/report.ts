@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { mkdirSync, writeFileSync, existsSync, appendFileSync } from 'fs'
 import type { RunResult } from './types'
+import { EVAL_EMBEDDING_MODEL } from './embedder'
 
 // Results dir relative to project root (where npm run eval is invoked from)
 const RESULTS_DIR = join(process.cwd(), 'eval', 'results')
@@ -10,6 +11,12 @@ function pad(s: string | number, len: number) {
 }
 function pct(n: number) {
   return (n * 100).toFixed(1) + '%'
+}
+
+function shortEmbedLabel(modelId: string): string {
+  if (modelId.includes('Qwen3-Embedding')) return 'qwen3'
+  if (modelId.includes('bge-small')) return 'bge-small'
+  return modelId.split('/').pop()?.split('-').slice(0, 2).join('-') ?? modelId
 }
 
 export function writeRunResult(result: RunResult): void {
@@ -28,6 +35,7 @@ function appendSummaryRow(result: RunResult): void {
   const summaryPath = join(RESULTS_DIR, 'summary.md')
   const { aggregates: a, timestamp, technique, dataset, topK } = result
   const date = timestamp.slice(0, 10)
+  const embed = shortEmbedLabel(EVAL_EMBEDDING_MODEL)
 
   if (!existsSync(summaryPath)) {
     writeFileSync(
@@ -35,13 +43,13 @@ function appendSummaryRow(result: RunResult): void {
       [
         '# Retrieval Eval Summary',
         '',
-        '| Date       | Technique    | Dataset      |  k | Recall@k |   MRR | p50ms | p95ms | Hits       |',
-        '|------------|--------------|--------------|----|---------:|------:|------:|------:|------------|',
+        '| Date       | Technique    | Dataset      |  k | Embed     | Recall@k |   MRR | p50ms | p95ms | Hits       |',
+        '|------------|--------------|--------------|----|-----------|---------:|------:|------:|------:|------------|',
       ].join('\n') + '\n'
     )
   }
 
-  const row = `| ${date} | ${pad(technique, 12)} | ${pad(dataset, 12)} | ${String(topK).padStart(2)} | ${pct(a.recallAtK).padStart(8)} | ${pct(a.mrr).padStart(5)} | ${String(a.p50Ms).padStart(5)} | ${String(a.p95Ms).padStart(5)} | ${a.hitsCount}/${a.totalQueries} |`
+  const row = `| ${date} | ${pad(technique, 12)} | ${pad(dataset, 12)} | ${String(topK).padStart(2)} | ${pad(embed, 9)} | ${pct(a.recallAtK).padStart(8)} | ${pct(a.mrr).padStart(5)} | ${String(a.p50Ms).padStart(5)} | ${String(a.p95Ms).padStart(5)} | ${a.hitsCount}/${a.totalQueries} |`
   appendFileSync(summaryPath, row + '\n')
   console.log('[report] appended to eval/results/summary.md')
 }

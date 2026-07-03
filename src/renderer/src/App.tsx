@@ -3,9 +3,7 @@ import Onboarding from './screens/Onboarding'
 import Chat from './screens/Chat'
 import Settings from './screens/Settings'
 import './styles/globals.css'
-import bgImg from './assets/background.png'
-import vitruvianManImg from './assets/vitruvian-man.png'
-import type { IndexProgress, IndexSummary, ModelProgress } from '../../preload'
+import type { IndexProgress, IndexSummary, ModelProgress, UpdateInfo } from '../../preload'
 
 type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready' | 'settings'
 
@@ -16,6 +14,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('loading')
   const [notebookFolder, setNotebookFolder] = useState<string | null>(null)
   const [modelId, setModelId] = useState<string | null>(null)
+  const [lastActiveSessionId, setLastActiveSessionId] = useState<string | null>(null)
 
   // Indexing
   const [progress, setProgress] = useState<IndexProgress | null>(null)
@@ -27,6 +26,11 @@ export default function App() {
   const [modelProgress, setModelProgress] = useState<ModelProgress | null>(null)
   const [modelLoadStage, setModelLoadStage] = useState<'download' | 'load' | 'embed' | null>(null)
   const [modelPrepError, setModelPrepError] = useState<string | null>(null)
+
+  // Update banner: a newer GitHub release the app can install over itself
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [updateHidden, setUpdateHidden] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState<{ loaded: number; total: number } | null>(null)
 
   const unsubsRef = useRef<Array<() => void>>([])
 
@@ -40,7 +44,25 @@ export default function App() {
         setScreen('onboarding')
       }
     })
+    // Fire-and-forget: resolves null on any network error, never blocks launch
+    window.api
+      .updateCheck()
+      .then((u) => u && setUpdateInfo(u))
+      .catch(() => {})
   }, [])
+
+  async function handleUpdateNow() {
+    if (!updateInfo || updateProgress) return
+    const unsub = window.api.onUpdateProgress((p) => setUpdateProgress(p))
+    setUpdateProgress({ loaded: 0, total: 0 })
+    try {
+      // Downloads the DMG, then the app quits and relaunches as the new version
+      await window.api.updateInstall(updateInfo.url)
+    } catch {
+      unsub()
+      setUpdateProgress(null)
+    }
+  }
 
   // ── Ingest helper ──────────────────────────────────────────────────────────
 
@@ -69,28 +91,12 @@ export default function App() {
   // embed model and indexes files). On success, show chat.
 
   async function ensureEmbedAndIndex(folder: string) {
-    const [folderState, currentParser] = await Promise.all([
-      window.api.getIngestState(folder),
-      window.api.getParserVersion(),
-    ])
-    const indexedFiles = Object.values(folderState.files ?? {}).filter((f) => !f.failed && f.chunkCount > 0)
-    const hasIndexedFiles = indexedFiles.length > 0
-    // Only skip ingest if the notebook was already indexed with the current model
-    // AND the current parser version — a version bump means the schema changed and
-    // all files need to be re-parsed and re-embedded into the new structure.
-    const onCurrentModel = folderState.embeddingModel === DEFAULT_EMBED_ID
-    const onCurrentParser = indexedFiles.every((f) => f.parserVersion === currentParser)
-
-    if (hasIndexedFiles && onCurrentModel && onCurrentParser) {
-      window.api.setWindowSize(1100, 760)
-      setScreen('ready')
-      return
-    }
-
-    // Missing files or stale embedding model — run ingest.
+    // Always run ingest — indexFolder is incremental (hash-based) so unchanged files
+    // are skipped. This ensures new/deleted files are picked up on every launch and
+    // the file watcher is started reliably.
     const ok = await runIngest(folder, DEFAULT_EMBED_ID)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
     // On failure: stay on indexing screen showing the error + Back button
@@ -147,7 +153,7 @@ export default function App() {
     if (folder) {
       await ensureEmbedAndIndex(folder)
     } else {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -170,7 +176,7 @@ export default function App() {
     setNotebookFolder(folder)
     const ok = await runIngest(folder, DEFAULT_EMBED_ID)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -185,7 +191,7 @@ export default function App() {
 
     const ok = await runIngest(newFolder)
     if (ok) {
-      window.api.setWindowSize(1100, 760)
+      window.api.setWindowSize(1240, 760)
       setScreen('ready')
     }
   }
@@ -197,8 +203,6 @@ export default function App() {
   if (screen === 'onboarding') {
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content">
           <Onboarding onComplete={handleOnboardingComplete} />
         </div>
@@ -236,8 +240,6 @@ export default function App() {
 
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -358,8 +360,6 @@ export default function App() {
 
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
             style={{
@@ -440,37 +440,89 @@ export default function App() {
     )
   }
 
-  if (screen === 'ready' && notebookFolder && modelId) {
+  if ((screen === 'ready' || screen === 'settings') && notebookFolder && modelId) {
+    const updatePct =
+      updateProgress && updateProgress.total > 0
+        ? Math.round((updateProgress.loaded / updateProgress.total) * 100)
+        : null
     return (
       <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
-        <div className="screen-content">
+        {updateInfo && !updateHidden && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: 'var(--ink)',
+              color: 'var(--cream)',
+              padding: '8px 14px',
+              borderRadius: 8,
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 12,
+              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <span>Vidura {updateInfo.version} is available</span>
+            <button
+              onClick={handleUpdateNow}
+              disabled={!!updateProgress}
+              style={{
+                border: 'none',
+                borderRadius: 5,
+                background: 'var(--ox)',
+                color: 'var(--cream)',
+                fontSize: 12,
+                padding: '5px 10px',
+                cursor: updateProgress ? 'default' : 'pointer',
+              }}
+            >
+              {updateProgress ? (updatePct !== null ? `Downloading... ${updatePct}%` : 'Downloading...') : 'Update now'}
+            </button>
+            {!updateProgress && (
+              <button
+                onClick={() => setUpdateHidden(true)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--cream)',
+                  opacity: 0.7,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Later
+              </button>
+            )}
+          </div>
+        )}
+        {/* Chat stays mounted even when Settings is open so generation keeps running */}
+        <div className="screen-content" style={{ display: screen === 'settings' ? 'none' : undefined }}>
           <Chat
             key={notebookFolder}
             folder={notebookFolder}
             modelId={modelId}
             onChangeFolder={handleChangeFolder}
             onOpenSettings={() => setScreen('settings')}
+            initialSessionId={lastActiveSessionId}
+            onSessionIdChange={(id) => setLastActiveSessionId(id)}
           />
         </div>
-      </div>
-    )
-  }
-
-  if (screen === 'settings' && notebookFolder && modelId) {
-    return (
-      <div className="app-window">
-        <img src={bgImg} className="vitruvian-texture" alt="" />
-        <img src={vitruvianManImg} className="vitruvian-man" alt="" />
-        <div className="screen-content">
-          <Settings
-            folder={notebookFolder}
-            modelId={modelId}
-            onClose={() => setScreen('ready')}
-            onModelChanged={(id) => setModelId(id)}
-          />
-        </div>
+        {screen === 'settings' && (
+          <div className="screen-content">
+            <Settings
+              folder={notebookFolder}
+              modelId={modelId}
+              onClose={() => setScreen('ready')}
+              onModelChanged={(id) => setModelId(id)}
+            />
+          </div>
+        )}
       </div>
     )
   }

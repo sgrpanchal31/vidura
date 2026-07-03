@@ -1,4 +1,4 @@
-# openbook-lm
+# Vidura
 
 Local-first desktop app: chat with documents using an on-device LLM. Electron + React + TypeScript, built with electron-vite.
 
@@ -40,14 +40,15 @@ src/renderer/src/
 - **sourceFile** in chunks = relative path from notebook root, not absolute
 - Build uses esbuild — TypeScript errors don't block `npm run build`
 
-## Models (GGUF Q4_K_M, downloaded to userData/models/)
+## Models (GGUF QAT Q4_0 / Q4_K_M, downloaded to userData/models/)
 
-| modelId       | Model         | Size    |
-| ------------- | ------------- | ------- |
-| `gemma2-2b`   | Qwen 2.5 1.5B | ~1 GB   |
-| `llama3.2-3b` | Llama 3.2 3B  | ~2 GB   |
-| `qwen2.5-7b`  | Qwen 2.5 7B   | ~4.7 GB |
-| `phi3-mini`   | Phi-3 Mini    | ~2.2 GB |
+| modelId       | Model        | Size     |
+| ------------- | ------------ | -------- |
+| `gemma4-e2b`  | Gemma 4 E2B  | ~3.4 GB  |
+| `llama3.2-3b` | Llama 3.2 3B | ~2 GB    |
+| `gemma4-e4b`  | Gemma 4 E4B  | ~5.2 GB  |
+| `gemma4-12b`  | Gemma 4 12B  | ~7 GB    |
+| `gpt-oss-20b` | GPT-OSS 20B  | ~11.6 GB |
 
 Embedding model (downloaded on first launch via HuggingFace Transformers, cached in userData/models/):
 

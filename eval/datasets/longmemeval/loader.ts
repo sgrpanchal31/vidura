@@ -70,7 +70,7 @@ export function loadLongMemEval(variant = 'oracle'): {
   const entries: DatasetEntry[] = raw.map((item, i) => ({
     id: item.question_id ?? `lme-${String(i).padStart(4, '0')}`,
     question: item.question,
-    expectedSubstring: item.answer,
+    expectedSubstring: typeof item.answer === 'string' && item.answer ? item.answer : undefined,
     expectedSourceFiles: item.answer_session_ids.map(id => `${id}.txt`),
     meta: { answer: item.answer, answerSessionIds: item.answer_session_ids },
   }))

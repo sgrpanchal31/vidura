@@ -3,7 +3,7 @@ import type { Llama, LlamaModel } from 'node-llama-cpp'
 import { getModelPath } from './models'
 
 const MODEL_LOAD_TIMEOUT_MS = 30_000 // watchdog for OOM (TODOS TODO-2)
-const CONTEXT_SIZE = 4096
+const CONTEXT_SIZE = 8192
 
 type NodeLlamaCppModule = typeof import('node-llama-cpp')
 
@@ -82,7 +82,12 @@ class LlamaService {
     return this.loadedModelId
   }
 
-  async generateStream(systemPrompt: string, userPrompt: string, onToken: (token: string) => void): Promise<string> {
+  async generateStream(
+    systemPrompt: string,
+    userPrompt: string,
+    onToken: (token: string) => void,
+    opts?: { maxTokens?: number }
+  ): Promise<string> {
     if (!this.model) throw new Error('No model loaded — call loadModel() first')
     if (this.generating) throw new Error('Already generating — call cancel() first')
 
@@ -90,39 +95,43 @@ class LlamaService {
 
     this.generating = true
     this.abortController = new AbortController()
-
-    // Fresh context per query — no history leakage between RAG calls
-    const context = await this.model.createContext({ contextSize: CONTEXT_SIZE })
-    const session = new LlamaChatSession({
-      contextSequence: context.getSequence(),
-      systemPrompt,
-    })
-
-    let fullText = ''
+    let context: Awaited<ReturnType<typeof this.model.createContext>> | null = null
 
     try {
+      // Fresh context per query — no history leakage between RAG calls
+      // swaFullCache=true: Gemma 4 uses SWA (sliding window attention); without this
+      // flag node-llama-cpp checkpoints the KV cache after every token, and the
+      // checkpoint writer crashes on Gemma 4 E4B's shared-KV layer structure.
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE, swaFullCache: true })
+      const session = new LlamaChatSession({
+        contextSequence: context.getSequence(),
+        systemPrompt,
+      })
+
+      let fullText = ''
       await session.prompt(userPrompt, {
         signal: this.abortController.signal,
+        ...(opts?.maxTokens !== undefined && { maxTokens: opts.maxTokens }),
         onTextChunk(text: string) {
           fullText += text
           onToken(text)
         },
       })
+      return fullText
     } finally {
       try {
-        await (context as any).dispose?.()
+        await (context as any)?.dispose?.()
       } catch {
         /* ignore */
       }
       this.generating = false
       this.abortController = null
     }
-
-    return fullText
   }
 
   cancel(): void {
     this.abortController?.abort()
+    this.generating = false
   }
 
   async dispose(): Promise<void> {

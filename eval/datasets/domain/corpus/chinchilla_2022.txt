@@ -1,0 +1,23 @@
+Training Compute-Optimal Large Language Models (Chinchilla)
+Hoffmann, Borgeaud, Mensch, Buchatskia, Cai, Rutherford, Casanova, Clark, Hendricks, Welbl, Clark, Hennigan, Noland, Davison, Jeblick, Driessche, Crome, Guy, Osindero, Kavukcuoglu, Hassabis, Rae, Sifre, Sifre (2022)
+
+We investigate the optimal model size and number of training tokens for a given compute budget. We find that current large language models are significantly undertrained relative to the compute-optimal frontier.
+
+By training over 400 language models ranging from 70M to over 16B parameters on 5 to 500 billion tokens, we find that for compute-optimal training, the model size and the number of training tokens should be scaled equally — for every doubling of model size, training tokens should also double.
+
+This directly contradicts the Kaplan et al. (2020) scaling laws, which suggested larger models are preferable given a fixed compute budget.
+
+Chinchilla scaling law: for a compute budget C (measured in FLOPs), the optimal model size N and token count D satisfy:
+N_opt ∝ C^{0.5}
+D_opt ∝ C^{0.5}
+
+To validate this, we train Chinchilla — a 70 billion parameter model trained on 1.4 trillion tokens — and compare it to Gopher (280B on 300B tokens).
+
+Results:
+- Chinchilla (70B, 1.4T tokens) outperforms Gopher (280B, 300B tokens) despite 4× fewer parameters
+- Chinchilla achieves 67.5 on MMLU (vs Gopher 60.0, GPT-3 43.9)
+- Chinchilla achieves 79.9% accuracy on BIG-Bench Language Understanding (vs Gopher 69.7)
+- HellaSwag: 80.8% (vs Gopher 79.2%)
+- Lower training and inference cost than Gopher
+
+Chinchilla's findings shifted the field: subsequent models including LLaMA, Mistral, and Llama 2 adopted the principle of training smaller models on far more tokens.

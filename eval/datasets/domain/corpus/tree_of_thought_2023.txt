@@ -1,0 +1,28 @@
+Tree of Thoughts: Deliberate Problem Solving with Large Language Models
+Yao, Yu, Zhao, Shafran, Griffiths, Cao, Narasimhan (2023)
+
+Language models are increasingly used for general problem solving. Current approaches (standard prompting, chain-of-thought) treat LMs as producing a left-to-right sequence of tokens in one pass. We propose Tree of Thoughts (ToT), a framework that generalizes chain-of-thought by allowing LMs to explore multiple reasoning paths and evaluate progress toward a goal — more like human deliberate reasoning.
+
+Tree of Thoughts framework:
+1. Decompose: Break a problem into thought steps — intermediate reasoning stages
+2. Generate: At each step, generate k candidate thoughts (using the LM itself)
+3. Evaluate: Use the LM to assess the promise of each partial solution (score/rank)
+4. Search: Use breadth-first search (BFS) or depth-first search (DFS) to explore the tree of possible reasoning paths
+5. Backtrack: Abandon unpromising branches and explore alternatives
+
+Three test tasks:
+
+Game of 24 (find arithmetic expression equaling 24 from 4 numbers):
+- Standard prompting (GPT-4): 4% success rate
+- Chain-of-thought (GPT-4): 4% success rate
+- Tree of Thoughts (GPT-4, BFS b=5): 74% success rate
+
+Creative Writing (write a coherent short story with 4 given sentences):
+- Chain-of-thought: 6.93 human rating (1-10)
+- Tree of Thoughts: 7.56 human rating (+9% improvement)
+
+Mini Crosswords (5×5):
+- Chain-of-thought: 16% of words correct
+- Tree of Thoughts: 60% of words correct
+
+ToT enables planning, lookahead, and backtracking — cognitive abilities that flat sequential generation cannot support. The LM both generates candidates and evaluates them, serving as both a generator and a verifier of its own reasoning.

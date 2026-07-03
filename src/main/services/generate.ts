@@ -6,9 +6,18 @@ import { parseMarkdown } from './ingest/markdown'
 import { parseText } from './ingest/text'
 import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
+import { getLangfuse } from './telemetry'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES, podcastLengthLine } from './podcast-script'
+
+// Structural type — LangfuseTraceClient and LangfuseSpanClient both satisfy this
+export type LangfuseParent = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  span(opts: { name: string; input?: unknown }): any
+}
 
 export type GenerateTask = 'overview' | 'podcast' | 'facts'
 export type GenerateFormat = 'prose' | 'mermaid' | 'facts-json'
+export type GenerateProgress = { stage: 'map' } | { stage: 'reduce' } | { stage: 'final'; type: GenerateTask }
 
 const SYSTEM_PROMPT =
   "You are a research assistant. You read documents and produce clear, well-structured summaries and syntheses. Follow the user's formatting instructions exactly. No preamble."
@@ -50,7 +59,8 @@ function reducePrompt(task: GenerateTask, format: GenerateFormat, intermediates:
 
   const taskHint: Record<GenerateTask, string> = {
     overview: 'Synthesize the following document summaries into a single cohesive overview.',
-    podcast: 'Combine the following talking points into a natural podcast script with a host narrating key ideas.',
+    podcast:
+      'Combine the following talking points into a single organized list of the best talking points for a podcast.',
     facts: 'Combine and deduplicate the following facts into a final list.',
   }
 
@@ -61,14 +71,14 @@ Summaries:
 ${intermediates}`
 }
 
-// Extract up to MAP_CHARS_PER_DOC of representative text from a file
-async function extractDocText(absPath: string, ext: string): Promise<string> {
+// Extract up to maxChars of representative text from a file
+async function extractDocText(absPath: string, ext: string, maxChars: number): Promise<string> {
   if (ext === '.pdf') {
     const parsed = await parsePdf(absPath)
     return parsed.pages
       .map((p) => p.text)
       .join('\n\n')
-      .slice(0, MAP_CHARS_PER_DOC)
+      .slice(0, maxChars)
   }
   const content = await readFile(absPath, 'utf-8')
   if (ext === '.md') {
@@ -76,7 +86,7 @@ async function extractDocText(absPath: string, ext: string): Promise<string> {
     return sections
       .map((s) => s.text)
       .join('\n\n')
-      .slice(0, MAP_CHARS_PER_DOC)
+      .slice(0, maxChars)
   }
   if (['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h', '.rb'].includes(ext)) {
     const symbols = await parseCode(absPath, content)
@@ -84,10 +94,10 @@ async function extractDocText(absPath: string, ext: string): Promise<string> {
       return symbols
         .map((s) => s.parentText)
         .join('\n\n')
-        .slice(0, MAP_CHARS_PER_DOC)
+        .slice(0, maxChars)
     }
   }
-  return parseText(content).text.slice(0, MAP_CHARS_PER_DOC)
+  return parseText(content).text.slice(0, maxChars)
 }
 
 export async function generateFromCorpus(
@@ -95,18 +105,42 @@ export async function generateFromCorpus(
   modelId: string,
   task: GenerateTask,
   format: GenerateFormat,
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  onProgress?: (p: GenerateProgress) => void,
+  allowedFiles?: string[], // relative paths; undefined = all files
+  externalTrace?: LangfuseParent | null,
+  question?: string, // original user question, prepended to the final synthesis prompt
+  podcastMode: 'solo' | 'duo' = 'duo' // router's narrator-count decision, only used when task is 'podcast'
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
   }
 
-  const { files } = await scanFolder(folderPath)
+  const { files: allFiles } = await scanFolder(folderPath)
+  const files = allowedFiles ? allFiles.filter((f) => allowedFiles.includes(relative(folderPath, f.path))) : allFiles
   if (files.length === 0) {
     const msg = 'No documents found in this notebook.'
     onToken(msg)
     return msg
   }
+
+  const lf = getLangfuse()
+  // If a parent trace is provided (chat-ask flow), attach as a child span.
+  // Otherwise create a standalone trace (direct generate:run calls from Podcast tile).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pipelineSpan: any = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trace: any
+  if (externalTrace) {
+    pipelineSpan = externalTrace.span({ name: 'generate-corpus', input: { task, format, fileCount: files.length } })
+    trace = pipelineSpan
+  } else {
+    trace = lf?.trace({ name: 'generate-corpus', input: { task, format, fileCount: files.length } }) ?? null
+  }
+
+  // Podcasts need more raw material than summaries: a script written from one
+  // page of source runs out of things to say long before the requested length.
+  const mapChars = task === 'podcast' ? (files.length <= 2 ? 16000 : 8000) : MAP_CHARS_PER_DOC
 
   // Map phase: summarize each document sequentially
   const intermediates: string[] = []
@@ -115,15 +149,26 @@ export async function generateFromCorpus(
     const relPath = relative(folderPath, file.path)
     let docText: string
     try {
-      docText = await extractDocText(file.path, ext)
+      docText = await extractDocText(file.path, ext, mapChars)
     } catch {
       continue
     }
     if (!docText.trim()) continue
 
+    onProgress?.({ stage: 'map' })
     const prompt = mapPrompt(task, format, `[${relPath}]\n${docText}`)
+    const mapGen = trace?.generation({
+      name: `map:${relPath}`,
+      model: modelId,
+      input: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt },
+      ],
+    })
     // Silent map calls — tokens only stream during the final reduce
     const summary = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+    mapGen?.update({ output: summary.slice(0, 200) })
+    mapGen?.end()
     if (summary.trim()) {
       intermediates.push(`[${relPath}]\n${summary.trim()}`)
     }
@@ -131,12 +176,16 @@ export async function generateFromCorpus(
 
   if (intermediates.length === 0) {
     const msg = 'Could not extract content from any documents in this notebook.'
+    trace?.update({ output: 'no_content' })
+    lf?.flushAsync().catch(() => {})
     onToken(msg)
     return msg
   }
 
   // Reduce phase: combine intermediates, batching if needed
+  onProgress?.({ stage: 'reduce' })
   let current = intermediates
+  let reduceRound = 0
   while (current.length > 1) {
     const next: string[] = []
     for (let i = 0; i < current.length; i += REDUCE_BATCH_SIZE) {
@@ -146,13 +195,49 @@ export async function generateFromCorpus(
         continue
       }
       const prompt = reducePrompt(task, format, batch.join('\n\n---\n\n'))
+      const reduceGen = trace?.generation({
+        name: `reduce:r${reduceRound}:b${Math.floor(i / REDUCE_BATCH_SIZE)}`,
+        model: modelId,
+        input: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: prompt },
+        ],
+      })
       const merged = await llamaService.generateStream(SYSTEM_PROMPT, prompt, () => {})
+      reduceGen?.update({ output: merged.slice(0, 200) })
+      reduceGen?.end()
       next.push(merged.trim())
     }
     current = next
+    reduceRound++
   }
 
-  // Final reduce — stream tokens to the caller
-  const finalPrompt = reducePrompt(task, format, current[0])
-  return llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
+  // Final reduce — stream tokens to the caller. Podcast gets the script-format
+  // rules here (not in intermediate reduces, which merge material only).
+  onProgress?.({ stage: 'final', type: task })
+  const basePrompt =
+    task === 'podcast'
+      ? podcastMode === 'solo'
+        ? `Turn the following talking points into an engaging single-narrator podcast.\n${SOLO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+        : `Turn the following talking points into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+      : reducePrompt(task, format, current[0])
+  const lengthLine = task === 'podcast' && question ? podcastLengthLine(question) : ''
+  const finalPrompt = [question ? `User request: "${question}"` : '', basePrompt, lengthLine]
+    .filter(Boolean)
+    .join('\n\n')
+  const finalGen = trace?.generation({
+    name: 'final',
+    model: modelId,
+    input: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: finalPrompt },
+    ],
+  })
+  const result = await llamaService.generateStream(SYSTEM_PROMPT, finalPrompt, onToken)
+  finalGen?.update({ output: result.slice(0, 200) })
+  finalGen?.end()
+  trace?.update({ output: 'completed' })
+  pipelineSpan?.end()
+  if (!externalTrace) lf?.flushAsync().catch(() => {})
+  return result
 }

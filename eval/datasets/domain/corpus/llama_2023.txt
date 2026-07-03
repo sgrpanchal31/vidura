@@ -1,0 +1,67 @@
+LLaMA: Open and Efficient Foundation Language Models
+Touvron, Lavril, Izacard, Martinet, Lachaux, Lacroix, Rozière, Goyal, Hambro, Azhar, Rodriguez, Joulin, Grave, Lample (2023)
+
+ABSTRACT
+
+We introduce LLaMA, a collection of foundation language models ranging from 7B to 65B parameters. We train our models on trillions of tokens, and show that it is possible to train state-of-the-art models using publicly available datasets exclusively, without resorting to proprietary and inaccessible datasets. In particular, LLaMA-13B outperforms GPT-3 (175B) on most benchmarks, and LLaMA-65B is competitive with the best models, Chinchilla-70B and PaLM-540B.
+
+MODEL SIZES
+
+LLaMA is released in four sizes:
+- LLaMA 7B: 7 billion parameters, 32 transformer layers, 4096 embedding dimensions, 32 attention heads
+- LLaMA 13B: 13 billion parameters, 40 transformer layers, 5120 embedding dimensions, 40 attention heads
+- LLaMA 33B: 33 billion parameters, 60 transformer layers, 6656 embedding dimensions, 52 attention heads
+- LLaMA 65B: 65 billion parameters, 80 transformer layers, 8192 embedding dimensions, 64 attention heads
+
+ARCHITECTURE
+
+LLaMA uses several improvements over the original Transformer:
+
+Pre-normalization: Normalizes the input of each transformer sub-layer using RMSNorm rather than the output. This improves training stability.
+
+SwiGLU activation: Replaces ReLU with SwiGLU activation function in the feed-forward network, improving performance.
+
+Rotary Embeddings (RoPE): Replaces absolute positional embeddings with rotary positional embeddings, applied at each layer of the network.
+
+TRAINING DATA
+
+Unlike GPT-3 which uses proprietary data, LLaMA is trained exclusively on publicly available data:
+- Common Crawl (67%): 3.3 trillion tokens after filtering
+- C4 (15%): 190 billion tokens
+- GitHub (4.5%): 100 billion tokens
+- Wikipedia (4.5%): 4.5 billion tokens in 20 languages
+- Books (4.5%): 26 billion tokens from Gutenberg and Books3
+- ArXiv (2.5%): 92 billion tokens
+- Stack Exchange (2%): 78 billion tokens
+Total: approximately 1.4 trillion tokens for LLaMA 7B/13B, 1.4 trillion for 33B/65B
+
+TRAINING EFFICIENCY
+
+LLaMA uses efficient attention implementations (xformers) and reduces memory usage through activation checkpointing. Training 65B parameters on 2048 A100 80GB GPUs took approximately 21 days (1,022,362 GPU hours total across all model sizes).
+
+KEY RESULTS
+
+Common Sense Reasoning:
+- LLaMA 65B achieves 84.2% on HellaSwag (vs GPT-3 at 78.9%)
+- LLaMA 13B outperforms GPT-3 on BoolQ, PIQA, SIQA, HellaSwag, WinoGrande, ARC
+
+Reading Comprehension (RACE):
+- LLaMA 65B: 81.5 accuracy (middle), 62.8 accuracy (high)
+
+Mathematical Reasoning (MATH):
+- LLaMA 65B: 10.6% (4-shot)
+- LLaMA 65B on GSM8k: 50.9% (8-shot, chain-of-thought)
+
+Code Generation (HumanEval):
+- LLaMA 65B: 23.7 pass@1
+
+MMLU (Massive Multitask Language Understanding):
+- LLaMA 65B: 63.4 (5-shot), competitive with Chinchilla 70B (67.5)
+- LLaMA 13B: 46.9, outperforming GPT-3 (43.9)
+
+TruthfulQA:
+- LLaMA 65B: 57.0%, higher than GPT-3 (58.55%) and GPT-J (43.42%)
+
+SIGNIFICANCE
+
+LLaMA demonstrates that competitive language models can be trained on publicly available data without proprietary datasets. This enables the research community to study and build on foundation models without relying on API access to closed models. LLaMA 13B outperforms GPT-3 (175B) on most benchmarks despite being 13x smaller, suggesting that training on more tokens with smaller models can match the performance of larger models trained on fewer tokens.

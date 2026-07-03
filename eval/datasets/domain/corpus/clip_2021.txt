@@ -1,0 +1,20 @@
+Learning Transferable Visual Models From Natural Language Supervision (CLIP)
+Radford, Kim, Hallacy, Ramesh, Goh, Agarwal, Sastry, Askell, Mishkin, Clark, Krueger, Sutskever (2021)
+
+We present CLIP (Contrastive Language-Image Pre-training), a neural network trained on a variety of (image, text) pairs collected from the internet. CLIP learns visual representations by predicting which caption goes with which image using a contrastive objective.
+
+Training data: ~400 million (image, text) pairs scraped from the internet, called WIT (WebImageText).
+
+Architecture: A vision encoder (ResNet or Vision Transformer) and a text encoder (Transformer). Both produce embeddings normalized to a unit sphere. Training maximizes cosine similarity between paired image and text embeddings while minimizing similarity for unpaired ones (InfoNCE loss).
+
+Zero-shot transfer: Once trained, CLIP performs zero-shot classification by encoding the image and a set of text prompts ("a photo of a {class}") and selecting the class whose text embedding is closest to the image embedding.
+
+Zero-shot performance on ImageNet:
+- CLIP ViT-L/14: 75.3% top-1 accuracy — matching ResNet-50 trained on ImageNet with supervision
+- CLIP outperforms few-shot linear probes from ResNet-50 using just 2 examples per class
+
+CLIP generalizes across 27 diverse datasets (OCR, activity recognition, geolocation, fine-grained classification) with competitive zero-shot performance without task-specific training data.
+
+The model is robust to distribution shift: CLIP's zero-shot performance degrades far less than ResNet-50 when evaluated on distribution-shifted ImageNet variants (ImageNet-V2, ImageNet-Sketch, ObjectNet).
+
+CLIP established vision-language contrastive pretraining as a powerful paradigm and became foundational for text-to-image generation models including DALL-E 2 and Stable Diffusion.

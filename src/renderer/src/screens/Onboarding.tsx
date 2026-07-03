@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './Onboarding.css'
+import logoUrl from '../assets/logo.svg'
 
 type Model = {
   id: string
@@ -11,10 +12,10 @@ type Model = {
 
 const MODELS: Model[] = [
   {
-    id: 'gemma2-2b',
-    name: 'Qwen 2.5 1.5B',
-    desc: 'Fast, accurate, optimised for Apple Silicon. Best starting point for most notebooks.',
-    size: '1.0 GB',
+    id: 'gemma4-e2b',
+    name: 'Gemma 4 E2B',
+    desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
+    size: '3.4 GB',
     minRamGB: 0,
   },
   {
@@ -25,25 +26,32 @@ const MODELS: Model[] = [
     minRamGB: 8,
   },
   {
-    id: 'qwen2.5-7b',
-    name: 'Qwen 2.5 7B',
-    desc: 'Highest quality. Requires 32 GB RAM or more.',
-    size: '4.4 GB',
-    minRamGB: 32,
+    id: 'gemma4-e4b',
+    name: 'Gemma 4 E4B',
+    desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
+    size: '5.2 GB',
+    minRamGB: 8,
   },
   {
-    id: 'phi3-mini',
-    name: 'Phi-3 Mini',
-    desc: "Microsoft's compact model. Good on structured notes and lists.",
-    size: '2.3 GB',
-    minRamGB: 0,
+    id: 'gemma4-12b',
+    name: 'Gemma 4 12B',
+    desc: 'High quality. Requires 24 GB RAM or more.',
+    size: '7.0 GB',
+    minRamGB: 24,
+  },
+  {
+    id: 'gpt-oss-20b',
+    name: 'GPT-OSS 20B',
+    desc: "OpenAI's open-weight model. Best reasoning quality. Needs 32 GB RAM.",
+    size: '11.6 GB',
+    minRamGB: 32,
   },
 ]
 
 function recommendedModelId(ramGB: number): string {
-  if (ramGB >= 32) return 'qwen2.5-7b'
-  if (ramGB >= 16) return 'llama3.2-3b'
-  return 'gemma2-2b'
+  if (ramGB >= 32) return 'gpt-oss-20b'
+  if (ramGB >= 24) return 'gemma4-12b'
+  return 'gemma4-e4b'
 }
 
 type Props = {
@@ -52,9 +60,9 @@ type Props = {
 
 export default function Onboarding({ onComplete }: Props) {
   const [folder, setFolder] = useState<string | null>(null)
-  const [modelId, setModelId] = useState('gemma2-2b')
+  const [modelId, setModelId] = useState('gemma4-e4b')
   const [ramGB, setRamGB] = useState<number | null>(null)
-  const [recommendedId, setRecommendedId] = useState('gemma2-2b')
+  const [recommendedId, setRecommendedId] = useState('gemma4-e4b')
   const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
@@ -78,9 +86,13 @@ export default function Onboarding({ onComplete }: Props) {
     <>
       {isMac && (
         <div className="titlebar">
-          <span className="win-title">openbook-lm</span>
+          <span className="win-title">Vidura</span>
         </div>
       )}
+
+      <div className="logo-hero">
+        <img src={logoUrl} alt="" className="logo-mark" />
+      </div>
 
       <div className="zone">
         <div className="eyebrow">Notebook Folder</div>
@@ -90,9 +102,6 @@ export default function Onboarding({ onComplete }: Props) {
             Choose folder
           </button>
         </div>
-        <a className="link-secondary" onClick={(e) => e.preventDefault()}>
-          Try with demo folder →
-        </a>
       </div>
 
       <div className="divider" />
@@ -105,23 +114,29 @@ export default function Onboarding({ onComplete }: Props) {
           </div>
         )}
         <div className="model-list">
-          {MODELS.map((model) => (
-            <div
-              key={model.id}
-              className={`model-row${modelId === model.id ? ' sel' : ''}`}
-              onClick={() => setModelId(model.id)}
-            >
-              <div className="radio" />
-              <div className="model-info">
-                <div className="model-name">
-                  {model.name}
-                  {model.id === recommendedId && <span className="tag-rec">Recommended</span>}
+          {MODELS.map((model) => {
+            // Selecting a model bigger than the machine's RAM would hang or crash
+            // on first load, so out-of-reach models are visible but not selectable
+            const tooBig = ramGB !== null && model.minRamGB > ramGB
+            return (
+              <div
+                key={model.id}
+                className={`model-row${modelId === model.id ? ' sel' : ''}${tooBig ? ' unavailable' : ''}`}
+                onClick={tooBig ? undefined : () => setModelId(model.id)}
+              >
+                <div className="radio" />
+                <div className="model-info">
+                  <div className="model-name">
+                    {model.name}
+                    {model.id === recommendedId && <span className="tag-rec">Recommended</span>}
+                    {tooBig && <span className="tag-ram">Needs {model.minRamGB} GB RAM</span>}
+                  </div>
+                  <div className="model-desc">{model.desc}</div>
                 </div>
-                <div className="model-desc">{model.desc}</div>
+                <div className="model-size">{model.size}</div>
               </div>
-              <div className="model-size">{model.size}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
