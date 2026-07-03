@@ -34,16 +34,16 @@ function recommendedLlmId(ramGB: number): string {
 // Curated Kokoro voices (all bundled with the app, no extra download).
 // Grades come from the Kokoro voice table; af_heart is the standout.
 const KOKORO_VOICES: { id: string; label: string }[] = [
-  { id: 'af_heart', label: 'Heart — female, best quality' },
-  { id: 'af_bella', label: 'Bella — female, great' },
-  { id: 'af_nicole', label: 'Nicole — female, good' },
-  { id: 'af_sarah', label: 'Sarah — female, decent' },
-  { id: 'bf_emma', label: 'Emma — female, British' },
-  { id: 'am_fenrir', label: 'Fenrir — male, decent' },
-  { id: 'am_michael', label: 'Michael — male, decent' },
-  { id: 'am_puck', label: 'Puck — male, decent' },
-  { id: 'bm_george', label: 'George — male, British' },
-  { id: 'bm_fable', label: 'Fable — male, British' },
+  { id: 'af_heart', label: 'Heart: female, best quality' },
+  { id: 'af_bella', label: 'Bella: female, great' },
+  { id: 'af_nicole', label: 'Nicole: female, good' },
+  { id: 'af_sarah', label: 'Sarah: female, decent' },
+  { id: 'bf_emma', label: 'Emma: female, British' },
+  { id: 'am_fenrir', label: 'Fenrir: male, decent' },
+  { id: 'am_michael', label: 'Michael: male, decent' },
+  { id: 'am_puck', label: 'Puck: male, decent' },
+  { id: 'bm_george', label: 'George: male, British' },
+  { id: 'bm_fable', label: 'Fable: male, British' },
 ]
 
 // Must match VOICE_A / VOICE_B / VOICE_SOLO in src/main/services/tts.ts
