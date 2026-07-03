@@ -1,6 +1,7 @@
 {
   "name": "vidura",
   "version": "0.1.3",
+  "license": "MIT",
   "description": "Local-first desktop app to chat with your documents privately, with no file limits",
   "main": "./out/main/index.js",
   "scripts": {

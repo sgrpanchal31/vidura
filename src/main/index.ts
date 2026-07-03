@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs'
 import os from 'os'
 import { indexFolder } from './services/indexer'
 import {
@@ -28,6 +28,26 @@ import { ttsService, CancelledError, type MessageAudio } from './services/tts'
 import { parsePodcastScript } from './services/podcast-script'
 import { readFile, copyFile } from 'fs/promises'
 import { resolve as resolvePath } from 'path'
+
+// Last-resort crash guard: without this, an uncaught main-process error kills
+// the app silently and a tester can only report "it just closed". Log every
+// error to userData; interrupt the user with a dialog only once per run.
+let crashDialogShown = false
+process.on('uncaughtException', (err) => {
+  try {
+    const logPath = join(app.getPath('userData'), 'crash.log')
+    appendFileSync(logPath, `[${new Date().toISOString()}] ${err.stack ?? String(err)}\n`)
+    if (!crashDialogShown) {
+      crashDialogShown = true
+      dialog.showErrorBox(
+        'Vidura hit an unexpected error',
+        `${err.message}\n\nDetails were saved to:\n${logPath}\n\nPlease report this at github.com/sgrpanchal31/vidura/issues`
+      )
+    }
+  } catch {
+    // never throw from the crash handler
+  }
+})
 
 let isBackgroundIndexing = false
 

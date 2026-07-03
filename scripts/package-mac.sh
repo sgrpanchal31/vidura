@@ -11,6 +11,13 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$REPO_DIR/dist"
 APP="$DIST/Vidura.app"
 
+# Safety: dev-mode builds inline the local Langfuse keys from .env.local into
+# out/main/index.js. Never ship one — require a fresh production build.
+if grep -qE 'pk-lf|new Langfuse' "$REPO_DIR/out/main/index.js" 2>/dev/null; then
+  echo "✗ out/ contains a dev build (telemetry keys detected) — run 'npm run build' first" >&2
+  exit 1
+fi
+
 echo "▶ Cleaning previous build artifacts"
 rm -rf "$DIST"
 mkdir -p "$DIST"

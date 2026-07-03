@@ -10,3 +10,6 @@ coverage
 eval/datasets/*/data/
 eval/results/*.json
 .openbook/eval/
+
+# TypeScript incremental build caches
+*.tsbuildinfo

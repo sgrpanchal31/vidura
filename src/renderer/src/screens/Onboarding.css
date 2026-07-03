@@ -256,3 +256,23 @@
   justify-content: flex-end;
   flex-shrink: 0;
 }
+
+/* Models above the machine's RAM: visible but not selectable */
+.model-row.unavailable {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.model-row.unavailable:hover {
+  background: none;
+}
+
+.tag-ram {
+  font-size: 10px;
+  color: var(--slate);
+  border: 1px solid var(--line-m);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 8px;
+  vertical-align: 1px;
+}

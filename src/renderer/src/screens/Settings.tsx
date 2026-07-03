@@ -2,26 +2,31 @@ import { useState, useEffect, useRef } from 'react'
 import './Settings.css'
 import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices, UpdateInfo } from '../../../preload/index'
 
-const LLM_META: Record<string, { name: string; desc: string }> = {
+const LLM_META: Record<string, { name: string; desc: string; minRamGB: number }> = {
   'gemma4-e2b': {
     name: 'Gemma 4 E2B',
     desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
+    minRamGB: 0,
   },
   'llama3.2-3b': {
     name: 'Llama 3.2 3B',
     desc: 'Slightly larger. Better on dense academic text and long-form sources.',
+    minRamGB: 8,
   },
   'gemma4-e4b': {
     name: 'Gemma 4 E4B',
     desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
+    minRamGB: 8,
   },
   'gemma4-12b': {
     name: 'Gemma 4 12B',
     desc: 'High quality. Requires 24 GB RAM or more.',
+    minRamGB: 24,
   },
   'gpt-oss-20b': {
     name: 'GPT-OSS 20B',
     desc: "OpenAI's open-weight model. Top-tier reasoning and comprehension. Needs 32 GB RAM.",
+    minRamGB: 32,
   },
 }
 
@@ -415,17 +420,21 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                     )
                   }
 
+                  // Models above the machine's RAM would hang or crash on load,
+                  // so their actions are disabled with an explanatory tag
+                  const tooBig = (meta?.minRamGB ?? 0) > ramGB
                   return (
                     <div
                       key={m.id}
-                      className={`settings-model-row${isActive ? ' sel' : ''}${busy && !isActive ? ' disabled' : ''}${!m.downloaded ? ' clickable' : ''}`}
-                      onClick={!m.downloaded ? () => showHint(m.id) : undefined}
+                      className={`settings-model-row${isActive ? ' sel' : ''}${(busy && !isActive) || tooBig ? ' disabled' : ''}${!m.downloaded && !tooBig ? ' clickable' : ''}`}
+                      onClick={!m.downloaded && !tooBig ? () => showHint(m.id) : undefined}
                     >
                       <div className="settings-radio" />
                       <div className="settings-model-info">
                         <div className="settings-model-name">
                           {meta?.name ?? m.id}
                           {m.id === recommendedLlm && <span className="tag-rec">Recommended</span>}
+                          {tooBig && <span className="tag-info">Needs {meta?.minRamGB} GB RAM</span>}
                         </div>
                         <div className="settings-model-desc">{meta?.desc ?? ''}</div>
                       </div>
@@ -435,7 +444,11 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                           {isActive && <span className="settings-badge active">Selected</span>}
                           {!isActive && m.downloaded && (
                             <>
-                              <button className="settings-use-btn" onClick={(e) => handleUse(m.id, e)} disabled={busy}>
+                              <button
+                                className="settings-use-btn"
+                                onClick={(e) => handleUse(m.id, e)}
+                                disabled={busy || tooBig}
+                              >
                                 {isLoading ? 'Loading…' : 'Use'}
                               </button>
                               <button
@@ -447,7 +460,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                               </button>
                             </>
                           )}
-                          {!m.downloaded && (
+                          {!m.downloaded && !tooBig && (
                             <div className="settings-download-group">
                               {hintId === m.id && <span className="settings-download-hint">Download first</span>}
                               <button
