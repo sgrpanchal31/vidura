@@ -798,7 +798,7 @@ export default function Chat({
   }
 
   async function handleSend(text: string) {
-    if (!text.trim()) return
+    if (!text.trim() || sessionLocked) return
     if (selectedFiles !== null && selectedFiles.size === 0) {
       if (noFilesToastTimerRef.current) clearTimeout(noFilesToastTimerRef.current)
       setShowNoFilesToast(true)
@@ -1024,6 +1024,12 @@ export default function Chat({
 
   const tree = buildTree(sources)
   const isCurrentSessionGenerating = isGenerating && generatingSessionId === sessionId
+  // A session with a generated podcast is read-only for now: chatting after the
+  // episode is not a real usage pattern (a future podcast-edit feature may reopen it)
+  const sessionLocked =
+    !isCurrentSessionGenerating &&
+    (messages.some((m) => m.audio) ||
+      (currentSessionType === 'podcast' && messages.some((m) => m.role === 'assistant')))
 
   // Compute tooltip position: fixed to viewport, smart top/bottom based on citation location
   const tooltipStyle: React.CSSProperties | null = activeCitation
@@ -1207,7 +1213,12 @@ export default function Chat({
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask your notebook…"
+                placeholder={
+                  sessionLocked
+                    ? 'This podcast is complete. Start a new chat or podcast to continue.'
+                    : 'Ask your notebook…'
+                }
+                disabled={sessionLocked}
                 rows={1}
               />
               {isCurrentSessionGenerating ? (
@@ -1220,7 +1231,7 @@ export default function Chat({
                 >
                   Stop
                 </button>
-              ) : (
+              ) : sessionLocked ? null : (
                 <span className="composer-hint">⌘ Return</span>
               )}
             </div>
