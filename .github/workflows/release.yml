@@ -38,7 +38,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/openbook-lm-arm64.dmg
+          files: dist/vidura-arm64.dmg
           draft: false
           generate_release_notes: false
           body: |
@@ -47,20 +47,22 @@ jobs:
             **Recommended — one-line installer (Apple Silicon only):**
 
             ```bash
-            curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/openbook-lm/main/scripts/install.sh | bash
+            curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/vidura/main/scripts/install.sh | bash
             ```
 
             This downloads the app, installs it to `/Applications`, and removes the quarantine flag so it opens cleanly.
+
+            **Already installed?** Vidura checks for updates on launch and can update itself from Settings > About. Re-running the install command also works.
 
             ---
 
             **Manual install:**
 
-            1. Download `openbook-lm-arm64.dmg` below (Apple Silicon only).
-            2. Open the DMG and drag `openbook-lm.app` to `/Applications`.
+            1. Download `vidura-arm64.dmg` below (Apple Silicon only).
+            2. Open the DMG and drag `Vidura.app` to `/Applications`.
             3. Run this once in Terminal to remove the quarantine flag:
                ```bash
-               xattr -cr /Applications/openbook-lm.app
+               xattr -cr /Applications/Vidura.app
                ```
             4. Open the app normally.
 

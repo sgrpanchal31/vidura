@@ -7,8 +7,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/vidura/main/scripts/install.sh | bash
 set -euo pipefail
 
-DMG_URL="https://github.com/sgrpanchal31/vidura/releases/latest/download/openbook-lm-arm64.dmg"
-APP_NAME="openbook-lm.app"
+DMG_URL="https://github.com/sgrpanchal31/vidura/releases/latest/download/vidura-arm64.dmg"
+APP_NAME="Vidura.app"
 INSTALL_DIR="/Applications"
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ fi
 
 TMP="$(mktemp -d)"
 MNT="$TMP/mnt"
-DMG="$TMP/openbook-lm.dmg"
+DMG="$TMP/vidura.dmg"
 
 # Clean up temp dir and unmount on exit (success or failure).
 cleanup() {
@@ -49,8 +49,10 @@ hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MNT" -quiet
 # ── Install ───────────────────────────────────────────────────────────────────
 
 echo "▶ Copying to $INSTALL_DIR…"
-# Remove any previous install so reruns work as an upgrade.
+# Remove any previous install so reruns work as an upgrade
+# (including installs from before the app was renamed to Vidura).
 rm -rf "$INSTALL_DIR/$APP_NAME"
+rm -rf "$INSTALL_DIR/openbook-lm.app"
 # ditto preserves code signatures; plain cp -r can strip them.
 ditto "$MNT/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
 
