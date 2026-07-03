@@ -261,7 +261,14 @@ ipcMain.handle(
     const decision = await routeQuery(question, availableFiles, trace)
 
     // Surface the routing decision on the trace so it's visible at the top level
-    trace?.update({ output: { scope: decision.scope, task: decision.task, targetFiles: decision.targetFiles } })
+    trace?.update({
+      output: {
+        scope: decision.scope,
+        task: decision.task,
+        targetFiles: decision.targetFiles,
+        podcastMode: decision.podcastMode,
+      },
+    })
 
     // If the router named specific files but any are deselected by the user, filter them out
     if (decision.scope === 'file' && selectedFiles && decision.targetFiles.length > 0) {
@@ -344,7 +351,8 @@ ipcMain.handle(
         (p) => mainWindow?.webContents.send('generate:progress', p),
         decision.targetFiles,
         trace,
-        question
+        question,
+        decision.podcastMode
       )
         .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
@@ -363,7 +371,8 @@ ipcMain.handle(
         (p) => mainWindow?.webContents.send('generate:progress', p),
         selectedFiles,
         trace,
-        question
+        question,
+        decision.podcastMode
       )
         .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
@@ -381,7 +390,8 @@ ipcMain.handle(
         onChatProgress,
         selectedFiles,
         decision.task === 'chat' ? undefined : decision.task,
-        trace
+        trace,
+        decision.podcastMode
       )
         .then((result) => finishAnswer(result.answer, result.citations))
         .catch((err) => {

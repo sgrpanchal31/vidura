@@ -7,7 +7,7 @@ import { parseText } from './ingest/text'
 import { parseCode } from './ingest/code'
 import { llamaService } from './inference'
 import { getLangfuse } from './telemetry'
-import { PODCAST_SCRIPT_RULES } from './podcast-script'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES } from './podcast-script'
 
 // Structural type — LangfuseTraceClient and LangfuseSpanClient both satisfy this
 export type LangfuseParent = {
@@ -109,7 +109,8 @@ export async function generateFromCorpus(
   onProgress?: (p: GenerateProgress) => void,
   allowedFiles?: string[], // relative paths; undefined = all files
   externalTrace?: LangfuseParent | null,
-  question?: string // original user question, prepended to the final synthesis prompt
+  question?: string, // original user question, prepended to the final synthesis prompt
+  podcastMode: 'solo' | 'duo' = 'duo' // router's narrator-count decision, only used when task is 'podcast'
 ): Promise<string> {
   if (!llamaService.isLoaded(modelId)) {
     await llamaService.loadModel(modelId)
@@ -212,7 +213,9 @@ export async function generateFromCorpus(
   onProgress?.({ stage: 'final', type: task })
   const basePrompt =
     task === 'podcast'
-      ? `Turn the following talking points into an engaging podcast conversation.\n${PODCAST_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+      ? podcastMode === 'solo'
+        ? `Turn the following talking points into an engaging first-person podcast narration.\n${SOLO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
+        : `Turn the following talking points into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}\n\nTalking points:\n${current[0]}`
       : reducePrompt(task, format, current[0])
   const finalPrompt = question ? `User request: "${question}"\n\n${basePrompt}` : basePrompt
   const finalGen = trace?.generation({

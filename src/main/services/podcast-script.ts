@@ -1,18 +1,25 @@
 // Podcast script format: the prompt rules and the parser live together so they
-// can never drift apart. generate.ts and rag.ts import PODCAST_SCRIPT_RULES;
-// tts.ts imports parsePodcastScript.
+// can never drift apart. generate.ts and rag.ts pick DUO or SOLO rules from the
+// router's podcastMode; tts.ts imports parsePodcastScript.
 
 export type ScriptSegment = { speaker: 'A' | 'B' | 'solo'; text: string }
 export type ScriptChapter = { title: string; segmentIndex: number }
 export type ParsedScript = { segments: ScriptSegment[]; chapters: ScriptChapter[] }
 
-export const PODCAST_SCRIPT_RULES = `Write the script following these EXACT formatting rules:
+export const DUO_SCRIPT_RULES = `Write the script following these EXACT formatting rules:
 - Two hosts. HOST A is Maya: warm and curious. She opens the show, asks questions, and reacts. HOST B is Sam: calm and knowledgeable. He explains ideas clearly with concrete examples.
 - Every spoken line MUST start with "HOST A:" or "HOST B:" at the start of the line.
 - Split the conversation into 2 to 4 sections. Before each section, put a line containing only [SECTION] followed by a short section title.
 - Open with a short greeting and close with a brief sign-off.
 - Plain spoken language only: no markdown, no asterisks, no bullet points, no stage directions, no citation numbers, no filenames.
-- If the user asked for a single narrator instead of two hosts, write flowing paragraphs with NO speaker tags, but keep the [SECTION] lines.
+- Match the requested length. About 150 spoken words equal one minute of audio.`
+
+export const SOLO_SCRIPT_RULES = `Write the script following these EXACT formatting rules:
+- A single narrator speaking in the first person, as the author of the documents reflecting on their own experiences and thoughts. Never invent hosts, interviewers, or a second voice.
+- Write flowing spoken paragraphs with NO speaker tags or names.
+- Split the narration into 2 to 4 sections. Before each section, put a line containing only [SECTION] followed by a short section title.
+- Open with a brief welcome and close with a short sign-off, still in the first person.
+- Plain spoken language only: no markdown, no asterisks, no bullet points, no stage directions, no citation numbers, no filenames.
 - Match the requested length. About 150 spoken words equal one minute of audio.`
 
 // [SECTION] Title | [SECTION: Title] | SECTION 1: Title | ## Title

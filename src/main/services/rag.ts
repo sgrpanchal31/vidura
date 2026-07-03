@@ -6,7 +6,7 @@ import { DEFAULT_EMBED, embedDim } from './embed-models'
 import { getLangfuse } from './telemetry'
 import { rerankerGgufService } from './reranker-gguf'
 import type { LangfuseParent } from './generate'
-import { PODCAST_SCRIPT_RULES } from './podcast-script'
+import { DUO_SCRIPT_RULES, SOLO_SCRIPT_RULES } from './podcast-script'
 
 // Retrieve more child chunks than we'll show, then collapse to unique parents.
 const RETRIEVE_TOP_K = 30
@@ -64,16 +64,19 @@ function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
-function buildPodcastPrompt(parents: SearchResult[]): string {
+function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo'): string {
   const passages = parents
     .map((c) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
       return `${filename}:\n${c.parentText.trim().slice(0, PARENT_PROMPT_CHARS)}`
     })
     .join('\n\n')
+  const lead =
+    podcastMode === 'solo'
+      ? `Turn the key ideas into an engaging first-person podcast narration.\n${SOLO_SCRIPT_RULES}`
+      : `Turn the key ideas into an engaging podcast conversation.\n${DUO_SCRIPT_RULES}`
   return `You are creating a podcast script from retrieved document passages.
-Turn the key ideas into an engaging podcast conversation.
-${PODCAST_SCRIPT_RULES}
+${lead}
 
 Passages:
 ${passages}`
@@ -194,7 +197,8 @@ export async function ragQuery(
   onProgress?: (p: ChatProgress) => void,
   sourceFileFilter?: string[],
   task?: 'podcast' | 'overview',
-  externalTrace?: LangfuseParent | null
+  externalTrace?: LangfuseParent | null,
+  podcastMode: 'solo' | 'duo' = 'duo' // router's narrator-count decision, only used when task is 'podcast'
 ): Promise<RagResult> {
   onProgress?.({ stage: 'reading' })
 
@@ -273,7 +277,7 @@ export async function ragQuery(
 
   // Format path: podcast/overview synthesis from retrieved chunks, no citations
   if (task) {
-    const sysPrompt = task === 'podcast' ? buildPodcastPrompt(parents) : buildOverviewPrompt(parents)
+    const sysPrompt = task === 'podcast' ? buildPodcastPrompt(parents, podcastMode) : buildOverviewPrompt(parents)
     onProgress?.({ stage: 'generating' })
     const gen = trace?.generation({
       name: 'llm',

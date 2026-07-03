@@ -4,6 +4,7 @@ export type RoutingDecision = {
   scope: 'rag' | 'corpus' | 'file'
   task: 'chat' | 'podcast' | 'overview'
   targetFiles: string[]
+  podcastMode: 'solo' | 'duo' // only meaningful when task is 'podcast'
 }
 
 // Minimal structural type matching what we actually call on a Langfuse trace object
@@ -25,6 +26,9 @@ Rules:
 - task "overview": user wants a summary or overview
 - task "chat": standard question and answer
 
+- podcastMode "solo": the user wants a single narrator or one voice (e.g. "I narrate", "single narrator", "one host", "in my voice")
+- podcastMode "duo": two hosts discussing; the default whenever the user did not ask for a single voice
+
 Examples:
 Query: "summarize CLAUDE"
 Available files: CLAUDE.md, notes.md
@@ -42,8 +46,12 @@ Query: "give me an overview of all my notes"
 Available files: notes.md, journal.md
 Output: {"scope":"corpus","task":"overview","targetFiles":[]}
 
+Query: "/podcast Create a podcast where I narrate my month based on my journal"
+Available files: journal.md, notes.md
+Output: {"scope":"corpus","task":"podcast","targetFiles":[],"podcastMode":"solo"}
+
 Output format (JSON only, no extra text):
-{"scope":"...","task":"...","targetFiles":[]}`
+{"scope":"...","task":"...","targetFiles":[],"podcastMode":"duo"}`
 
 export async function routeQuery(
   question: string,
@@ -74,7 +82,9 @@ export async function routeQuery(
       : parsed.targetFile
         ? [parsed.targetFile]
         : []
-    const d: RoutingDecision = { scope: parsed.scope, task: parsed.task, targetFiles }
+    // Lenient: the model may omit podcastMode on non-podcast queries — never fail on it
+    const podcastMode = parsed.podcastMode === 'solo' ? 'solo' : 'duo'
+    const d: RoutingDecision = { scope: parsed.scope, task: parsed.task, targetFiles, podcastMode }
     routeSpan?.update({ output: { ...d, usedFallback: false } })
     routeSpan?.end()
     return d
@@ -88,8 +98,10 @@ export async function routeQuery(
 
 function fallbackRoute(question: string): RoutingDecision {
   const q = question.trimStart()
-  if (q.startsWith('/podcast')) return { scope: 'corpus', task: 'podcast', targetFiles: [] }
+  // Keyword guess for narrator count when the LLM router is unavailable
+  const podcastMode = /\bnarrat|\b(solo|single|one)\b.{0,20}\b(narrator|voice|host|person)\b/i.test(q) ? 'solo' : 'duo'
+  if (q.startsWith('/podcast')) return { scope: 'corpus', task: 'podcast', targetFiles: [], podcastMode }
   if (/\b(summarize|summarise|summary|overview)\b/i.test(q))
-    return { scope: 'corpus', task: 'overview', targetFiles: [] }
-  return { scope: 'rag', task: 'chat', targetFiles: [] }
+    return { scope: 'corpus', task: 'overview', targetFiles: [], podcastMode }
+  return { scope: 'rag', task: 'chat', targetFiles: [], podcastMode }
 }

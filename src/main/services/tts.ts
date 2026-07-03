@@ -8,10 +8,11 @@ import type { MessageAudio } from './state'
 export type { MessageAudio }
 
 // Voice assignment. af_heart is Kokoro's highest-quality voice (grade A);
-// am_fenrir is the most energetic male. Swap to am_michael if fenrir sounds off.
+// am_fenrir is the most energetic male. Solo narration is first person from the
+// notebook owner's perspective, so it uses a calm male voice (Sagar's choice).
 const VOICE_A = 'af_heart'
 const VOICE_B = 'am_fenrir'
-const VOICE_SOLO = 'af_heart'
+const VOICE_SOLO = 'am_michael'
 
 // Number of stderr lines to keep as a rolling tail for crash diagnostics
 const STDERR_TAIL = 20
