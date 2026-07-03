@@ -60,7 +60,7 @@
     "kokoro-js": "^1.2.1",
     "langfuse": "^2.8.0",
     "node-llama-cpp": "^3.18.1",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.1.200",
     "tree-sitter-wasms": "^0.1.13",
     "web-tree-sitter": "^0.26.9"
   }
