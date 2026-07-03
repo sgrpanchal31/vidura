@@ -12,7 +12,7 @@ export const DUO_SCRIPT_RULES = `Write the script following these EXACT formatti
 - Split the conversation into 2 to 4 sections. Before each section, put a line containing only [SECTION] followed by a short section title.
 - Open with a short greeting and close with a brief sign-off.
 - Plain spoken language only: no markdown, no asterisks, no bullet points, no stage directions, no citation numbers, no filenames.
-- Meet the target length. About 150 spoken words equal one minute of audio, so 5 minutes needs about 750 words. If no length was requested, aim for 5 minutes. Keep writing until the target is reached; do not end early.`
+- Meet the target length. About 150 spoken words equal one minute of audio, so 5 minutes needs about 750 words. If no length was requested, aim for 5 minutes.`
 
 export const SOLO_SCRIPT_RULES = `Write the script following these EXACT formatting rules:
 - A single narrator. Choose the narrator's perspective from the user request: if the user asks to narrate their own journal, notes, or experiences, speak in the first person as the author; if they ask for an overview, explanation, or expert take on documents, speak as a knowledgeable host presenting the material. Never invent hosts, interviewers, or a second voice.
@@ -20,7 +20,7 @@ export const SOLO_SCRIPT_RULES = `Write the script following these EXACT formatt
 - Split the narration into 2 to 4 sections. Before each section, put a line containing only [SECTION] followed by a short section title.
 - Open with a brief welcome and close with a short sign-off, keeping the same perspective throughout.
 - Plain spoken language only: no markdown, no asterisks, no bullet points, no stage directions, no citation numbers, no filenames.
-- Meet the target length. About 150 spoken words equal one minute of audio, so 5 minutes needs about 750 words. If no length was requested, aim for 5 minutes. Keep writing until the target is reached; do not end early.`
+- Meet the target length. About 150 spoken words equal one minute of audio, so 5 minutes needs about 750 words. If no length was requested, aim for 5 minutes.`
 
 // Turn "Length: about 5 minutes" in the user's request into an explicit word
 // target. Small local models read the minutes fine but fail the times-150
@@ -30,7 +30,7 @@ export function podcastLengthLine(question: string): string {
   if (!m) return ''
   const minutes = parseInt(m[1], 10)
   if (!minutes || minutes > 60) return ''
-  return `Target length: ${minutes} minute${minutes === 1 ? '' : 's'}. Write at least ${minutes * 150} words of spoken script.`
+  return `Target length: about ${minutes} minute${minutes === 1 ? '' : 's'}, which is about ${minutes * 150} words of spoken script. Stay close to that word count: do not stop far short of it, and do not run far past it.`
 }
 
 // [SECTION] Title | [SECTION: Title] | SECTION 1: Title | ## Title

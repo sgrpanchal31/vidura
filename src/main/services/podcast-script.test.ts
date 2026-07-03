@@ -90,12 +90,9 @@ describe('parsePodcastScript', () => {
 
 describe('podcastLengthLine', () => {
   it('converts requested minutes into a word target', () => {
-    expect(podcastLengthLine('/podcast two hosts.\nLength: about 5 minutes.')).toBe(
-      'Target length: 5 minutes. Write at least 750 words of spoken script.'
-    )
-    expect(podcastLengthLine('make it a 10 min episode')).toBe(
-      'Target length: 10 minutes. Write at least 1500 words of spoken script.'
-    )
+    expect(podcastLengthLine('/podcast two hosts.\nLength: about 5 minutes.')).toContain('about 5 minutes')
+    expect(podcastLengthLine('/podcast two hosts.\nLength: about 5 minutes.')).toContain('about 750 words')
+    expect(podcastLengthLine('make it a 10 min episode')).toContain('about 1500 words')
   })
 
   it('returns empty when no length is mentioned or the value is unreasonable', () => {
