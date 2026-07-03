@@ -3,7 +3,7 @@ import Onboarding from './screens/Onboarding'
 import Chat from './screens/Chat'
 import Settings from './screens/Settings'
 import './styles/globals.css'
-import type { IndexProgress, IndexSummary, ModelProgress } from '../../preload'
+import type { IndexProgress, IndexSummary, ModelProgress, UpdateInfo } from '../../preload'
 
 type Screen = 'loading' | 'onboarding' | 'indexing' | 'model_prep' | 'ready' | 'settings'
 
@@ -27,6 +27,11 @@ export default function App() {
   const [modelLoadStage, setModelLoadStage] = useState<'download' | 'load' | 'embed' | null>(null)
   const [modelPrepError, setModelPrepError] = useState<string | null>(null)
 
+  // Update banner: a newer GitHub release the app can install over itself
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+  const [updateHidden, setUpdateHidden] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState<{ loaded: number; total: number } | null>(null)
+
   const unsubsRef = useRef<Array<() => void>>([])
 
   useEffect(() => {
@@ -39,7 +44,25 @@ export default function App() {
         setScreen('onboarding')
       }
     })
+    // Fire-and-forget: resolves null on any network error, never blocks launch
+    window.api
+      .updateCheck()
+      .then((u) => u && setUpdateInfo(u))
+      .catch(() => {})
   }, [])
+
+  async function handleUpdateNow() {
+    if (!updateInfo || updateProgress) return
+    const unsub = window.api.onUpdateProgress((p) => setUpdateProgress(p))
+    setUpdateProgress({ loaded: 0, total: 0 })
+    try {
+      // Downloads the DMG, then the app quits and relaunches as the new version
+      await window.api.updateInstall(updateInfo.url)
+    } catch {
+      unsub()
+      setUpdateProgress(null)
+    }
+  }
 
   // ── Ingest helper ──────────────────────────────────────────────────────────
 
@@ -418,8 +441,66 @@ export default function App() {
   }
 
   if ((screen === 'ready' || screen === 'settings') && notebookFolder && modelId) {
+    const updatePct =
+      updateProgress && updateProgress.total > 0
+        ? Math.round((updateProgress.loaded / updateProgress.total) * 100)
+        : null
     return (
       <div className="app-window">
+        {updateInfo && !updateHidden && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 14,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              background: 'var(--ink)',
+              color: 'var(--cream)',
+              padding: '8px 14px',
+              borderRadius: 8,
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 12,
+              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.25)',
+            }}
+          >
+            <span>Vidura {updateInfo.version} is available</span>
+            <button
+              onClick={handleUpdateNow}
+              disabled={!!updateProgress}
+              style={{
+                border: 'none',
+                borderRadius: 5,
+                background: 'var(--ox)',
+                color: 'var(--cream)',
+                fontSize: 12,
+                padding: '5px 10px',
+                cursor: updateProgress ? 'default' : 'pointer',
+              }}
+            >
+              {updateProgress ? (updatePct !== null ? `Downloading... ${updatePct}%` : 'Downloading...') : 'Update now'}
+            </button>
+            {!updateProgress && (
+              <button
+                onClick={() => setUpdateHidden(true)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--cream)',
+                  opacity: 0.7,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Later
+              </button>
+            )}
+          </div>
+        )}
         {/* Chat stays mounted even when Settings is open so generation keeps running */}
         <div className="screen-content" style={{ display: screen === 'settings' ? 'none' : undefined }}>
           <Chat

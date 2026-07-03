@@ -102,9 +102,6 @@ export default function Onboarding({ onComplete }: Props) {
             Choose folder
           </button>
         </div>
-        <a className="link-secondary" onClick={(e) => e.preventDefault()}>
-          Try with demo folder →
-        </a>
       </div>
 
       <div className="divider" />
@@ -117,23 +114,29 @@ export default function Onboarding({ onComplete }: Props) {
           </div>
         )}
         <div className="model-list">
-          {MODELS.map((model) => (
-            <div
-              key={model.id}
-              className={`model-row${modelId === model.id ? ' sel' : ''}`}
-              onClick={() => setModelId(model.id)}
-            >
-              <div className="radio" />
-              <div className="model-info">
-                <div className="model-name">
-                  {model.name}
-                  {model.id === recommendedId && <span className="tag-rec">Recommended</span>}
+          {MODELS.map((model) => {
+            // Selecting a model bigger than the machine's RAM would hang or crash
+            // on first load, so out-of-reach models are visible but not selectable
+            const tooBig = ramGB !== null && model.minRamGB > ramGB
+            return (
+              <div
+                key={model.id}
+                className={`model-row${modelId === model.id ? ' sel' : ''}${tooBig ? ' unavailable' : ''}`}
+                onClick={tooBig ? undefined : () => setModelId(model.id)}
+              >
+                <div className="radio" />
+                <div className="model-info">
+                  <div className="model-name">
+                    {model.name}
+                    {model.id === recommendedId && <span className="tag-rec">Recommended</span>}
+                    {tooBig && <span className="tag-ram">Needs {model.minRamGB} GB RAM</span>}
+                  </div>
+                  <div className="model-desc">{model.desc}</div>
                 </div>
-                <div className="model-desc">{model.desc}</div>
+                <div className="model-size">{model.size}</div>
               </div>
-              <div className="model-size">{model.size}</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

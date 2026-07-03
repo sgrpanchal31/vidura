@@ -8,6 +8,12 @@ Built for knowledge workers who keep their thinking in local folders: journals, 
 
 ---
 
+## Requirements
+
+- Mac with Apple Silicon (M1 or newer). Intel Macs and Windows are not supported yet (you can build from source on those, CPU-only).
+- macOS 13 or newer recommended.
+- 8 GB+ RAM (16 GB recommended) and roughly 8 GB of free disk for the on-device models.
+
 ## Install
 
 One command. Takes about two minutes.
@@ -21,6 +27,10 @@ curl -fsSL https://raw.githubusercontent.com/sgrpanchal31/vidura/main/scripts/in
 3. Open a folder of documents. Vidura indexes it and you can start asking questions immediately.
 
 That's it. Nothing is uploaded anywhere.
+
+## Updating
+
+Vidura checks for new versions when it starts and shows an update banner: one click installs the update and relaunches. You can also check manually in Settings > About, or just re-run the install command above.
 
 <details>
 <summary>Build from source</summary>
@@ -42,11 +52,11 @@ Requires Node.js 18+. macOS also needs Xcode Command Line Tools (`xcode-select -
 ## Features
 
 - **Cited answers:** every response links back to the exact passage, file, and heading it came from
+- **Audio podcasts:** turn your documents into a two-host discussion or a single-narrator episode, written and voiced entirely on your device
 - **Folder sync:** watches your folder and picks up new or updated files automatically, no re-upload needed
 - **No file limits:** NotebookLM caps you at 50 sources. Vidura has no cap.
-- **Fully private:** all inference and embeddings run locally, no data ever leaves your machine
+- **Fully private:** all inference, embeddings, and text-to-speech run locally, no data ever leaves your machine
 - **Multi-turn chat:** conversation history and query expansion stay in context across messages
-- **macOS and Windows**
 
 ---
 
@@ -69,6 +79,12 @@ Apple Silicon gets Metal GPU acceleration automatically. Intel Mac and Windows u
 ## Tech
 
 Electron, React, TypeScript. LLM inference via [node-llama-cpp](https://github.com/withcatai/node-llama-cpp). Vector search via [LanceDB](https://lancedb.github.io/lancedb/). Embeddings via [Qwen3-Embedding-0.6B-ONNX](https://huggingface.co/onnx-community/Qwen3-Embedding-0.6B-ONNX) (~600 MB, runs locally).
+
+---
+
+## Feedback
+
+Found a bug or have an idea? [Open an issue](https://github.com/sgrpanchal31/vidura/issues). Early feedback shapes what gets built next.
 
 ---
 

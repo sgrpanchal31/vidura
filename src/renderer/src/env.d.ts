@@ -20,6 +20,7 @@ import type {
   PodcastDone,
   PodcastError,
   ChatRouted,
+  UpdateInfo,
 } from '../../preload/index'
 
 declare global {
@@ -29,6 +30,11 @@ declare global {
       getPrefs: () => Promise<Prefs>
       setPrefs: (patch: Partial<Prefs>) => Promise<void>
       getSystemInfo: () => Promise<SystemInfo>
+
+      getAppVersion: () => Promise<string>
+      updateCheck: () => Promise<UpdateInfo | null>
+      updateInstall: (url: string) => Promise<void>
+      onUpdateProgress: (cb: (p: { loaded: number; total: number }) => void) => () => void
 
       getParserVersion: () => Promise<string>
       startIngest: (folderPath: string, embeddingModel?: string) => Promise<IndexSummary>

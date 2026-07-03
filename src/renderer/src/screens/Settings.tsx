@@ -1,27 +1,32 @@
 import { useState, useEffect, useRef } from 'react'
 import './Settings.css'
-import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices } from '../../../preload/index'
+import type { LlmModelInfo, EmbedModelInfo, ModelProgress, PodcastVoices, UpdateInfo } from '../../../preload/index'
 
-const LLM_META: Record<string, { name: string; desc: string }> = {
+const LLM_META: Record<string, { name: string; desc: string; minRamGB: number }> = {
   'gemma4-e2b': {
     name: 'Gemma 4 E2B',
     desc: "Google's smallest Gemma 4 model. Fast and works on any Mac, including 8 GB models.",
+    minRamGB: 0,
   },
   'llama3.2-3b': {
     name: 'Llama 3.2 3B',
     desc: 'Slightly larger. Better on dense academic text and long-form sources.',
+    minRamGB: 8,
   },
   'gemma4-e4b': {
     name: 'Gemma 4 E4B',
     desc: "Google's efficient edge model. Better quality than E2B, works on 8 GB and 16 GB Macs.",
+    minRamGB: 8,
   },
   'gemma4-12b': {
     name: 'Gemma 4 12B',
     desc: 'High quality. Requires 24 GB RAM or more.',
+    minRamGB: 24,
   },
   'gpt-oss-20b': {
     name: 'GPT-OSS 20B',
     desc: "OpenAI's open-weight model. Top-tier reasoning and comprehension. Needs 32 GB RAM.",
+    minRamGB: 32,
   },
 }
 
@@ -49,7 +54,7 @@ const KOKORO_VOICES: { id: string; label: string }[] = [
 // Must match VOICE_A / VOICE_B / VOICE_SOLO in src/main/services/tts.ts
 const DEFAULT_VOICES: PodcastVoices = { hostA: 'af_heart', hostB: 'am_fenrir', solo: 'am_michael' }
 
-type Section = 'llm' | 'embed' | 'retrieval' | 'audio'
+type Section = 'llm' | 'embed' | 'retrieval' | 'audio' | 'about'
 
 type Props = {
   folder: string
@@ -97,6 +102,12 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
   // Podcast audio state
   const [podcastVoices, setPodcastVoices] = useState<PodcastVoices>(DEFAULT_VOICES)
 
+  // About / updates state
+  const [appVersion, setAppVersion] = useState('')
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'latest'>('idle')
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null)
+  const [updateDl, setUpdateDl] = useState<{ loaded: number; total: number } | null>(null)
+
   const unsubRef = useRef<(() => void) | null>(null)
   const embedUnsubRef = useRef<(() => void) | null>(null)
 
@@ -117,6 +128,10 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
       setRerankerDownloaded(reranker.downloaded)
       if (prefs.podcastVoices) setPodcastVoices(prefs.podcastVoices)
     })
+    window.api
+      .getAppVersion()
+      .then(setAppVersion)
+      .catch(() => {})
 
     return () => {
       unsubRef.current?.()
@@ -283,6 +298,31 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     await window.api.setPrefs({ podcastVoices: next })
   }
 
+  async function handleCheckUpdates() {
+    setUpdateStatus('checking')
+    setAvailableUpdate(null)
+    const update = await window.api.updateCheck().catch(() => null)
+    if (update) {
+      setAvailableUpdate(update)
+      setUpdateStatus('idle')
+    } else {
+      setUpdateStatus('latest')
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!availableUpdate || updateDl) return
+    const unsub = window.api.onUpdateProgress((p) => setUpdateDl(p))
+    setUpdateDl({ loaded: 0, total: 0 })
+    try {
+      // Downloads the DMG, then the app quits and relaunches as the new version
+      await window.api.updateInstall(availableUpdate.url)
+    } catch {
+      unsub()
+      setUpdateDl(null)
+    }
+  }
+
   const recommendedLlm = recommendedLlmId(ramGB)
   const busy = !!downloadingId || !!loadingId
 
@@ -291,6 +331,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
     { id: 'embed', label: 'Embedding model' },
     { id: 'retrieval', label: 'Retrieval' },
     { id: 'audio', label: 'Podcast audio' },
+    { id: 'about', label: 'About' },
   ]
 
   return (
@@ -379,17 +420,21 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                     )
                   }
 
+                  // Models above the machine's RAM would hang or crash on load,
+                  // so their actions are disabled with an explanatory tag
+                  const tooBig = (meta?.minRamGB ?? 0) > ramGB
                   return (
                     <div
                       key={m.id}
-                      className={`settings-model-row${isActive ? ' sel' : ''}${busy && !isActive ? ' disabled' : ''}${!m.downloaded ? ' clickable' : ''}`}
-                      onClick={!m.downloaded ? () => showHint(m.id) : undefined}
+                      className={`settings-model-row${isActive ? ' sel' : ''}${(busy && !isActive) || tooBig ? ' disabled' : ''}${!m.downloaded && !tooBig ? ' clickable' : ''}`}
+                      onClick={!m.downloaded && !tooBig ? () => showHint(m.id) : undefined}
                     >
                       <div className="settings-radio" />
                       <div className="settings-model-info">
                         <div className="settings-model-name">
                           {meta?.name ?? m.id}
                           {m.id === recommendedLlm && <span className="tag-rec">Recommended</span>}
+                          {tooBig && <span className="tag-info">Needs {meta?.minRamGB} GB RAM</span>}
                         </div>
                         <div className="settings-model-desc">{meta?.desc ?? ''}</div>
                       </div>
@@ -399,7 +444,11 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                           {isActive && <span className="settings-badge active">Selected</span>}
                           {!isActive && m.downloaded && (
                             <>
-                              <button className="settings-use-btn" onClick={(e) => handleUse(m.id, e)} disabled={busy}>
+                              <button
+                                className="settings-use-btn"
+                                onClick={(e) => handleUse(m.id, e)}
+                                disabled={busy || tooBig}
+                              >
                                 {isLoading ? 'Loading…' : 'Use'}
                               </button>
                               <button
@@ -411,7 +460,7 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
                               </button>
                             </>
                           )}
-                          {!m.downloaded && (
+                          {!m.downloaded && !tooBig && (
                             <div className="settings-download-group">
                               {hintId === m.id && <span className="settings-download-hint">Download first</span>}
                               <button
@@ -572,6 +621,60 @@ export default function Settings({ folder, modelId, onClose, onModelChanged }: P
               </div>
             </div>
           )}
+          {/* ── About ── */}
+          {activeSection === 'about' && (
+            <div className="settings-section">
+              <div className="settings-section-title">About</div>
+              <div className="settings-section-note">
+                Vidura is local-first: your documents and conversations never leave your Mac.
+              </div>
+              <div className="settings-voice-list">
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Version</div>
+                    <div className="settings-model-desc">Vidura {appVersion || '...'}</div>
+                  </div>
+                  {availableUpdate ? (
+                    <button className="settings-use-btn" onClick={handleInstallUpdate} disabled={!!updateDl}>
+                      {updateDl
+                        ? updateDl.total > 0
+                          ? `Downloading... ${Math.round((updateDl.loaded / updateDl.total) * 100)}%`
+                          : 'Downloading...'
+                        : `Update to ${availableUpdate.version}`}
+                    </button>
+                  ) : (
+                    <button
+                      className="settings-use-btn"
+                      onClick={handleCheckUpdates}
+                      disabled={updateStatus === 'checking'}
+                    >
+                      {updateStatus === 'checking'
+                        ? 'Checking...'
+                        : updateStatus === 'latest'
+                          ? 'You are on the latest version'
+                          : 'Check for updates'}
+                    </button>
+                  )}
+                </div>
+                <div className="settings-voice-row">
+                  <div className="settings-model-info">
+                    <div className="settings-model-name">Feedback</div>
+                    <div className="settings-model-desc">Found a bug or have an idea? It helps a lot.</div>
+                  </div>
+                  <a
+                    className="settings-use-btn"
+                    style={{ textDecoration: 'none' }}
+                    href="https://github.com/sgrpanchal31/vidura/issues"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Report an issue
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Podcast audio ── */}
           {activeSection === 'audio' && (
             <div className="settings-section">
