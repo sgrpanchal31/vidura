@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vidura icon preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@1,60,300&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #272320;
+      font-family: 'IBM Plex Sans', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 40px;
+      gap: 64px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: rgba(244,239,228,0.5);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .row {
+      display: flex;
+      align-items: flex-end;
+      gap: 40px;
+    }
+
+    .swatch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .swatch label {
+      color: rgba(244,239,228,0.4);
+      font-size: 11px;
+    }
+
+    /* The icon itself — inline SVG scaled via CSS */
+    .icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #F4EFE4;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .icon .v {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+      font-weight: 300;
+      font-variation-settings: 'opsz' 60;
+      color: #6B2424;
+      line-height: 1;
+      /* scale the V proportionally relative to the icon size */
+      font-size: calc(var(--sz) * 0.664);
+      /* push baseline down to roughly center the cap-height */
+      margin-top: calc(var(--sz) * 0.14);
+    }
+
+    /* Sizes */
+    .icon.sz-512 { --sz: 512px; width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+    .icon.sz-256 { --sz: 256px; width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+    .icon.sz-128 { --sz: 128px; width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+    .icon.sz-64  { --sz: 64px;  width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+    .icon.sz-32  { --sz: 32px;  width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+    .icon.sz-16  { --sz: 16px;  width: var(--sz); height: var(--sz); border-radius: calc(var(--sz) * 0.224); }
+
+    /* Flat (no rounded corners) for full icon inspection */
+    .icon.flat { border-radius: 0; }
+
+    .divider {
+      width: 1px;
+      height: 80px;
+      background: rgba(244,239,228,0.1);
+      align-self: center;
+    }
+
+    /* Onboarding context preview */
+    .ctx-onboarding {
+      width: 620px;
+      background: #F4EFE4;
+      border-radius: 11px;
+      overflow: hidden;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.65);
+      padding-bottom: 32px;
+    }
+
+    .ctx-titlebar {
+      height: 44px;
+      background: #EDE8DC;
+      border-bottom: 1px solid rgba(26,22,18,0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ctx-titlebar span {
+      font-size: 13px;
+      font-weight: 500;
+      color: #5A5751;
+    }
+
+    .ctx-logo-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 36px 0 28px;
+      gap: 10px;
+    }
+
+    .ctx-logo-section .icon.sz-72 {
+      --sz: 72px;
+      width: var(--sz);
+      height: var(--sz);
+      border-radius: calc(var(--sz) * 0.224);
+    }
+
+    .ctx-app-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-style: italic;
+      font-weight: 300;
+      font-variation-settings: 'opsz' 60;
+      font-size: 22px;
+      color: #1A1612;
+    }
+
+    .ctx-eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #5A5751;
+      padding: 0 52px;
+      margin-top: 4px;
+    }
+
+    .ctx-field-row {
+      display: flex;
+      gap: 10px;
+      padding: 10px 52px 0;
+    }
+
+    .ctx-field {
+      flex: 1;
+      height: 34px;
+      border: 1px solid rgba(26,22,18,0.18);
+      border-radius: 3px;
+      background: rgba(26,22,18,0.03);
+      display: flex;
+      align-items: center;
+      padding: 0 11px;
+      font-size: 13px;
+      color: #5A5751;
+      font-style: italic;
+    }
+
+    .ctx-btn {
+      height: 34px;
+      padding: 0 18px;
+      background: #6B2424;
+      color: #f9f0e6;
+      border: none;
+      border-radius: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Vidura — Icon preview</h1>
+
+  <!-- Sizes row -->
+  <div class="row">
+    <div class="swatch">
+      <div class="icon sz-512"><span class="v">V</span></div>
+      <label>512</label>
+    </div>
+    <div class="swatch">
+      <div class="icon sz-256"><span class="v">V</span></div>
+      <label>256</label>
+    </div>
+    <div class="swatch">
+      <div class="icon sz-128"><span class="v">V</span></div>
+      <label>128</label>
+    </div>
+    <div class="swatch">
+      <div class="icon sz-64"><span class="v">V</span></div>
+      <label>64</label>
+    </div>
+    <div class="swatch">
+      <div class="icon sz-32"><span class="v">V</span></div>
+      <label>32</label>
+    </div>
+    <div class="swatch">
+      <div class="icon sz-16"><span class="v">V</span></div>
+      <label>16</label>
+    </div>
+  </div>
+
+  <!-- Onboarding screen context -->
+  <div>
+    <h1 style="margin-bottom:24px; text-align:center;">In context: onboarding screen</h1>
+    <div class="ctx-onboarding">
+      <div class="ctx-titlebar"><span>Vidura</span></div>
+      <div class="ctx-logo-section">
+        <div class="icon sz-72"><span class="v">V</span></div>
+        <div class="ctx-app-name">Vidura</div>
+      </div>
+      <div class="ctx-eyebrow">Notebook Folder</div>
+      <div class="ctx-field-row">
+        <div class="ctx-field">No folder selected yet</div>
+        <button class="ctx-btn">Choose folder</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
