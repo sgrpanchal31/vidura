@@ -20,6 +20,20 @@
   -webkit-app-region: no-drag;
 }
 
+/* ---- Logo ---- */
+
+.logo-hero {
+  display: flex;
+  justify-content: center;
+  padding: 32px 0 16px;
+  flex-shrink: 0;
+}
+
+.logo-mark {
+  width: 64px;
+  height: 64px;
+}
+
 /* ---- Layout zones ---- */
 
 .zone {
