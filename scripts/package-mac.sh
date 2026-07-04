@@ -35,6 +35,13 @@ cp -r "$ELECTRON_APP" "$APP"
 # Strip any quarantine/extended-attributes that would break signing
 xattr -cr "$APP"
 
+# Replace Electron's default icon with the Vidura icon. Must happen before
+# signing: codesign seals the bundle contents, so changing the icon afterwards
+# would invalidate the signature.
+echo "▶ Installing app icon"
+cp "$REPO_DIR/resources/icon.icns" "$APP/Contents/Resources/vidura.icns"
+rm -f "$APP/Contents/Resources/electron.icns"
+
 # ── 2. Prune devDependencies before bundling ──
 echo "▶ Pruning devDependencies"
 cd "$REPO_DIR"
@@ -106,6 +113,7 @@ PLIST="$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName Vidura"          "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.vidura.app" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable vidura"    "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile vidura.icns" "$PLIST"
 mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/vidura"
 
 # ── 6. Ad-hoc code-sign (inside-out: native binaries first, then the bundle) ──
