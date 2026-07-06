@@ -8,6 +8,7 @@ export function normalize(s: string): string {
   return s
     .toLowerCase()
     .replace(/\[\d+\]/g, ' ') // citation markers are not answer content
+    .replace(/(\d)[,.](\d)/g, '$1$2') // "8,192"→"8192", "28.4"→"284" (both sides)
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }

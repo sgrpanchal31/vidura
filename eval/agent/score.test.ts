@@ -3,7 +3,7 @@ import { normalize, substringHit, tokenF1, citationValidity } from './score'
 
 describe('normalize', () => {
   it('lowercases, strips punctuation and citation markers', () => {
-    expect(normalize('The score is 28.4 BLEU [1].')).toBe('the score is 28 4 bleu')
+    expect(normalize('The score is 28.4 BLEU [1].')).toBe('the score is 284 bleu')
   })
   it('makes formatting variants comparable ("8,192" vs "8192")', () => {
     expect(normalize('8,192')).toBe(normalize('8192'))
