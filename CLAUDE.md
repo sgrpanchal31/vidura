@@ -16,8 +16,11 @@ src/main/           — Electron main process
   services/
     models.ts       — GGUF download + validation
     embed.ts        — Embedding coordinator (talks to worker thread)
-    inference.ts    — LLM via node-llama-cpp
-    rag.ts          — embed → retrieve → prompt → stream → remap citations
+    inference.ts    — LLM via node-llama-cpp (generateStream + agent sessions)
+    agent/          — chat pipeline: orchestrator loop, tool registry, tools/
+                      (grammar-constrained decisions; see decision log in issue #55)
+    rag.ts          — retrieval primitives (retrieve/rerank/dedupe) + legacy pipeline
+                      behind prefs.agentEnabled=false + podcast/overview prompts
     store.ts        — LanceDB vector store
     indexer.ts      — folder ingest orchestrator
     state.ts        — per-notebook state (.openbook/state.json)
