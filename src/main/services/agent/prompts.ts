@@ -22,12 +22,15 @@ Evidence passages are numbered [1], [2], and so on. Most questions are answerabl
 }
 
 export function buildFirstTurn(question: string, evidenceBlock: string): string {
+  // The explicit "answer now" invitation matters: without it, small models
+  // almost never answer at the first decision (eval: 1 of 30 runs), adding a
+  // ~12s verification search to nearly every question.
   return `Question: ${question}
 
 Evidence gathered so far:
 ${evidenceBlock || '(none — the initial search found nothing)'}
 
-Output your next action as JSON.`
+If the evidence above covers the question, choose "answer" now. Output your next action as JSON.`
 }
 
 export function buildObservationTurn(toolName: string, llmText: string): string {
