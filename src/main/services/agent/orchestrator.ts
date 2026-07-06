@@ -157,7 +157,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
       // the workflow after this session is disposed — one generation at a time.
       if (tool.kind === 'deliverable') {
         deliverable = { tool: tool.name, params }
-        steps.push({
+        const record: AgentStepRecord = {
           step,
           thought,
           tool: tool.name,
@@ -165,7 +165,10 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
           summary: 'Handing off',
           evidenceCount: 0,
           durationMs: 0,
-        })
+        }
+        steps.push(record)
+        onStep({ type: 'step_start', step, thought, tool: tool.name, params })
+        onStep({ type: 'step_result', ...record })
         break
       }
 
