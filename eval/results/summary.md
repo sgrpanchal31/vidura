@@ -26,3 +26,26 @@
 | 2026-06-25 | baseline   | longmemeval | 5   | qwen3     |    73.6% | 59.6% |    96 |   149 | 368/500 |
 | 2026-06-25 | hybrid-rrf | longmemeval | 5   | qwen3     |    78.8% | 65.4% |   100 |   143 | 394/500 |
 | 2026-06-25 | reranker   | longmemeval | 5   | qwen3     |    91.6% | 68.2% |   110 |   265 | 458/500 |
+
+# Answer-Level Eval: Agent Pipeline vs Old RAG Pipeline (eval/agent/)
+
+Measures generated ANSWERS (not retrieval): key-fact hit, token F1 vs gold, citation validity
+(% of cited passages containing the fact), end-to-end latency. Domain dataset, 20 single-hop +
+10 multi-hop questions, gemma4-e4b, reranker on, run headless via `npx tsx eval/agent/runner.mts`.
+
+| Date       | Arm           | Subset   | n   | Hit | F1    | CitValid | p50s |
+| ---------- | ------------- | -------- | --- | --- | ----- | -------- | ---- |
+| 2026-07-06 | old rag       | all      | 30  | 37% | 0.353 | 0.45     | 20.4 |
+| 2026-07-06 | agent (tuned) | all      | 30  | 47% | 0.359 | 0.48     | 36.1 |
+| 2026-07-06 | old rag       | simple   | 20  | 25% | 0.327 | 0.42     | 20.4 |
+| 2026-07-06 | agent (tuned) | simple   | 20  | 40% | 0.324 | 0.47     | 35.5 |
+| 2026-07-06 | old rag       | multihop | 10  | 60% | 0.405 | 0.50     | 21.9 |
+| 2026-07-06 | agent (tuned) | multihop | 10  | 60% | 0.429 | 0.50     | 44.8 |
+
+Tuning history (agent arm, all-subset): untuned 43% hit / 0.287 F1 / 43.8s p50 →
+concise-answer + tight decisions 43% / 0.372 / 39.8 → + answer-at-first-decision nudge
+47% / 0.359 / 36.1. Latency floor is structural: each grammar-constrained decision with a
+visible thought costs 3-6s of generation on local hardware.
+
+Known corpus issue affecting both arms: chunker splits parents mid-sentence, detaching
+facts from their subjects (issue #56).
