@@ -1,0 +1,48 @@
+// All prompt text for the agent loop, in one place so tuning is easy.
+import type { HistoryMessage } from '../rag'
+import { THOUGHT_MAX_CHARS } from './registry'
+
+export function buildAgentSystemPrompt(toolDocs: string, history: HistoryMessage[]): string {
+  // Same history policy as the old pipeline: last 6 messages, 300 chars each.
+  const recentHistory = history.slice(-6)
+  const historySection =
+    recentHistory.length > 0
+      ? '\n\nRecent conversation:\n' +
+        recentHistory.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`).join('\n')
+      : ''
+
+  return `You are a research assistant that answers questions about the user's documents.
+You work in steps. At each step, output ONE JSON object choosing your next action, and nothing else.
+"thought" is one short sentence (under ${THOUGHT_MAX_CHARS} characters) explaining your choice.
+
+Actions:
+${toolDocs}
+
+Evidence passages are numbered [1], [2], and so on. Choose "answer" as soon as the evidence covers the question — do not keep searching for information you already have.${historySection}`
+}
+
+export function buildFirstTurn(question: string, evidenceBlock: string): string {
+  return `Question: ${question}
+
+Evidence gathered so far:
+${evidenceBlock || '(none — the initial search found nothing)'}
+
+Output your next action as JSON.`
+}
+
+export function buildObservationTurn(toolName: string, llmText: string): string {
+  return `Result of ${toolName}:
+${llmText}
+
+Output your next action as JSON. If the evidence now covers the question, choose "answer".`
+}
+
+// Sent instead of a decision prompt when budgets run out or the model repeats
+// itself — no decision is requested, the loop goes straight to the answer.
+// The answer instruction carries the citation rules verbatim from the old
+// pipeline (rag.ts buildSystemPrompt) so answer style and citing behavior
+// carry over unchanged.
+export const ANSWER_INSTRUCTION = `Now write the final answer to the question using the evidence above.
+Describe what you find in the evidence as it relates to the question. Always cite sources like [1] or [2].
+If the evidence doesn't directly answer the question, describe the closest relevant content you found.
+Write complete sentences. No preamble. Do not say you cannot find information — instead, describe what IS in the evidence.`

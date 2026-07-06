@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './Chat.css'
-import type { CitationEntry, NotebookState, MessageAudio } from '../../../preload'
+import type { CitationEntry, NotebookState, MessageAudio, AgentStepRecord } from '../../../preload'
 import AudioPlayer from '../components/AudioPlayer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -11,6 +11,80 @@ type Message = {
   content: string
   citations: CitationEntry[]
   audio?: MessageAudio
+  steps?: AgentStepRecord[]
+}
+
+// A step row while the agent is running: appears on step_start (pending),
+// gets its summary/duration on step_result.
+type LiveStep = {
+  step: number
+  thought: string
+  tool: string
+  params: Record<string, unknown>
+  summary?: string
+  durationMs?: number
+  isError?: boolean
+  done: boolean
+}
+
+// Human phrasing for a tool call, present tense while running, past when done
+function stepActionLabel(step: LiveStep): string {
+  switch (step.tool) {
+    case 'search_documents':
+      return `${step.done ? 'Searched' : 'Searching'} "${String(step.params.query ?? '')}"`
+    case 'keyword_search':
+      return `${step.done ? 'Looked' : 'Looking'} for "${String(step.params.term ?? '')}"`
+    case 'list_files':
+      return step.done ? 'Listed files' : 'Listing files'
+    case 'read_file':
+      return `${step.done ? 'Read' : 'Reading'} ${String(step.params.file ?? '')}`
+    case 'generate_podcast':
+      return 'Creating a podcast'
+    case 'generate_overview':
+      return 'Writing an overview'
+    default:
+      return step.tool
+  }
+}
+
+function AgentStepRow({ step }: { step: LiveStep }): React.JSX.Element {
+  return (
+    <div className={`agent-step${step.isError ? ' agent-step-error' : ''}`}>
+      <span className="agent-step-icon">
+        {step.done ? '✓' : <span className="thinking-spinner agent-step-spinner" />}
+      </span>
+      <span className="agent-step-body">
+        {step.thought && <span className="agent-step-thought">{step.thought}</span>}
+        <span className="agent-step-action">
+          {stepActionLabel(step)}
+          {step.done && step.summary && (
+            <span className="agent-step-result">
+              {' '}
+              → {step.summary}
+              {step.durationMs !== undefined && ` · ${(step.durationMs / 1000).toFixed(1)}s`}
+            </span>
+          )}
+        </span>
+      </span>
+    </div>
+  )
+}
+
+// Collapsed "Ran N steps" trace on a finished message
+function AgentTrace({ steps }: { steps: AgentStepRecord[] }): React.JSX.Element {
+  const totalSec = (steps.reduce((sum, s) => sum + s.durationMs, 0) / 1000).toFixed(1)
+  return (
+    <details className="agent-trace">
+      <summary className="agent-trace-summary">
+        Ran {steps.length} step{steps.length === 1 ? '' : 's'} · {totalSec}s
+      </summary>
+      <div className="agent-steps">
+        {steps.map((s) => (
+          <AgentStepRow key={s.step} step={{ ...s, done: true }} />
+        ))}
+      </div>
+    </details>
+  )
 }
 
 type SourceItem = {
@@ -391,6 +465,10 @@ export default function Chat({
   // Router's task for the in-flight ask; podcasts swap the streaming transcript
   // for simple phase labels ("Generating script..." / "Generating audio...")
   const [routedTask, setRoutedTask] = useState<'chat' | 'podcast' | 'overview' | null>(null)
+  // Agent steps for the in-flight ask, rendered as live rows above the stream
+  const [liveSteps, setLiveSteps] = useState<LiveStep[]>([])
+  // True between answer_start and the first token ("Writing response...")
+  const [answerStarted, setAnswerStarted] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesListRef = useRef<HTMLDivElement>(null)
@@ -862,8 +940,31 @@ export default function Chat({
     setActiveCitation(null)
     setAudioErrorMsgId(null)
     setRoutedTask(null)
+    setLiveSteps([])
+    setAnswerStarted(false)
 
     const unsubRouted = window.api.onChatRouted(({ task }) => setRoutedTask(task))
+    // Agent step trace: step_start adds a pending row, step_result completes it,
+    // answer_start switches the status to writing. Steps arrive regardless of
+    // which session the user is viewing; display is gated at render time.
+    const unsubStep = window.api.onChatStep((e) => {
+      if (e.type === 'step_start') {
+        setLiveSteps((prev) => [
+          ...prev,
+          { step: e.step, thought: e.thought, tool: e.tool, params: e.params, done: false },
+        ])
+      } else if (e.type === 'step_result') {
+        setLiveSteps((prev) =>
+          prev.map((s) =>
+            s.step === e.step
+              ? { ...s, summary: e.summary, durationMs: e.durationMs, isError: e.isError, done: true }
+              : s
+          )
+        )
+      } else if (e.type === 'answer_start') {
+        setAnswerStarted(true)
+      }
+    })
     const unsubChatProgress = window.api.onChatProgress((p) => {
       if (p.stage === 'reading') setGenerateStatus('Reading documents...')
       else if (p.stage === 'reranking') setGenerateStatus('Finding best matches...')
@@ -889,6 +990,7 @@ export default function Chat({
         role: 'assistant',
         content: result.answer,
         citations: result.citations as CitationEntry[],
+        ...(result.steps && result.steps.length > 0 ? { steps: result.steps } : {}),
       }
 
       if (currentSessionIdRef.current === snapshot?.sessionId) {
@@ -921,12 +1023,16 @@ export default function Chat({
         generatingSnapshotRef.current = null
         setAudioPhase({ sessionId: result.podcast.sessionId, messageId: result.podcast.messageId })
         setStreamBuffer('')
+        setLiveSteps([])
+        setAnswerStarted(false)
         setGenerateStatus('Generating audio...')
       } else {
         generatingSessionIdRef.current = null
         generatingSnapshotRef.current = null
         setGeneratingSessionId(null)
         setStreamBuffer('')
+        setLiveSteps([])
+        setAnswerStarted(false)
         setGenerateStatus('')
         setIsGenerating(false)
         setRoutedTask(null)
@@ -968,6 +1074,8 @@ export default function Chat({
       generatingSnapshotRef.current = null
       setGeneratingSessionId(null)
       setStreamBuffer('')
+      setLiveSteps([])
+      setAnswerStarted(false)
       setGenerateStatus('')
       setIsGenerating(false)
       setRoutedTask(null)
@@ -981,9 +1089,10 @@ export default function Chat({
       unsubToken()
       unsubDone()
       unsubError()
+      unsubStep()
       unsubsRef.current = []
     }
-    unsubsRef.current = [unsubRouted, unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError]
+    unsubsRef.current = [unsubRouted, unsubChatProgress, unsubProgress, unsubToken, unsubDone, unsubError, unsubStep]
 
     const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }))
     const fileFilter = selectedFiles === null ? undefined : Array.from(selectedFiles)
@@ -1138,6 +1247,9 @@ export default function Chat({
                 return (
                   <div key={msg.id} className={`message message-${msg.role}`}>
                     <div className="message-bubble">
+                      {msg.role === 'assistant' && msg.steps && msg.steps.length > 0 && (
+                        <AgentTrace steps={msg.steps} />
+                      )}
                       {msg.role === 'user' ? (
                         msg.content
                       ) : msg.audio ? (
@@ -1156,23 +1268,33 @@ export default function Chat({
                   </div>
                 )
               })}
-              {isCurrentSessionGenerating && (!streamBuffer || routedTask === 'podcast') && (
+              {isCurrentSessionGenerating && (
                 <div className="message message-assistant">
-                  <div className="message-bubble thinking-loader">
-                    <span className="thinking-spinner" />
-                    <span className="thinking-label">
-                      {routedTask === 'podcast' && !audioPhase
-                        ? 'Generating script...'
-                        : generateStatus || 'Thinking...'}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {isCurrentSessionGenerating && streamBuffer && routedTask !== 'podcast' && (
-                <div className="message message-assistant">
-                  <div className="message-bubble message-streaming">
-                    {streamBuffer}
-                    <span className="stream-cursor">▋</span>
+                  <div className="message-bubble">
+                    {liveSteps.length > 0 && (
+                      <div className="agent-steps agent-steps-live">
+                        {liveSteps.map((s) => (
+                          <AgentStepRow key={s.step} step={s} />
+                        ))}
+                      </div>
+                    )}
+                    {streamBuffer && routedTask !== 'podcast' ? (
+                      <div className="message-streaming">
+                        {streamBuffer}
+                        <span className="stream-cursor">▋</span>
+                      </div>
+                    ) : liveSteps.some((s) => !s.done) ? null : ( // a pending step row already shows a spinner
+                      <div className="thinking-loader">
+                        <span className="thinking-spinner" />
+                        <span className="thinking-label">
+                          {routedTask === 'podcast' && !audioPhase
+                            ? 'Generating script...'
+                            : answerStarted
+                              ? 'Writing response...'
+                              : generateStatus || 'Thinking...'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -21,6 +21,7 @@ import type {
   PodcastError,
   ChatRouted,
   UpdateInfo,
+  AgentStepEvent,
 } from '../../preload/index'
 
 declare global {
@@ -74,6 +75,7 @@ declare global {
       chatCancel: () => Promise<void>
       onChatToken: (cb: (token: string) => void) => () => void
       onChatRouted: (cb: (r: ChatRouted) => void) => () => void
+      onChatStep: (cb: (e: AgentStepEvent) => void) => () => void
       onChatDone: (cb: (result: ChatResult) => void) => () => void
       onChatError: (cb: (message: string) => void) => () => void
       chatSessionList: (

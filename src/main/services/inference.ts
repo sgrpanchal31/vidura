@@ -1,5 +1,5 @@
 // node-llama-cpp is ESM-only. Loaded via dynamic import() to satisfy the CJS main bundle.
-import type { Llama, LlamaModel } from 'node-llama-cpp'
+import type { Llama, LlamaModel, GbnfJsonSchema, LlamaGrammar } from 'node-llama-cpp'
 import { getModelPath } from './models'
 
 const MODEL_LOAD_TIMEOUT_MS = 30_000 // watchdog for OOM (TODOS TODO-2)
@@ -12,6 +12,16 @@ let _mod: NodeLlamaCppModule | null = null
 async function mod(): Promise<NodeLlamaCppModule> {
   if (!_mod) _mod = (await import('node-llama-cpp')) as NodeLlamaCppModule
   return _mod
+}
+
+// Handle for one agent run: JSON-constrained decision turns and free-text
+// answer turns share one chat session (and its KV cache). Always dispose() —
+// it frees the context and releases the generating mutex.
+export type AgentSession = {
+  signal: AbortSignal
+  promptJson(text: string, grammar: LlamaGrammar, opts: { maxTokens: number }): Promise<string>
+  promptText(text: string, opts: { onToken: (token: string) => void }): Promise<string>
+  dispose(): Promise<void>
 }
 
 class LlamaService {
@@ -132,6 +142,78 @@ class LlamaService {
   cancel(): void {
     this.abortController?.abort()
     this.generating = false
+  }
+
+  // Compiles a JSON-Schema into a sampling grammar. Generation under a grammar
+  // is constrained token-by-token: the model physically cannot emit JSON that
+  // violates the schema. This is what makes small local models reliable tool
+  // callers — the agent loop's decisions are sampled this way.
+  async createJsonGrammar(schema: GbnfJsonSchema): Promise<LlamaGrammar> {
+    const llama = await this.ensureLlama()
+    // Cast: createGrammarForJsonSchema's generic wants a literal schema type;
+    // ours is built dynamically from the tool registry.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return llama.createGrammarForJsonSchema(schema as any)
+  }
+
+  // A multi-turn session for one agent run. Unlike generateStream (fresh
+  // context per call), the context lives across turns so the KV cache is
+  // reused — each step only pays for the new text, not the whole transcript.
+  // Holds the same generating mutex as generateStream, so cancel() aborts
+  // agent runs exactly like it aborts old-pipeline generations.
+  async createAgentSession(systemPrompt: string): Promise<AgentSession> {
+    if (!this.model) throw new Error('No model loaded — call loadModel() first')
+    if (this.generating) throw new Error('Already generating — call cancel() first')
+
+    const { LlamaChatSession } = await mod()
+
+    this.generating = true
+    this.abortController = new AbortController()
+    const signal = this.abortController.signal
+
+    // Same context flags as generateStream (see comment there re: swaFullCache)
+    let context: Awaited<ReturnType<LlamaModel['createContext']>>
+    try {
+      context = await this.model.createContext({ contextSize: CONTEXT_SIZE, swaFullCache: true })
+    } catch (err) {
+      // Release the mutex if the context never came up, or generation locks forever
+      this.generating = false
+      this.abortController = null
+      throw err
+    }
+    const session = new LlamaChatSession({
+      contextSequence: context.getSequence(),
+      systemPrompt,
+    })
+
+    const release = async (): Promise<void> => {
+      try {
+        await (context as any)?.dispose?.()
+      } catch {
+        /* ignore */
+      }
+      this.generating = false
+      this.abortController = null
+    }
+
+    return {
+      signal,
+      promptJson: async (text, grammar, opts) => {
+        return session.prompt(text, { signal, grammar: grammar as any, maxTokens: opts.maxTokens })
+      },
+      promptText: async (text, opts) => {
+        let fullText = ''
+        await session.prompt(text, {
+          signal,
+          onTextChunk(t: string) {
+            fullText += t
+            opts.onToken(t)
+          },
+        })
+        return fullText
+      },
+      dispose: release,
+    }
   }
 
   async dispose(): Promise<void> {

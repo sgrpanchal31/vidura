@@ -17,6 +17,10 @@ import { isModelDownloaded, downloadModel, cancelDownload, listModels, deleteMod
 import { listEmbedModels, deleteEmbed, DEFAULT_EMBED, embedDim } from './services/embed-models'
 import { llamaService } from './services/inference'
 import { ragQuery, ragSummarizeFile } from './services/rag'
+import { runAgent } from './services/agent/orchestrator'
+import { buildDefaultRegistry } from './services/agent/tools'
+import { resolveFile as resolveAgentFile } from './services/agent/tools/resolve-file'
+import type { AgentStepEvent, AgentStepRecord } from './services/agent/types'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 import { routeQuery } from './services/router'
@@ -28,6 +32,10 @@ import { ttsService, CancelledError, type MessageAudio } from './services/tts'
 import { parsePodcastScript } from './services/podcast-script'
 import { readFile, copyFile } from 'fs/promises'
 import { resolve as resolvePath } from 'path'
+
+// The agent's toolbox — built once; tools are stateless (per-run state lives
+// in the AgentContext the orchestrator creates).
+const agentRegistry = buildDefaultRegistry()
 
 // Last-resort crash guard: without this, an uncaught main-process error kills
 // the app silently and a tester can only report "it just closed". Log every
@@ -77,6 +85,9 @@ type Prefs = {
   rerankerEnabled: boolean
   ttsEngine: string | null
   podcastVoices: PodcastVoices | null
+  // Escape hatch: false routes chat through the old router+RAG pipeline
+  // instead of the agent loop. Kept for one release as a safety valve.
+  agentEnabled?: boolean
 }
 
 function readPrefs(): Prefs {
@@ -291,7 +302,108 @@ ipcMain.handle(
     // The route span (showing scope/task/targetFile/usedFallback) is attached inside routeQuery.
     const lf = getLangfuse()
     const trace = lf?.trace({ name: 'chat-ask', input: { question } })
+    const flushTrace = () => lf?.flushAsync().catch(() => {})
 
+    // ── Agent path (the default) ─────────────────────────────────────────────
+    // One loop replaces the router + hardcoded pipelines: the model itself
+    // picks search/read steps (streamed to the UI via chat:step) and either
+    // answers or dispatches a deliverable (podcast/overview) with parameters.
+    if (readPrefs().agentEnabled ?? true) {
+      const onStep = (e: AgentStepEvent) => mainWindow?.webContents.send('chat:step', e)
+
+      // Runs podcast/overview generation after the loop chose it. The loop
+      // itself never runs these: only one LLM generation can be live at a
+      // time, so the agent session is disposed before the workflow starts.
+      const dispatchDeliverable = async (
+        tool: string,
+        params: Record<string, unknown>,
+        steps: AgentStepRecord[]
+      ): Promise<void> => {
+        const isPodcast = tool === 'generate_podcast'
+        const task: GenerateTask = isPodcast ? 'podcast' : 'overview'
+        mainWindow?.webContents.send('chat:routed', { task })
+
+        // The model names files fuzzily (or [] = all); resolve against the
+        // index and honor the user's file selection. Nothing valid → all/selection.
+        await vectorStore.open(folderPath, { dim: embedDim(DEFAULT_EMBED) })
+        let available = await vectorStore.listSourceFiles()
+        if (selectedFiles) available = available.filter((f) => selectedFiles.includes(f))
+        const requested = Array.isArray(params.files) ? params.files.map(String) : []
+        const resolved = requested.map((f) => resolveAgentFile(f, available)).filter((f): f is string => f !== null)
+        const targetFiles = resolved.length > 0 ? resolved : selectedFiles
+        const podcastMode = params.mode === 'solo' ? 'solo' : 'duo'
+
+        const answer = await generateFromCorpus(
+          folderPath,
+          modelId,
+          task,
+          'prose',
+          onToken,
+          (p) => mainWindow?.webContents.send('generate:progress', p),
+          targetFiles,
+          trace,
+          question,
+          podcastMode
+        )
+        if (isPodcast && sessionId) {
+          const messageId = `${Date.now()}-a`
+          mainWindow?.webContents.send('chat:done', {
+            answer,
+            citations: [],
+            steps,
+            podcast: { sessionId, messageId },
+          })
+          startPodcastAudio(folderPath, sessionId, messageId, answer, trace)
+        } else {
+          mainWindow?.webContents.send('chat:done', { answer, citations: [], steps })
+        }
+        flushTrace()
+      }
+
+      const runAgentPath = async (): Promise<void> => {
+        // Explicit /podcast command: no reason to spend agent steps deciding
+        // what the user already said. Same narrator-count regex the old
+        // router fallback used.
+        if (question.trimStart().startsWith('/podcast')) {
+          const podcastMode = /\bnarrat|\b(solo|single|one)\b.{0,20}\b(narrator|voice|host|person)\b/i.test(question)
+            ? 'solo'
+            : 'duo'
+          await dispatchDeliverable('generate_podcast', { files: [], mode: podcastMode }, [])
+          return
+        }
+
+        mainWindow?.webContents.send('chat:routed', { task: 'chat' })
+        const result = await runAgent({
+          question,
+          folderPath,
+          modelId,
+          history,
+          registry: agentRegistry,
+          allowedFiles: selectedFiles,
+          onToken,
+          onStep,
+          externalTrace: trace,
+        })
+        if (result.deliverable) {
+          await dispatchDeliverable(result.deliverable.tool, result.deliverable.params, result.steps)
+        } else {
+          mainWindow?.webContents.send('chat:done', {
+            answer: result.answer,
+            citations: result.citations,
+            steps: result.steps,
+          })
+          flushTrace()
+        }
+      }
+
+      runAgentPath().catch((err) => {
+        mainWindow?.webContents.send('chat:error', String(err))
+        flushTrace()
+      })
+      return
+    }
+
+    // ── Legacy pipeline (escape hatch: prefs.agentEnabled = false) ───────────
     const dim = embedDim(DEFAULT_EMBED)
     await vectorStore.open(folderPath, { dim })
     const availableFiles = await vectorStore.listSourceFiles()
@@ -321,9 +433,6 @@ ipcMain.handle(
     // Let the renderer adapt its progress UI to the task (podcasts hide the
     // streaming transcript and show phase labels instead)
     mainWindow?.webContents.send('chat:routed', { task: decision.task })
-
-    // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
-    const flushTrace = () => lf?.flushAsync().catch(() => {})
 
     // Podcast tasks continue into TTS after the script is done; the renderer needs
     // the message id main will use so it can attach the audio when podcast:done fires

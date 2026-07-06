@@ -60,6 +60,7 @@ export type PersistedMessage = {
   content: string
   citations: unknown[] // CitationEntry[] — typed on the renderer side, opaque here
   audio?: MessageAudio // generated podcast audio, if any
+  steps?: unknown[] // AgentStepRecord[] — the agent trace behind this answer, opaque here
 }
 
 export type ChatSession = {

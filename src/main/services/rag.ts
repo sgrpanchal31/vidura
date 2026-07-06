@@ -41,7 +41,7 @@ export type RagResult = {
 // Rerank all candidate chunks with the cross-encoder before deduplication.
 // Running on the full pool (not just 8 parents) gives the reranker maximum headroom.
 // No-op if the reranker isn't ready (disabled or model not loaded).
-async function rerankChunks(query: string, chunks: SearchResult[]): Promise<SearchResult[]> {
+export async function rerankChunks(query: string, chunks: SearchResult[]): Promise<SearchResult[]> {
   if (!rerankerGgufService.isReady() || chunks.length === 0) return chunks
   try {
     const docs = chunks.map((c) => c.parentText.slice(0, 2000))
@@ -56,7 +56,7 @@ async function rerankChunks(query: string, chunks: SearchResult[]): Promise<Sear
 
 // Collapse child chunks to unique parents, keeping the highest-scoring child per parent.
 // Chunks arrive ordered best-score-first, so the first occurrence of each parentId is best.
-function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
+export function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   const seen = new Map<string, SearchResult>()
   for (const c of chunks) {
     if (!seen.has(c.parentId)) seen.set(c.parentId, c)

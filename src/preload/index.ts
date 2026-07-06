@@ -11,6 +11,9 @@ export type Prefs = {
   rerankerEnabled: boolean
   ttsEngine: string | null
   podcastVoices: PodcastVoices | null
+  // Escape hatch: false routes chat through the old router+RAG pipeline
+  // instead of the agent loop. Kept for one release as a safety valve.
+  agentEnabled?: boolean
 }
 
 export type LlmModelInfo = {
@@ -105,6 +108,33 @@ export type MessageAudio = {
   chapters: Array<{ title: string; startSec: number }>
 }
 
+// One executed agent step, persisted with its message so the trace survives
+// session reloads. Mirrors AgentStepRecord in main/services/agent/types.ts.
+export type AgentStepRecord = {
+  step: number
+  thought: string
+  tool: string
+  params: Record<string, unknown>
+  summary: string
+  evidenceCount: number
+  durationMs: number
+  isError?: boolean
+}
+
+// Live step events streamed while an agent run is in progress (chat:step)
+export type AgentStepEvent =
+  | { type: 'step_start'; step: number; thought: string; tool: string; params: Record<string, unknown> }
+  | {
+      type: 'step_result'
+      step: number
+      tool: string
+      summary: string
+      evidenceCount: number
+      durationMs: number
+      isError?: boolean
+    }
+  | { type: 'answer_start' }
+
 export type ChatSession = {
   id: string
   createdAt: number
@@ -118,12 +148,15 @@ export type ChatSession = {
     content: string
     citations: CitationEntry[]
     audio?: MessageAudio
+    steps?: AgentStepRecord[]
   }>
 }
 
 export type ChatResult = {
   answer: string
   citations: CitationEntry[]
+  // The agent steps that produced this answer (absent on the old pipeline)
+  steps?: AgentStepRecord[]
   // Present when this was a podcast task: main will follow up with podcast:progress
   // events and attach audio to the message with this id via podcast:done
   podcast?: { sessionId: string; messageId: string }
@@ -234,6 +267,11 @@ const api = {
     const handler = (_: Electron.IpcRendererEvent, r: ChatRouted) => cb(r)
     ipcRenderer.on('chat:routed', handler)
     return () => ipcRenderer.off('chat:routed', handler)
+  },
+  onChatStep: (cb: (e: AgentStepEvent) => void): (() => void) => {
+    const handler = (_: Electron.IpcRendererEvent, e: AgentStepEvent) => cb(e)
+    ipcRenderer.on('chat:step', handler)
+    return () => ipcRenderer.off('chat:step', handler)
   },
   onChatDone: (cb: (result: ChatResult) => void): (() => void) => {
     const handler = (_: Electron.IpcRendererEvent, result: ChatResult) => cb(result)

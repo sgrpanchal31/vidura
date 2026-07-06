@@ -404,6 +404,101 @@
   padding: 2px 0;
 }
 
+/* ── Agent step trace ─────────────────────────────────────────────────── */
+
+.agent-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-steps-live {
+  margin-bottom: 10px;
+}
+
+.agent-step {
+  display: flex;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.agent-step-icon {
+  color: var(--ox);
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+.agent-step-spinner {
+  width: 11px;
+  height: 11px;
+  border-width: 1.5px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.agent-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.agent-step-thought {
+  color: var(--slate);
+  font-style: italic;
+}
+
+.agent-step-action {
+  color: var(--ink);
+}
+
+.agent-step-result {
+  color: var(--slate);
+}
+
+.agent-step-error .agent-step-icon {
+  color: var(--slate);
+}
+
+.agent-trace {
+  margin-bottom: 10px;
+}
+
+.agent-trace-summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--slate);
+  user-select: none;
+  list-style: none;
+}
+
+.agent-trace-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s ease;
+}
+
+.agent-trace[open] .agent-trace-summary::before {
+  transform: rotate(90deg);
+}
+
+.agent-trace-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-trace[open] {
+  padding-bottom: 4px;
+}
+
+.agent-trace .agent-steps {
+  margin-top: 8px;
+  padding-left: 4px;
+  border-left: 2px solid var(--line);
+}
+
 .thinking-spinner {
   width: 16px;
   height: 16px;
