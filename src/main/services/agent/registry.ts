@@ -10,7 +10,7 @@ import type { AgentTool } from './types'
 // itself so a small model physically cannot ramble; the system prompt must
 // mention the length expectation (node-llama-cpp docs: unstated caps cause
 // hallucinations).
-export const THOUGHT_MAX_CHARS = 200
+export const THOUGHT_MAX_CHARS = 100
 
 export class ToolRegistry {
   private tools = new Map<string, AgentTool>()

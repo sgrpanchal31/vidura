@@ -18,7 +18,7 @@ You work in steps. At each step, output ONE JSON object choosing your next actio
 Actions:
 ${toolDocs}
 
-Evidence passages are numbered [1], [2], and so on. Choose "answer" as soon as the evidence covers the question — do not keep searching for information you already have.${historySection}`
+Evidence passages are numbered [1], [2], and so on. Most questions are answerable from the evidence already gathered: choose "answer" unless something essential is clearly missing. Every extra search costs the user real time.${historySection}`
 }
 
 export function buildFirstTurn(question: string, evidenceBlock: string): string {
@@ -43,6 +43,6 @@ Output your next action as JSON. If the evidence now covers the question, choose
 // pipeline (rag.ts buildSystemPrompt) so answer style and citing behavior
 // carry over unchanged.
 export const ANSWER_INSTRUCTION = `Now write the final answer to the question using the evidence above.
-Describe what you find in the evidence as it relates to the question. Always cite sources like [1] or [2].
-If the evidence doesn't directly answer the question, describe the closest relevant content you found.
-Write complete sentences. No preamble. Do not say you cannot find information — instead, describe what IS in the evidence.`
+Answer the question directly in the first sentence, citing sources like [1] or [2]. Then add only the supporting details that matter.
+If the evidence doesn't directly answer the question, state the closest relevant facts it does contain — do not say you cannot find information.
+Be concise. No preamble.`

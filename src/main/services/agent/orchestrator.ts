@@ -24,9 +24,10 @@ import type { AgentContext, AgentRunResult, AgentStepEvent, AgentStepRecord, Too
 // wandering, not converging.
 const MAX_STEPS = 4
 const SEED_TOP_K = 30
-// Thought (≤200 chars) + action + params fits comfortably; headroom so the
-// grammar never gets truncated mid-JSON by the token cap.
-const DECISION_MAX_TOKENS = 160
+// Thought (≤100 chars) + action + params fits comfortably; headroom so the
+// grammar never gets truncated mid-JSON by the token cap. Kept tight because
+// every decision token costs real time on local hardware (eval: 3-6s/decision).
+const DECISION_MAX_TOKENS = 96
 const SEED_EVIDENCE_CHARS = 12_000
 const OBSERVATION_CHARS = 3_000
 // Rough token estimate (chars/4). Past this we stop offering decisions and
