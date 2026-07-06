@@ -90,7 +90,7 @@ describe('ToolRegistry', () => {
   it('builds a oneOf decision schema with a thought on every branch plus answer', () => {
     const reg = new ToolRegistry()
     reg.register(fakeTool)
-    const schema = reg.buildDecisionSchema() as {
+    const schema = reg.buildDecisionSchema() as unknown as {
       oneOf: Array<{ properties: Record<string, unknown> }>
     }
     expect(schema.oneOf).toHaveLength(2) // the tool + the terminal "answer"

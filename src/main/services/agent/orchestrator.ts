@@ -69,51 +69,59 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
   const ctx: AgentContext = { folderPath, allowedFiles, evidence }
   const steps: AgentStepRecord[] = []
 
-  // ── Step 1: seeded retrieval ──────────────────────────────────────────────
-  // The same hybrid search + rerank + parent-dedupe the old pipeline ran.
-  // Done in code (not by the model) so every run starts with evidence on the
-  // table and easy questions can answer immediately.
-  const seedThought = 'Searching the documents for passages related to the question'
-  onStep({ type: 'step_start', step: 1, thought: seedThought, tool: 'search_documents', params: { query: question } })
-  const seedStart = Date.now()
-  const seedSpan = trace?.span({ name: 'seed-retrieve', input: { question } })
-  const seedChunks = await retrieve(question, folderPath, { topK: SEED_TOP_K, sourceFileFilter: allowedFiles })
-  const seedParents = dedupeByParent(await rerankChunks(question, seedChunks))
-  evidence.add(seedParents)
-  seedSpan?.update({
-    output: seedParents.map((c, i) => ({ rank: i + 1, sourceFile: c.sourceFile, text: c.text.slice(0, 200) })),
-  })
-  seedSpan?.end()
-  const seedFiles = new Set(seedParents.map((c) => c.sourceFile))
-  const seedRecord: AgentStepRecord = {
-    step: 1,
-    thought: seedThought,
-    tool: 'search_documents',
-    params: { query: question },
-    summary:
-      seedParents.length > 0
-        ? `Found ${seedParents.length} passages in ${seedFiles.size} file${seedFiles.size === 1 ? '' : 's'}`
-        : 'No matches',
-    evidenceCount: seedParents.length,
-    durationMs: Date.now() - seedStart,
-  }
-  steps.push(seedRecord)
-  onStep({ type: 'step_result', ...seedRecord })
-
-  // ── The loop ──────────────────────────────────────────────────────────────
+  // The session (and its AbortController) exists for the WHOLE run — created
+  // before seed retrieval so chat:cancel works during every phase, not just
+  // while the LLM is generating.
   const systemPrompt = buildAgentSystemPrompt(registry.renderToolDocs(), history)
   const decisionGrammar = await llamaService.createJsonGrammar(registry.buildDecisionSchema())
   const session = await llamaService.createAgentSession(systemPrompt)
-
-  // Everything sent to the model, for the context-budget estimate (chars/4).
-  let transcriptChars = systemPrompt.length
+  const assertNotCancelled = (): void => {
+    if (session.signal.aborted) throw new Error('cancelled')
+  }
 
   try {
+    // ── Step 1: seeded retrieval ────────────────────────────────────────────
+    // The same hybrid search + rerank + parent-dedupe the old pipeline ran.
+    // Done in code (not by the model) so every run starts with evidence on the
+    // table and easy questions can answer immediately.
+    const seedThought = 'Searching the documents for passages related to the question'
+    onStep({ type: 'step_start', step: 1, thought: seedThought, tool: 'search_documents', params: { query: question } })
+    const seedStart = Date.now()
+    const seedSpan = trace?.span({ name: 'seed-retrieve', input: { question } })
+    const seedChunks = await retrieve(question, folderPath, { topK: SEED_TOP_K, sourceFileFilter: allowedFiles })
+    const seedParents = dedupeByParent(await rerankChunks(question, seedChunks))
+    evidence.add(seedParents)
+    seedSpan?.update({
+      output: seedParents.map((c, i) => ({ rank: i + 1, sourceFile: c.sourceFile, text: c.text.slice(0, 200) })),
+    })
+    seedSpan?.end()
+    const seedFiles = new Set(seedParents.map((c) => c.sourceFile))
+    const seedRecord: AgentStepRecord = {
+      step: 1,
+      thought: seedThought,
+      tool: 'search_documents',
+      params: { query: question },
+      summary:
+        seedParents.length > 0
+          ? `Found ${seedParents.length} passages in ${seedFiles.size} file${seedFiles.size === 1 ? '' : 's'}`
+          : 'No matches',
+      evidenceCount: seedParents.length,
+      durationMs: Date.now() - seedStart,
+    }
+    steps.push(seedRecord)
+    onStep({ type: 'step_result', ...seedRecord })
+    assertNotCancelled()
+
+    // ── The loop ────────────────────────────────────────────────────────────
+    // Everything sent to the model, for the context-budget estimate (chars/4).
+    let transcriptChars = systemPrompt.length
+
     let turnText = buildFirstTurn(question, formatEvidenceWithinBudget(evidence.all(), SEED_EVIDENCE_CHARS))
     const seenCalls = new Set<string>()
     let deliverable: AgentRunResult['deliverable']
 
     for (let step = 2; step <= MAX_STEPS + 1; step++) {
+      assertNotCancelled()
       transcriptChars += turnText.length
       if (transcriptChars / 4 > TRANSCRIPT_TOKEN_GUARD) break
 
@@ -204,6 +212,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
     }
 
     // ── Final answer: one unconstrained streaming generation ─────────────────
+    assertNotCancelled()
     onStep({ type: 'answer_start' })
     const gen = trace?.generation({ name: 'answer', model: modelId, input: ANSWER_INSTRUCTION })
     const rawAnswer = await session.promptText(ANSWER_INSTRUCTION, { onToken })
