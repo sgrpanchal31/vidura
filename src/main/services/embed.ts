@@ -1,5 +1,6 @@
 import { Worker } from 'worker_threads'
 import { join } from 'path'
+import { existsSync } from 'fs'
 import os from 'os'
 import { DEFAULT_EMBED, EMBED_REGISTRY } from './embed-models'
 
@@ -43,7 +44,13 @@ export class EmbedService {
       this.rejectReady = rej
     })
 
-    const workerPath = join(__dirname, 'workers', 'embed.worker.js')
+    // In the app the worker sits next to the bundle; under tsx (eval harness)
+    // __dirname is src/main/services, so fall back to the built output —
+    // run `npm run build` before headless use.
+    let workerPath = join(__dirname, 'workers', 'embed.worker.js')
+    if (!existsSync(workerPath)) {
+      workerPath = join(__dirname, '..', '..', '..', 'out', 'main', 'workers', 'embed.worker.js')
+    }
 
     let cacheDir: string
     if (opts?.cacheDir) {

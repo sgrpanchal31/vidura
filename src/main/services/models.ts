@@ -2,8 +2,15 @@ import { join } from 'path'
 import { app, net } from 'electron'
 import { existsSync, createWriteStream, mkdirSync } from 'fs'
 import { stat, unlink, open as fsOpen } from 'fs/promises'
+import os from 'os'
 
-const MODELS_DIR = join(app.getPath('userData'), 'models')
+// Resolved lazily so this module also loads outside Electron (the eval
+// harness runs services under tsx, where `app` doesn't exist) — same
+// cacheDir pattern as embed.ts.
+function modelsDir(): string {
+  if (process.versions.electron) return join(app.getPath('userData'), 'models')
+  return process.env.OPENBOOK_MODELS_DIR ?? join(os.homedir(), '.openbook', 'models')
+}
 
 // A file is only "downloaded" if it's at least this fraction of the expected size.
 // Catches partial downloads that were interrupted mid-stream.
@@ -57,14 +64,14 @@ const REGISTRY: Record<string, ModelEntry> = {
 const LLM_IDS = ['gemma4-e2b', 'llama3.2-3b', 'gemma4-e4b', 'gemma4-12b', 'gpt-oss-20b'] as const
 
 function ensureModelsDir(): void {
-  mkdirSync(MODELS_DIR, { recursive: true })
+  mkdirSync(modelsDir(), { recursive: true })
 }
 
 export function getModelPath(modelId: string): string {
   ensureModelsDir()
   const entry = REGISTRY[modelId]
   if (!entry) throw new Error(`Unknown model ID: ${modelId}`)
-  return join(MODELS_DIR, entry.filename)
+  return join(modelsDir(), entry.filename)
 }
 
 async function hasGgufMagic(filePath: string): Promise<boolean> {

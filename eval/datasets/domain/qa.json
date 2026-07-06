@@ -118,5 +118,95 @@
     "question": "How did the Chinchilla paper revise the scaling law conclusions of Kaplan et al.?",
     "expectedSubstring": "1.4T tokens",
     "meta": { "answer": "Chinchilla found that model size and training tokens should scale equally (both ∝ C^0.5), contradicting Kaplan et al. who suggested larger models are preferable. Chinchilla-70B trained on 1.4T tokens outperforms Gopher-280B trained on 300B tokens." }
+  },
+  {
+    "id": "domain-021",
+    "question": "Which model has more parameters, BERT-Large or the largest GPT-2, and what are their sizes?",
+    "expectedSubstring": "340",
+    "meta": {
+      "answer": "The largest GPT-2 (1542M / 1.5B parameters) is larger than BERT-Large (340 million parameters)",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-022",
+    "question": "Which model uses more transformer layers: BERT-Large or LLaMA 7B?",
+    "expectedSubstring": "32",
+    "meta": {
+      "answer": "LLaMA 7B uses 32 transformer layers, more than BERT-Large's 24 layers",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-023",
+    "question": "How many parameters do PaLM and GPT-3 have, and which is bigger?",
+    "expectedSubstring": "540",
+    "meta": {
+      "answer": "PaLM has 540 billion parameters and GPT-3 has 175 billion, so PaLM is roughly three times bigger",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-024",
+    "question": "How does Tree of Thoughts extend chain-of-thought prompting?",
+    "expectedSubstring": "multiple reasoning paths",
+    "meta": {
+      "answer": "Chain-of-thought produces a single left-to-right sequence of intermediate reasoning steps; Tree of Thoughts generalizes it by exploring multiple reasoning paths as a tree with search (BFS/DFS), evaluation, and backtracking",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-025",
+    "question": "How much pretraining data did BERT use compared to RoBERTa?",
+    "expectedSubstring": "3.3 billion",
+    "meta": {
+      "answer": "BERT was pretrained on about 3.3 billion words (BooksCorpus + English Wikipedia); RoBERTa trained on 160GB of text adding CC-News, OpenWebText, and Stories",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-026",
+    "question": "What games did DQN and AlphaGo each master, and what search technique did AlphaGo add?",
+    "expectedSubstring": "Atari",
+    "meta": {
+      "answer": "DQN mastered 49 Atari 2600 games; AlphaGo mastered Go by combining deep neural networks with Monte Carlo tree search (MCTS)",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-027",
+    "question": "What retriever does RAG use, and what encoder architecture does that retriever build on?",
+    "expectedSubstring": "DPR",
+    "meta": {
+      "answer": "RAG uses Dense Passage Retrieval (DPR), a bi-encoder with separate query and document encoders both based on BERT-base",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-028",
+    "question": "How do ReAct and Toolformer differ in how the model learns to use external tools?",
+    "expectedSubstring": "self-supervised",
+    "meta": {
+      "answer": "ReAct uses prompting to interleave reasoning traces with actions at inference time, while Toolformer is fine-tuned self-supervised to decide which APIs to call and insert API calls into its generations",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-029",
+    "question": "Compare the pretraining batch sizes of BERT and RoBERTa.",
+    "expectedSubstring": "256",
+    "meta": {
+      "answer": "RoBERTa used a much larger batch size of 8,192 sequences versus BERT's 256",
+      "multiHop": true
+    }
+  },
+  {
+    "id": "domain-030",
+    "question": "How does sample generation in diffusion models differ from GANs?",
+    "expectedSubstring": "denois",
+    "meta": {
+      "answer": "Diffusion models generate by iteratively denoising from random noise over many steps, whereas GANs generate in a single forward pass of a generator trained adversarially against a discriminator",
+      "multiHop": true
+    }
   }
 ]
