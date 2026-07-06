@@ -118,6 +118,11 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
     let transcriptChars = systemPrompt.length
 
     let turnText = buildFirstTurn(question, formatEvidenceWithinBudget(evidence.all(), SEED_EVIDENCE_CHARS))
+    // False whenever turnText holds content the model hasn't seen yet (the
+    // step budget or context guard can end the loop before the last tool's
+    // results were ever sent) — the answer prompt must carry it then, or the
+    // model can't use evidence the deepest runs worked hardest to gather.
+    let turnSent = false
     const seenCalls = new Set<string>()
     let deliverable: AgentRunResult['deliverable']
 
@@ -128,6 +133,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
 
       const decisionSpan = trace?.span({ name: `decide-${step}`, input: { turnText: turnText.slice(0, 500) } })
       const raw = await session.promptJson(turnText, decisionGrammar, { maxTokens: DECISION_MAX_TOKENS })
+      turnSent = true
       transcriptChars += raw.length
       decisionSpan?.update({ output: raw })
       decisionSpan?.end()
@@ -206,6 +212,7 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
       onStep({ type: 'step_result', ...record })
 
       turnText = buildObservationTurn(tool.name, result.llmText.slice(0, OBSERVATION_CHARS))
+      turnSent = false
     }
 
     if (deliverable) {
@@ -218,8 +225,9 @@ export async function runAgent(opts: AgentRunOptions): Promise<AgentRunResult> {
     // ── Final answer: one unconstrained streaming generation ─────────────────
     assertNotCancelled()
     onStep({ type: 'answer_start' })
-    const gen = trace?.generation({ name: 'answer', model: modelId, input: ANSWER_INSTRUCTION })
-    const rawAnswer = await session.promptText(ANSWER_INSTRUCTION, { onToken })
+    const answerPrompt = turnSent ? ANSWER_INSTRUCTION : `${turnText}\n\n${ANSWER_INSTRUCTION}`
+    const gen = trace?.generation({ name: 'answer', model: modelId, input: answerPrompt })
+    const rawAnswer = await session.promptText(answerPrompt, { onToken })
     gen?.update({ output: rawAnswer })
     gen?.end()
 

@@ -4,7 +4,7 @@
 // real schemas; what's under test is grammar creation, decision decoding,
 // thought quality, and the constrained→unconstrained turn switch on one session.
 //
-// Run: npx tsx eval/agent/smoke.ts [modelFile]   (default gemma4-e4b.gguf)
+// Run: npx tsx eval/agent/smoke.mts [modelFile]   (default gemma4-e4b.gguf)
 import { getLlama, LlamaChatSession } from 'node-llama-cpp'
 import { join } from 'path'
 import { homedir } from 'os'

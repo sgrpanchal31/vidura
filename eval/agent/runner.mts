@@ -89,7 +89,7 @@ const rows: Row[] = []
 
 for (const entry of qa) {
   const t0 = Date.now()
-  let answer = ''
+  let answer: string
   let citedTexts: string[] = []
   let stepCount: number | undefined
   let dispatched: string | undefined

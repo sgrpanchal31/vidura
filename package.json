@@ -10,6 +10,7 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w @lancedb/lancedb",
     "eval": "tsx eval/cli.ts",
+    "eval:agent": "tsx eval/agent/runner.mts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src eval",

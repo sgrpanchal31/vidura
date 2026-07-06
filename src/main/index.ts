@@ -299,7 +299,6 @@ ipcMain.handle(
     const onChatProgress = (p: unknown) => mainWindow?.webContents.send('chat:progress', p)
 
     // Create a top-level Langfuse trace for this chat:ask call.
-    // The route span (showing scope/task/targetFile/usedFallback) is attached inside routeQuery.
     const lf = getLangfuse()
     const trace = lf?.trace({ name: 'chat-ask', input: { question } })
     const flushTrace = () => lf?.flushAsync().catch(() => {})
