@@ -188,6 +188,7 @@ class LlamaService {
 
     const release = async (): Promise<void> => {
       try {
+        // Cast: dispose() is missing from the published context type
         await (context as any)?.dispose?.()
       } catch {
         /* ignore */
@@ -199,6 +200,7 @@ class LlamaService {
     return {
       signal,
       promptJson: async (text, grammar, opts) => {
+        // Cast: prompt()'s grammar generic wants a literal schema type; ours is dynamic
         return session.prompt(text, { signal, grammar: grammar as any, maxTokens: opts.maxTokens })
       },
       promptText: async (text, opts) => {
