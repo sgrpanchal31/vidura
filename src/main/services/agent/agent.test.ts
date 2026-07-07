@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { EvidenceRegistry, formatEvidence } from './evidence'
 import { remapCitations } from './citations'
 import { ToolRegistry } from './registry'
+import { narrationFor } from './prompts'
 import type { AgentTool } from './types'
 import type { SearchResult } from '../store'
 
@@ -87,7 +88,7 @@ describe('ToolRegistry', () => {
     execute: async () => ({ llmText: '', evidence: [], uiSummary: '' }),
   }
 
-  it('builds a oneOf decision schema with a thought on every branch plus answer', () => {
+  it('builds a oneOf decision schema without a thought field by default', () => {
     const reg = new ToolRegistry()
     reg.register(fakeTool)
     const schema = reg.buildDecisionSchema() as unknown as {
@@ -95,10 +96,32 @@ describe('ToolRegistry', () => {
     }
     expect(schema.oneOf).toHaveLength(2) // the tool + the terminal "answer"
     for (const branch of schema.oneOf) {
-      expect(Object.keys(branch.properties)[0]).toBe('thought') // reason before acting
+      expect(branch.properties.thought).toBeUndefined() // narration is code-derived
       expect(branch.properties.action).toBeDefined()
     }
     expect(schema.oneOf[0].properties.query).toEqual({ type: 'string' })
+  })
+
+  it('puts thought first on every branch when withThought is set (eval A/B)', () => {
+    const reg = new ToolRegistry()
+    reg.register(fakeTool)
+    const schema = reg.buildDecisionSchema({ withThought: true }) as unknown as {
+      oneOf: Array<{ properties: Record<string, unknown> }>
+    }
+    for (const branch of schema.oneOf) {
+      expect(Object.keys(branch.properties)[0]).toBe('thought') // reason before acting
+    }
+  })
+
+  it('filters tools by kind so research mode cannot pick a deliverable', () => {
+    const reg = new ToolRegistry()
+    reg.register(fakeTool)
+    reg.register({ ...fakeTool, name: 'generate_podcast', kind: 'deliverable' })
+    const schema = reg.buildDecisionSchema({ kinds: ['observation'] }) as unknown as {
+      oneOf: Array<{ properties: Record<string, { const?: string }> }>
+    }
+    const actions = schema.oneOf.map((b) => b.properties.action.const)
+    expect(actions).toEqual(['search_documents', 'answer'])
   })
 
   it('documents every tool plus answer in the prompt docs', () => {
@@ -107,5 +130,23 @@ describe('ToolRegistry', () => {
     const docs = reg.renderToolDocs()
     expect(docs).toContain('"search_documents" (params: "query"): Search things.')
     expect(docs).toContain('"answer"')
+  })
+})
+
+// ─── narrationFor ────────────────────────────────────────────────────────────
+// The step text users see. Composed from the structured action so it's always
+// coherent and costs zero generated tokens.
+describe('narrationFor', () => {
+  it('narrates each tool from its params', () => {
+    expect(narrationFor('search_documents', { query: 'attention heads' })).toBe(
+      'Searching the documents for "attention heads"'
+    )
+    expect(narrationFor('read_file', { file: 'docs/paper.pdf', start_chunk: 0 })).toBe('Reading docs/paper.pdf')
+    expect(narrationFor('list_files', {})).toBe('Scanning the file list')
+    expect(narrationFor('generate_podcast', { files: [], mode: 'duo' })).toBe('Preparing a podcast')
+  })
+
+  it('falls back to a generic line for unknown tools (future skills)', () => {
+    expect(narrationFor('summon_skill', {})).toBe('Running summon_skill')
   })
 })

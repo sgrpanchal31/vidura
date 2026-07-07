@@ -1,12 +1,10 @@
 // Deliverable tools: podcast and overview generation. Unlike observation
-// tools, these end the loop — the model's job is to dispatch them with the
-// right parameters, not to reason over their output.
+// tools, these change the run's goal — picking one switches the loop into
+// research mode (gather material with the observation tools), and the run
+// ends by rendering a script/overview from the evidence instead of answering.
 //
-// execute() is intentionally never called: the workflows (generateFromCorpus)
-// run their own LLM generations, and only one generation can run at a time,
-// so the agent session must be disposed first. The orchestrator returns the
-// dispatch descriptor and chat:ask runs the workflow — see runAgent() and the
-// chat:ask handler in main/index.ts.
+// execute() is intentionally never called: the orchestrator handles the mode
+// switch and the render itself — see runAgent() in orchestrator.ts.
 import type { AgentTool } from '../types'
 
 const neverCalled = async (): Promise<never> => {

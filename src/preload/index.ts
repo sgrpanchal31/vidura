@@ -121,8 +121,10 @@ export type AgentStepRecord = {
   isError?: boolean
 }
 
-// Live step events streamed while an agent run is in progress (chat:step)
+// Live step events streamed while an agent run is in progress (chat:step).
+// 'phase' is harness-composed narration between steps, not model output.
 export type AgentStepEvent =
+  | { type: 'phase'; label: string }
   | { type: 'step_start'; step: number; thought: string; tool: string; params: Record<string, unknown> }
   | {
       type: 'step_result'

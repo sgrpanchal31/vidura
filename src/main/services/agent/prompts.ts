@@ -2,7 +2,11 @@
 import type { HistoryMessage } from '../rag'
 import { THOUGHT_MAX_CHARS } from './registry'
 
-export function buildAgentSystemPrompt(toolDocs: string, history: HistoryMessage[]): string {
+export function buildAgentSystemPrompt(
+  toolDocs: string,
+  history: HistoryMessage[],
+  opts: { withThought?: boolean } = {}
+): string {
   // Same history policy as the old pipeline: last 6 messages, 300 chars each.
   const recentHistory = history.slice(-6)
   const historySection =
@@ -10,10 +14,14 @@ export function buildAgentSystemPrompt(toolDocs: string, history: HistoryMessage
       ? '\n\nRecent conversation:\n' +
         recentHistory.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`).join('\n')
       : ''
+  // Only mentioned when the grammar actually has the field (eval A/B) —
+  // unstated caps cause hallucinations, and unused docs cause confusion.
+  const thoughtLine = opts.withThought
+    ? `\n"thought" is one short sentence (under ${THOUGHT_MAX_CHARS} characters) explaining your choice.`
+    : ''
 
   return `You are a research assistant that answers questions about the user's documents.
-You work in steps. At each step, output ONE JSON object choosing your next action, and nothing else.
-"thought" is one short sentence (under ${THOUGHT_MAX_CHARS} characters) explaining your choice.
+You work in steps. At each step, output ONE JSON object choosing your next action, and nothing else.${thoughtLine}
 
 Actions:
 ${toolDocs}
@@ -38,6 +46,39 @@ export function buildObservationTurn(toolName: string, llmText: string): string 
 ${llmText}
 
 Output your next action as JSON. If the evidence now covers the question, choose "answer".`
+}
+
+// The step narration shown in the UI, composed from the structured action.
+// Derived, not model-generated: a 4B model's capped thought is noise that
+// costs 3-6s of generation per step; the harness already knows what it's doing.
+export function narrationFor(tool: string, params: Record<string, unknown>): string {
+  switch (tool) {
+    case 'search_documents':
+      return `Searching the documents for "${String(params.query ?? '')}"`
+    case 'keyword_search':
+      return `Scanning the documents for "${String(params.term ?? '')}"`
+    case 'list_files':
+      return 'Scanning the file list'
+    case 'read_file':
+      return `Reading ${String(params.file ?? '')}`
+    case 'generate_podcast':
+      return 'Preparing a podcast'
+    case 'generate_overview':
+      return 'Preparing an overview'
+    default:
+      return `Running ${tool}`
+  }
+}
+
+// Sent when the run switches into deliverable research: same loop, same tools,
+// but the goal is now gathering material for a podcast/overview instead of
+// answering a question. "answer" becomes "done researching, render now".
+export function buildResearchTurn(kind: 'podcast' | 'overview', files: string[]): string {
+  const scope = files.length > 0 ? `Focus on these files: ${files.join(', ')}.` : 'Cover the main documents.'
+  const what = kind === 'podcast' ? 'a podcast episode' : 'a written overview'
+  return `The user wants ${what} created from their documents. ${scope}
+Gather the material first: read the key files or search for their main topics. The evidence gathered so far counts.
+When the evidence covers the main points worth including, choose "answer" to start writing. Output your next action as JSON.`
 }
 
 // Sent instead of a decision prompt when budgets run out or the model repeats

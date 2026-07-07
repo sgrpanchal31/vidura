@@ -19,8 +19,7 @@ import { llamaService } from './services/inference'
 import { ragQuery, ragSummarizeFile } from './services/rag'
 import { runAgent } from './services/agent/orchestrator'
 import { buildDefaultRegistry } from './services/agent/tools'
-import { resolveFile as resolveAgentFile } from './services/agent/tools/resolve-file'
-import type { AgentStepEvent, AgentStepRecord } from './services/agent/types'
+import type { AgentStepEvent } from './services/agent/types'
 import { PARSER_VERSION } from './services/chunker'
 import { generateFromCorpus, type GenerateTask, type GenerateFormat } from './services/generate'
 import { routeQuery } from './services/router'
@@ -306,93 +305,76 @@ ipcMain.handle(
     // ── Agent path (the default) ─────────────────────────────────────────────
     // One loop replaces the router + hardcoded pipelines: the model itself
     // picks search/read steps (streamed to the UI via chat:step) and either
-    // answers or dispatches a deliverable (podcast/overview) with parameters.
+    // answers or researches + renders a deliverable (podcast/overview). Only
+    // TTS happens out here — everything else lives in the loop, so the step
+    // trail and the Langfuse trace cover the whole run.
     if (readPrefs().agentEnabled ?? true) {
-      const onStep = (e: AgentStepEvent) => mainWindow?.webContents.send('chat:step', e)
-
-      // Runs podcast/overview generation after the loop chose it. The loop
-      // itself never runs these: only one LLM generation can be live at a
-      // time, so the agent session is disposed before the workflow starts.
-      const dispatchDeliverable = async (
-        tool: string,
-        params: Record<string, unknown>,
-        steps: AgentStepRecord[]
-      ): Promise<void> => {
-        const isPodcast = tool === 'generate_podcast'
-        const task: GenerateTask = isPodcast ? 'podcast' : 'overview'
-        mainWindow?.webContents.send('chat:routed', { task })
-
-        // The model names files fuzzily (or [] = all); resolve against the
-        // index and honor the user's file selection. Nothing valid → all/selection.
-        await vectorStore.open(folderPath, { dim: embedDim(DEFAULT_EMBED) })
-        let available = await vectorStore.listSourceFiles()
-        if (selectedFiles) available = available.filter((f) => selectedFiles.includes(f))
-        const requested = Array.isArray(params.files) ? params.files.map(String) : []
-        const resolved = requested.map((f) => resolveAgentFile(f, available)).filter((f): f is string => f !== null)
-        const targetFiles = resolved.length > 0 ? resolved : selectedFiles
-        const podcastMode = params.mode === 'solo' ? 'solo' : 'duo'
-
-        const answer = await generateFromCorpus(
-          folderPath,
-          modelId,
-          task,
-          'prose',
-          onToken,
-          (p) => mainWindow?.webContents.send('generate:progress', p),
-          targetFiles,
-          trace,
-          question,
-          podcastMode
-        )
-        if (isPodcast && sessionId) {
-          const messageId = `${Date.now()}-a`
-          mainWindow?.webContents.send('chat:done', {
-            answer,
-            citations: [],
-            steps,
-            podcast: { sessionId, messageId },
+      const onStep = (e: AgentStepEvent): void => {
+        // The renderer suppresses raw script streaming and switches labels the
+        // moment a deliverable is coming — tell it as soon as the loop decides.
+        if (e.type === 'step_start' && (e.tool === 'generate_podcast' || e.tool === 'generate_overview')) {
+          mainWindow?.webContents.send('chat:routed', {
+            task: e.tool === 'generate_podcast' ? 'podcast' : 'overview',
           })
-          startPodcastAudio(folderPath, sessionId, messageId, answer, trace)
-        } else {
-          mainWindow?.webContents.send('chat:done', { answer, citations: [], steps })
         }
-        flushTrace()
+        mainWindow?.webContents.send('chat:step', e)
       }
 
       const runAgentPath = async (): Promise<void> => {
-        // Explicit /podcast command: no reason to spend agent steps deciding
-        // what the user already said. Same narrator-count regex the old
-        // router fallback used.
+        // File list for resolving the fuzzy names a model puts in deliverable
+        // params, honoring the user's selection.
+        await vectorStore.open(folderPath, { dim: embedDim(DEFAULT_EMBED) })
+        let availableFiles = await vectorStore.listSourceFiles()
+        if (selectedFiles) availableFiles = availableFiles.filter((f) => selectedFiles.includes(f))
+
+        // Explicit /podcast command: no reason to spend an agent step deciding
+        // what the user already said — preset the deliverable, keep the
+        // research phase. Same narrator-count regex the old router used.
+        let preset: { tool: string; params: Record<string, unknown> } | undefined
+        let agentQuestion = question
         if (question.trimStart().startsWith('/podcast')) {
           const podcastMode = /\bnarrat|\b(solo|single|one)\b.{0,20}\b(narrator|voice|host|person)\b/i.test(question)
             ? 'solo'
             : 'duo'
-          await dispatchDeliverable('generate_podcast', { files: [], mode: podcastMode }, [])
-          return
+          preset = { tool: 'generate_podcast', params: { files: [], mode: podcastMode } }
+          agentQuestion =
+            question.trimStart().replace(/^\/podcast\s*/i, '') || 'An engaging podcast about these documents'
+          mainWindow?.webContents.send('chat:routed', { task: 'podcast' })
+        } else {
+          mainWindow?.webContents.send('chat:routed', { task: 'chat' })
         }
 
-        mainWindow?.webContents.send('chat:routed', { task: 'chat' })
         const result = await runAgent({
-          question,
+          question: agentQuestion,
           folderPath,
           modelId,
           history,
           registry: agentRegistry,
           allowedFiles: selectedFiles,
+          availableFiles,
+          preset,
           onToken,
           onStep,
           externalTrace: trace,
         })
-        if (result.deliverable) {
-          await dispatchDeliverable(result.deliverable.tool, result.deliverable.params, result.steps)
+        if (result.deliverable?.tool === 'generate_podcast' && sessionId) {
+          // The rendered script is result.answer; only audio remains.
+          const messageId = `${Date.now()}-a`
+          mainWindow?.webContents.send('chat:done', {
+            answer: result.answer,
+            citations: [],
+            steps: result.steps,
+            podcast: { sessionId, messageId },
+          })
+          startPodcastAudio(folderPath, sessionId, messageId, result.answer, trace)
         } else {
           mainWindow?.webContents.send('chat:done', {
             answer: result.answer,
             citations: result.citations,
             steps: result.steps,
           })
-          flushTrace()
         }
+        flushTrace()
       }
 
       runAgentPath().catch((err) => {

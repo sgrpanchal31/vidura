@@ -33,19 +33,25 @@ Measures generated ANSWERS (not retrieval): key-fact hit, token F1 vs gold, cita
 (% of cited passages containing the fact), end-to-end latency. Domain dataset, 20 single-hop +
 10 multi-hop questions, gemma4-e4b, reranker on, run headless via `npx tsx eval/agent/runner.mts`.
 
-| Date       | Arm           | Subset   | n   | Hit | F1    | CitValid | p50s |
-| ---------- | ------------- | -------- | --- | --- | ----- | -------- | ---- |
-| 2026-07-06 | old rag       | all      | 30  | 37% | 0.353 | 0.45     | 20.4 |
-| 2026-07-06 | agent (tuned) | all      | 30  | 47% | 0.359 | 0.48     | 36.1 |
-| 2026-07-06 | old rag       | simple   | 20  | 25% | 0.327 | 0.42     | 20.4 |
-| 2026-07-06 | agent (tuned) | simple   | 20  | 40% | 0.324 | 0.47     | 35.5 |
-| 2026-07-06 | old rag       | multihop | 10  | 60% | 0.405 | 0.50     | 21.9 |
-| 2026-07-06 | agent (tuned) | multihop | 10  | 60% | 0.429 | 0.50     | 44.8 |
+| Date       | Arm              | Subset   | n   | Hit | F1    | CitValid | p50s |
+| ---------- | ---------------- | -------- | --- | --- | ----- | -------- | ---- |
+| 2026-07-06 | old rag          | all      | 30  | 37% | 0.353 | 0.45     | 20.4 |
+| 2026-07-06 | agent (tuned)    | all      | 30  | 47% | 0.359 | 0.48     | 36.1 |
+| 2026-07-07 | agent no-thought | all      | 30  | 50% | 0.343 | 0.44     | 23.9 |
+| 2026-07-06 | old rag          | simple   | 20  | 25% | 0.327 | 0.42     | 20.4 |
+| 2026-07-06 | agent (tuned)    | simple   | 20  | 40% | 0.324 | 0.47     | 35.5 |
+| 2026-07-07 | agent no-thought | simple   | 20  | 45% | 0.303 | 0.44     | 28.3 |
+| 2026-07-06 | old rag          | multihop | 10  | 60% | 0.405 | 0.50     | 21.9 |
+| 2026-07-06 | agent (tuned)    | multihop | 10  | 60% | 0.429 | 0.50     | 44.8 |
+| 2026-07-07 | agent no-thought | multihop | 10  | 60% | 0.423 | 0.45     | 20.3 |
 
 Tuning history (agent arm, all-subset): untuned 43% hit / 0.287 F1 / 43.8s p50 →
 concise-answer + tight decisions 43% / 0.372 / 39.8 → + answer-at-first-decision nudge
-47% / 0.359 / 36.1. Latency floor is structural: each grammar-constrained decision with a
-visible thought costs 3-6s of generation on local hardware.
+47% / 0.359 / 36.1 → drop model thought from decisions (narration now harness-derived)
+50% / 0.343 / 23.9. The ReAct question, answered empirically: with grammar-constrained
+decisions and seeded evidence, a verbalized thought changed no quality metric beyond
+noise but cost 12s of p50 (each thought = 3-6s of generation per step on local hardware).
+Ship config is no-thought; `--thoughts` flag re-enables it for A/B.
 
 Known corpus issue affecting both arms: chunker splits parents mid-sentence, detaching
 facts from their subjects (issue #56).

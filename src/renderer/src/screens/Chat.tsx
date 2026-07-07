@@ -54,7 +54,6 @@ function AgentStepRow({ step }: { step: LiveStep }): React.JSX.Element {
         {step.done ? '✓' : <span className="thinking-spinner agent-step-spinner" />}
       </span>
       <span className="agent-step-body">
-        {step.thought && <span className="agent-step-thought">{step.thought}</span>}
         <span className="agent-step-action">
           {stepActionLabel(step)}
           {step.done && step.summary && (
@@ -467,6 +466,10 @@ export default function Chat({
   const [routedTask, setRoutedTask] = useState<'chat' | 'podcast' | 'overview' | null>(null)
   // Agent steps for the in-flight ask, rendered as live rows above the stream
   const [liveSteps, setLiveSteps] = useState<LiveStep[]>([])
+  // Harness narration between steps ("Understanding the question",
+  // "Writing the script") — shown in the loader slot until a step row or the
+  // answer takes over
+  const [phaseLabel, setPhaseLabel] = useState<string | null>(null)
   // True between answer_start and the first token ("Writing response...")
   const [answerStarted, setAnswerStarted] = useState(false)
 
@@ -941,6 +944,7 @@ export default function Chat({
     setAudioErrorMsgId(null)
     setRoutedTask(null)
     setLiveSteps([])
+    setPhaseLabel(null)
     setAnswerStarted(false)
 
     const unsubRouted = window.api.onChatRouted(({ task }) => setRoutedTask(task))
@@ -948,7 +952,10 @@ export default function Chat({
     // answer_start switches the status to writing. Steps arrive regardless of
     // which session the user is viewing; display is gated at render time.
     const unsubStep = window.api.onChatStep((e) => {
-      if (e.type === 'step_start') {
+      if (e.type === 'phase') {
+        setPhaseLabel(e.label)
+      } else if (e.type === 'step_start') {
+        setPhaseLabel(null) // the step row's own spinner takes over
         setLiveSteps((prev) => [
           ...prev,
           { step: e.step, thought: e.thought, tool: e.tool, params: e.params, done: false },
@@ -962,6 +969,7 @@ export default function Chat({
           )
         )
       } else if (e.type === 'answer_start') {
+        setPhaseLabel(null)
         setAnswerStarted(true)
       }
     })
@@ -1024,6 +1032,7 @@ export default function Chat({
         setAudioPhase({ sessionId: result.podcast.sessionId, messageId: result.podcast.messageId })
         setStreamBuffer('')
         setLiveSteps([])
+        setPhaseLabel(null)
         setAnswerStarted(false)
         setGenerateStatus('Generating audio...')
       } else {
@@ -1032,6 +1041,7 @@ export default function Chat({
         setGeneratingSessionId(null)
         setStreamBuffer('')
         setLiveSteps([])
+        setPhaseLabel(null)
         setAnswerStarted(false)
         setGenerateStatus('')
         setIsGenerating(false)
@@ -1075,6 +1085,7 @@ export default function Chat({
       setGeneratingSessionId(null)
       setStreamBuffer('')
       setLiveSteps([])
+      setPhaseLabel(null)
       setAnswerStarted(false)
       setGenerateStatus('')
       setIsGenerating(false)
@@ -1287,11 +1298,12 @@ export default function Chat({
                       <div className="thinking-loader">
                         <span className="thinking-spinner" />
                         <span className="thinking-label">
-                          {routedTask === 'podcast' && !audioPhase
-                            ? 'Generating script...'
-                            : answerStarted
-                              ? 'Writing response...'
-                              : generateStatus || 'Thinking...'}
+                          {answerStarted
+                            ? 'Writing response...'
+                            : (phaseLabel ??
+                              (routedTask === 'podcast' && !audioPhase
+                                ? 'Generating script...'
+                                : generateStatus || 'Thinking...'))}
                         </span>
                       </div>
                     )}

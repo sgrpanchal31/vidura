@@ -45,6 +45,9 @@ const modelId = flag('model') ?? 'gemma4-e4b'
 const limit = flag('limit') ? parseInt(flag('limit')!, 10) : Infinity
 const onlyMultiHop = flag('only') === 'multihop'
 const verbose = args.includes('--verbose')
+// A/B lever: put the grammar-capped thought back into decisions to measure
+// whether ReAct-style reasoning changes decision quality (production runs without)
+const withThought = args.includes('--thoughts')
 
 // ── Notebook setup: the domain corpus as a real indexed notebook ──────────
 const corpusDir = join(ROOT, 'eval', 'datasets', 'domain', 'corpus')
@@ -102,6 +105,7 @@ for (const entry of qa) {
         modelId,
         history: [],
         registry: buildDefaultRegistry(),
+        withThought,
         onToken: () => {},
         onStep: (e) => {
           if (verbose && e.type === 'step_start')

@@ -64,7 +64,7 @@ export function dedupeByParent(chunks: SearchResult[]): SearchResult[] {
   return [...seen.values()].slice(0, MAX_UNIQUE_PARENTS)
 }
 
-function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo', lengthLine: string): string {
+export function buildPodcastPrompt(parents: SearchResult[], podcastMode: 'solo' | 'duo', lengthLine: string): string {
   const passages = parents
     .map((c) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile
@@ -82,7 +82,7 @@ Passages:
 ${passages}`
 }
 
-function buildOverviewPrompt(parents: SearchResult[]): string {
+export function buildOverviewPrompt(parents: SearchResult[]): string {
   const passages = parents
     .map((c) => {
       const filename = c.sourceFile.split('/').pop() ?? c.sourceFile

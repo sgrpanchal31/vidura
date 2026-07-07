@@ -445,11 +445,6 @@
   min-width: 0;
 }
 
-.agent-step-thought {
-  color: var(--slate);
-  font-style: italic;
-}
-
 .agent-step-action {
   color: var(--ink);
 }

@@ -6,10 +6,11 @@
 import type { GbnfJsonSchema } from 'node-llama-cpp'
 import type { AgentTool } from './types'
 
-// Every decision carries a short visible thought. Capped by the grammar
-// itself so a small model physically cannot ramble; the system prompt must
-// mention the length expectation (node-llama-cpp docs: unstated caps cause
-// hallucinations).
+// Optional per-decision thought, capped by the grammar itself so a small
+// model physically cannot ramble. Off in production: on local hardware each
+// thought costs 3-6s of generation, and the UI narrates steps from the
+// structured action instead. Kept behind a flag so the eval can A/B whether
+// ReAct-style "reason before acting" changes decision quality.
 export const THOUGHT_MAX_CHARS = 100
 
 export class ToolRegistry {
@@ -30,21 +31,27 @@ export class ToolRegistry {
   // The decision schema: a oneOf where each branch is one tool call (or the
   // terminal "answer"). Sampled under a grammar, so the model's output always
   // parses and always names a real tool with the right param types.
-  // Property order matters: thought comes first so the model reasons before
-  // it picks — the JSON is generated left to right.
-  buildDecisionSchema(): GbnfJsonSchema {
-    const thought = { type: 'string' as const, maxLength: THOUGHT_MAX_CHARS }
-    const branches: GbnfJsonSchema[] = this.list().map((tool) => ({
+  // With thoughts on, property order matters: thought comes first so the
+  // model reasons before it picks — the JSON is generated left to right.
+  // `kinds` narrows which tools the grammar offers — research mode excludes
+  // deliverable tools so the model can't pick "generate_podcast" while already
+  // researching a podcast.
+  buildDecisionSchema(opts: { withThought?: boolean; kinds?: Array<AgentTool['kind']> } = {}): GbnfJsonSchema {
+    const head: Record<string, GbnfJsonSchema> = opts.withThought
+      ? { thought: { type: 'string', maxLength: THOUGHT_MAX_CHARS } }
+      : {}
+    const tools = opts.kinds ? this.list().filter((t) => opts.kinds!.includes(t.kind)) : this.list()
+    const branches: GbnfJsonSchema[] = tools.map((tool) => ({
       type: 'object' as const,
       properties: {
-        thought,
+        ...head,
         action: { const: tool.name },
         ...tool.parameters,
       },
     }))
     branches.push({
       type: 'object' as const,
-      properties: { thought, action: { const: 'answer' } },
+      properties: { ...head, action: { const: 'answer' } },
     })
     return { oneOf: branches }
   }
