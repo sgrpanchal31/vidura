@@ -266,7 +266,7 @@ ipcMain.handle('reranker:setEnabled', async (_event, enabled: boolean) => {
     if (!downloaded) throw new Error('Reranker model not downloaded — download it from Settings first')
     await rerankerGgufService.start()
   } else {
-    rerankerGgufService.stop()
+    await rerankerGgufService.stop()
   }
 })
 
@@ -593,21 +593,33 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    embedService.stop()
-    rerankerGgufService.stop()
-    app.quit()
-  }
+  if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+// Native model/worker teardown (llama.cpp, GGUF reranker, embed worker thread) is
+// async and must finish before the process exits, or macOS's Crash Reporter
+// intercepts the kill mid-teardown and reports "Electron quit unexpectedly" on
+// every quit. So we hold the quit here until cleanup actually settles, then
+// exit ourselves — this also covers the updater's app.quit() call, since it
+// goes through this same event.
+let quitCleanupStarted = false
+
+app.on('before-quit', (event) => {
+  if (quitCleanupStarted) return
+  quitCleanupStarted = true
+  event.preventDefault()
+
+  mainWindow?.webContents.send('app:quitting')
   folderWatcher.stop()
-  embedService.stop()
-  rerankerGgufService.stop()
-  ttsService.stop()
-  llamaService.dispose()
-  // Deliver any queued Langfuse events; fire-and-forget flushes lose them on fast quits
-  getLangfuse()
-    ?.shutdownAsync()
-    .catch(() => {})
+
+  Promise.all([
+    embedService.stop(),
+    rerankerGgufService.stop(),
+    llamaService.dispose(),
+    Promise.resolve(ttsService.stop()),
+    // Deliver any queued Langfuse events; fire-and-forget flushes lose them on fast quits
+    getLangfuse()
+      ?.shutdownAsync()
+      .catch(() => {}),
+  ]).finally(() => app.exit())
 })

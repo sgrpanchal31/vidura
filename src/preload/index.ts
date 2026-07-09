@@ -158,6 +158,11 @@ const api = {
     ipcRenderer.on('update:progress', handler)
     return () => ipcRenderer.off('update:progress', handler)
   },
+  onAppQuitting: (cb: () => void): (() => void) => {
+    const handler = () => cb()
+    ipcRenderer.on('app:quitting', handler)
+    return () => ipcRenderer.off('app:quitting', handler)
+  },
 
   // ── Ingest ──────────────────────────────────────────────────────────────────
   getParserVersion: (): Promise<string> => ipcRenderer.invoke('ingest:parserVersion'),

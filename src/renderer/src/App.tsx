@@ -32,7 +32,15 @@ export default function App() {
   const [updateHidden, setUpdateHidden] = useState(false)
   const [updateProgress, setUpdateProgress] = useState<{ loaded: number; total: number } | null>(null)
 
+  // True once the main process starts native cleanup on quit — shown so the
+  // window doesn't just freeze while llama.cpp/embedding teardown finishes.
+  const [quitting, setQuitting] = useState(false)
+
   const unsubsRef = useRef<Array<() => void>>([])
+
+  useEffect(() => {
+    return window.api.onAppQuitting(() => setQuitting(true))
+  }, [])
 
   useEffect(() => {
     window.api.getPrefs().then((prefs) => {
@@ -262,11 +270,21 @@ export default function App() {
     </div>
   )
 
+  // Rendered on every screen once the main process starts quitting, so the
+  // window doesn't just freeze while native cleanup finishes.
+  const quittingOverlay = quitting && (
+    <div className="quitting-overlay">
+      <span className="quitting-overlay-spinner" />
+      <span>Quitting Vidura...</span>
+    </div>
+  )
+
   if (screen === 'loading') return null
 
   if (screen === 'onboarding') {
     return (
       <div className="app-window">
+        {quittingOverlay}
         <div className="screen-content">
           <Onboarding onComplete={handleOnboardingComplete} />
         </div>
@@ -304,6 +322,7 @@ export default function App() {
 
     return (
       <div className="app-window">
+        {quittingOverlay}
         {updateBanner}
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
@@ -425,6 +444,7 @@ export default function App() {
 
     return (
       <div className="app-window">
+        {quittingOverlay}
         {updateBanner}
         <div className="screen-content" style={{ padding: '64px 52px' }}>
           <span
@@ -509,6 +529,7 @@ export default function App() {
   if ((screen === 'ready' || screen === 'settings') && notebookFolder && modelId) {
     return (
       <div className="app-window">
+        {quittingOverlay}
         {updateBanner}
         {/* Chat stays mounted even when Settings is open so generation keeps running */}
         <div className="screen-content" style={{ display: screen === 'settings' ? 'none' : undefined }}>
