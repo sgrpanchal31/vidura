@@ -49,14 +49,13 @@ class RerankerGgufService {
     return this._status
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     const ctx = this.context
     const model = this.model
     this.context = null
     this.model = null
     this._status = 'idle'
-    ctx?.dispose().catch(() => {})
-    ;(model as any)?.dispose?.().catch(() => {})
+    await Promise.all([ctx?.dispose().catch(() => {}), (model as any)?.dispose?.().catch(() => {})])
   }
 }
 

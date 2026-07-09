@@ -243,6 +243,18 @@ function buildSuggestions(sources: SourceItem[]): string[] {
   ]
 }
 
+// ── Ingest failure reasons ──────────────────────────────────────────────────
+
+// Maps a raw error message from indexing into something a non-technical user
+// can act on. Permission errors are the most common cause on a freshly
+// installed machine (macOS blocks folder access until the user grants it).
+function describeFailReason(reason?: string): string {
+  if (reason && /EPERM|EACCES|operation not permitted/i.test(reason)) {
+    return 'Permission denied. Open System Settings → Privacy & Security → Files and Folders and allow Vidura to access this folder.'
+  }
+  return reason ?? 'Unknown error'
+}
+
 // ── Markdown rendering ────────────────────────────────────────────────────────
 
 function parseInline(
@@ -371,6 +383,7 @@ export default function Chat({
   const [showWaitToast, setShowWaitToast] = useState(false)
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null)
   const [sources, setSources] = useState<SourceItem[]>([])
+  const [failedSources, setFailedSources] = useState<{ relativePath: string; reason: string }[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set())
   const [isReindexing, setIsReindexing] = useState(false)
@@ -444,6 +457,11 @@ export default function Chat({
         setSources(items)
         setCollapsedDirs(collectDirPaths(buildTree(items)))
         setSuggestions(buildSuggestions(items))
+
+        const failed = Object.values(state.files)
+          .filter((f) => f.failed)
+          .map((f) => ({ relativePath: f.relativePath, reason: describeFailReason(f.failReason) }))
+        setFailedSources(failed)
       })
       .catch(() => {})
   }
@@ -1264,6 +1282,14 @@ export default function Chat({
               </span>
             )}
           </div>
+          {failedSources.length > 0 && (
+            <div className="sources-failed-banner" title={failedSources.map((f) => f.relativePath).join(', ')}>
+              {failedSources.length === 1
+                ? `1 file couldn't be read`
+                : `${failedSources.length} files couldn't be read`}
+              : {failedSources[0].reason}
+            </div>
+          )}
           {isReindexing && <div className="sources-progress" />}
           <div className={isReindexing ? 'sources-list reindexing' : 'sources-list'}>
             {renderTree(
