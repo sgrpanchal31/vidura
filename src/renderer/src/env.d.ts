@@ -35,6 +35,7 @@ declare global {
       updateCheck: () => Promise<UpdateInfo | null>
       updateInstall: (url: string) => Promise<void>
       onUpdateProgress: (cb: (p: { loaded: number; total: number }) => void) => () => void
+      onAppQuitting: (cb: () => void) => () => void
 
       getParserVersion: () => Promise<string>
       startIngest: (folderPath: string, embeddingModel?: string) => Promise<IndexSummary>

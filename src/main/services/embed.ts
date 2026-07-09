@@ -173,7 +173,7 @@ export class EmbedService {
     return this.started
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     const worker = this.worker
     // Null this.worker BEFORE terminate() so the exit handler's guard ignores the event
     this.worker = null
@@ -181,7 +181,7 @@ export class EmbedService {
     this.currentModelId = null
     this.readyPromise = null
     this.pending.clear()
-    worker?.terminate()
+    await worker?.terminate()
   }
 }
 
