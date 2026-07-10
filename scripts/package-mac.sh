@@ -62,10 +62,10 @@ echo "▶ Removing typescript (~23 MB, dev tooling)"
 # but it is never imported at runtime.
 rm -rf "$REPO_DIR/node_modules/typescript"
 
-echo "▶ Removing @napi-rs/canvas (~25 MB, optional PDF renderer)"
-# pdfjs-dist declares @napi-rs/canvas as *optional* — it is only needed for
-# pixel rendering; our ingest/pdf.ts only calls getTextContent(), no canvas.
-rm -rf "$REPO_DIR/node_modules/@napi-rs"
+# @napi-rs/canvas must ship: pdfjs-dist v5 needs it for its DOMMatrix polyfill
+# in Node, and pdf.mjs constructs a DOMMatrix at module load — without the
+# package, importing pdfjs throws "DOMMatrix is not defined" and PDF ingest
+# fails entirely in the packaged app.
 
 echo "▶ Removing unused pdfjs-dist builds (app uses legacy/ only)"
 # The main process imports pdfjs-dist/legacy/build/pdf.mjs — legacy/ must stay.
