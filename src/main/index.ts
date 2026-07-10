@@ -111,7 +111,10 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#272320',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    ...(isMac && { trafficLightPosition: { x: 16, y: 16 } }),
+    // y: 14 measured via the accessibility API: macOS renders the buttons 1pt
+    // below the requested y with a 14pt height, so y=14 puts their visual
+    // center at 22pt, matching the sidebar toggle centered in the 44px titlebar.
+    ...(isMac && { trafficLightPosition: { x: 16, y: 14 } }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
