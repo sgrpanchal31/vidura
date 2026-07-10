@@ -33,11 +33,15 @@ import { resolve as resolvePath } from 'path'
 // the app silently and a tester can only report "it just closed". Log every
 // error to userData; interrupt the user with a dialog only once per run.
 let crashDialogShown = false
+// Declared here (rather than near before-quit below) so the crash handler can
+// read it: errors during quit teardown still get logged but must not pop a
+// dialog while the app is exiting.
+let quitCleanupStarted = false
 process.on('uncaughtException', (err) => {
   try {
     const logPath = join(app.getPath('userData'), 'crash.log')
     appendFileSync(logPath, `[${new Date().toISOString()}] ${err.stack ?? String(err)}\n`)
-    if (!crashDialogShown) {
+    if (!crashDialogShown && !quitCleanupStarted) {
       crashDialogShown = true
       dialog.showErrorBox(
         'Vidura hit an unexpected error',
@@ -54,16 +58,12 @@ let isBackgroundIndexing = false
 async function runBackgroundIndex(folderPath: string, embeddingModel?: string): Promise<void> {
   if (isBackgroundIndexing) return
   isBackgroundIndexing = true
-  mainWindow?.webContents.send('watch:status', { active: true })
+  safeSend('watch:status', { active: true })
   try {
-    await indexFolder(
-      folderPath,
-      (progress) => mainWindow?.webContents.send('ingest:progress', progress),
-      embeddingModel
-    )
+    await indexFolder(folderPath, (progress) => safeSend('ingest:progress', progress), embeddingModel)
   } finally {
     isBackgroundIndexing = false
-    mainWindow?.webContents.send('watch:status', { active: false })
+    safeSend('watch:status', { active: false })
   }
 }
 
@@ -96,6 +96,10 @@ function writePrefs(prefs: Prefs): void {
 
 let mainWindow: BrowserWindow | null = null
 
+function safeSend(channel: string, ...args: unknown[]): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, ...args)
+}
+
 function createWindow(): void {
   const isMac = process.platform === 'darwin'
 
@@ -112,6 +116,10 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
     },
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -158,7 +166,7 @@ ipcMain.handle('update:check', () => checkForUpdate())
 
 ipcMain.handle('update:install', async (_event, url: string) => {
   await downloadAndInstall(url, (loaded, total) => {
-    mainWindow?.webContents.send('update:progress', { loaded, total })
+    safeSend('update:progress', { loaded, total })
   })
 })
 
@@ -168,7 +176,7 @@ ipcMain.handle('ingest:start', async (_event, folderPath: string, embeddingModel
   const result = await indexFolder(
     folderPath,
     (progress) => {
-      mainWindow?.webContents.send('ingest:progress', progress)
+      safeSend('ingest:progress', progress)
     },
     embeddingModel
   )
@@ -200,7 +208,7 @@ ipcMain.handle('model:isDownloaded', async (_event, modelId: string) => {
 
 ipcMain.handle('model:download', async (_event, modelId: string) => {
   await downloadModel(modelId, (downloaded, total) => {
-    mainWindow?.webContents.send('model:progress', { modelId, downloaded, total })
+    safeSend('model:progress', { modelId, downloaded, total })
   })
 })
 
@@ -235,16 +243,15 @@ ipcMain.handle('embed:list', async () => {
 // Ensure the default embedding model is downloaded and ready (used at startup).
 ipcMain.handle('embed:ensure', async () => {
   await embedService.start(
-    (loaded, total) => mainWindow?.webContents.send('embed:downloadProgress', { hfId: DEFAULT_EMBED, loaded, total }),
+    (loaded, total) => safeSend('embed:downloadProgress', { hfId: DEFAULT_EMBED, loaded, total }),
     { modelId: DEFAULT_EMBED }
   )
 })
 
 ipcMain.handle('embed:download', async (_event, hfId: string) => {
-  await embedService.start(
-    (loaded, total) => mainWindow?.webContents.send('embed:downloadProgress', { hfId, loaded, total }),
-    { modelId: hfId }
-  )
+  await embedService.start((loaded, total) => safeSend('embed:downloadProgress', { hfId, loaded, total }), {
+    modelId: hfId,
+  })
 })
 
 ipcMain.handle('embed:delete', async (_event, hfId: string) => {
@@ -284,8 +291,8 @@ ipcMain.handle(
     sessionId?: string // needed for podcast audio file naming; optional for older callers
   ) => {
     // Returns immediately; streams tokens via 'chat:token', terminates with 'chat:done' or 'chat:error'
-    const onToken = (token: string) => mainWindow?.webContents.send('chat:token', token)
-    const onChatProgress = (p: unknown) => mainWindow?.webContents.send('chat:progress', p)
+    const onToken = (token: string) => safeSend('chat:token', token)
+    const onChatProgress = (p: unknown) => safeSend('chat:progress', p)
 
     // Create a top-level Langfuse trace for this chat:ask call.
     // The route span (showing scope/task/targetFile/usedFallback) is attached inside routeQuery.
@@ -320,7 +327,7 @@ ipcMain.handle(
 
     // Let the renderer adapt its progress UI to the task (podcasts hide the
     // streaming transcript and show phase labels instead)
-    mainWindow?.webContents.send('chat:routed', { task: decision.task })
+    safeSend('chat:routed', { task: decision.task })
 
     // Flush the full trace (routing + pipeline spans) once the pipeline promise settles
     const flushTrace = () => lf?.flushAsync().catch(() => {})
@@ -330,10 +337,10 @@ ipcMain.handle(
     const finishAnswer = (answer: string, citations: unknown[]) => {
       if (decision.task === 'podcast' && sessionId) {
         const messageId = `${Date.now()}-a`
-        mainWindow?.webContents.send('chat:done', { answer, citations, podcast: { sessionId, messageId } })
+        safeSend('chat:done', { answer, citations, podcast: { sessionId, messageId } })
         startPodcastAudio(folderPath, sessionId, messageId, answer, trace)
       } else {
-        mainWindow?.webContents.send('chat:done', { answer, citations })
+        safeSend('chat:done', { answer, citations })
       }
       flushTrace()
     }
@@ -352,11 +359,11 @@ ipcMain.handle(
           trace
         )
           .then((result) => {
-            mainWindow?.webContents.send('chat:done', result)
+            safeSend('chat:done', result)
             flushTrace()
           })
           .catch((err) => {
-            mainWindow?.webContents.send('chat:error', String(err))
+            safeSend('chat:error', String(err))
             flushTrace()
           })
       } else {
@@ -373,11 +380,11 @@ ipcMain.handle(
           trace
         )
           .then((result) => {
-            mainWindow?.webContents.send('chat:done', result)
+            safeSend('chat:done', result)
             flushTrace()
           })
           .catch((err) => {
-            mainWindow?.webContents.send('chat:error', String(err))
+            safeSend('chat:error', String(err))
             flushTrace()
           })
       }
@@ -389,7 +396,7 @@ ipcMain.handle(
         decision.task as GenerateTask,
         'prose',
         onToken,
-        (p) => mainWindow?.webContents.send('generate:progress', p),
+        (p) => safeSend('generate:progress', p),
         decision.targetFiles,
         trace,
         question,
@@ -397,7 +404,7 @@ ipcMain.handle(
       )
         .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
-          mainWindow?.webContents.send('chat:error', String(err))
+          safeSend('chat:error', String(err))
           flushTrace()
         })
     } else if (decision.scope === 'corpus') {
@@ -409,7 +416,7 @@ ipcMain.handle(
         task as GenerateTask,
         'prose',
         onToken,
-        (p) => mainWindow?.webContents.send('generate:progress', p),
+        (p) => safeSend('generate:progress', p),
         selectedFiles,
         trace,
         question,
@@ -417,7 +424,7 @@ ipcMain.handle(
       )
         .then((answer) => finishAnswer(answer, []))
         .catch((err) => {
-          mainWindow?.webContents.send('chat:error', String(err))
+          safeSend('chat:error', String(err))
           flushTrace()
         })
     } else {
@@ -436,7 +443,7 @@ ipcMain.handle(
       )
         .then((result) => finishAnswer(result.answer, result.citations))
         .catch((err) => {
-          mainWindow?.webContents.send('chat:error', String(err))
+          safeSend('chat:error', String(err))
           flushTrace()
         })
     }
@@ -477,18 +484,18 @@ function startPodcastAudio(
       sessionId,
       messageId,
       voices,
-      onProgress: (p) => mainWindow?.webContents.send('podcast:progress', { sessionId, messageId, ...p }),
+      onProgress: (p) => safeSend('podcast:progress', { sessionId, messageId, ...p }),
     })
     .then((audio: MessageAudio) => {
       span?.end({ output: { durationSec: audio.durationSec, file: audio.file } })
       flush()
-      mainWindow?.webContents.send('podcast:done', { sessionId, messageId, audio })
+      safeSend('podcast:done', { sessionId, messageId, audio })
     })
     .catch((err) => {
       const cancelled = err instanceof CancelledError
       span?.end({ output: { error: cancelled ? 'cancelled' : String(err) } })
       flush()
-      mainWindow?.webContents.send('podcast:error', {
+      safeSend('podcast:error', {
         sessionId,
         messageId,
         cancelled,
@@ -562,12 +569,12 @@ ipcMain.handle(
       modelId,
       task,
       format,
-      (token) => mainWindow?.webContents.send('generate:token', token),
-      (p) => mainWindow?.webContents.send('generate:progress', p),
+      (token) => safeSend('generate:token', token),
+      (p) => safeSend('generate:progress', p),
       selectedFiles
     )
-      .then((result) => mainWindow?.webContents.send('generate:done', result))
-      .catch((err) => mainWindow?.webContents.send('generate:error', String(err)))
+      .then((result) => safeSend('generate:done', result))
+      .catch((err) => safeSend('generate:error', String(err)))
   }
 )
 
@@ -602,14 +609,12 @@ app.on('window-all-closed', () => {
 // every quit. So we hold the quit here until cleanup actually settles, then
 // exit ourselves — this also covers the updater's app.quit() call, since it
 // goes through this same event.
-let quitCleanupStarted = false
-
 app.on('before-quit', (event) => {
   if (quitCleanupStarted) return
   quitCleanupStarted = true
   event.preventDefault()
 
-  mainWindow?.webContents.send('app:quitting')
+  safeSend('app:quitting')
   folderWatcher.stop()
 
   Promise.all([
